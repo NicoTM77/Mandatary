@@ -2,7 +2,7 @@
 
 ## 1. Authority and current gate
 
-**Decision date:2026-10-26. Status: independent round1 FAIL; narrow mapping correction prepared, exact-head re-review pending.** No PASS is asserted before the `reviewer` profile independently examines the actual documents after all twelve prerequisite tasks are complete. Original gate **0.13 `t_ddd96736`** and its twelve parent edges are preserved; no duplicate gate is created.
+**Decision date:2026-10-26. Final status: PASS — Step0 complete.** The native `reviewer` profile independently approved the corrected exact design head **5c7fdb831ec93086143c6e87b945be68b796ecc9** in run19/comment33 and completed original gate **0.13 `t_ddd96736`**. All13 Step0 tasks are done; all twelve original parent edges are preserved. Round1 failure and its correction remain in the audit trail. This final audit-only status update does not alter the reviewed architecture or backlog.
 
 Nico approved all six qualified final recommendations. `technical-decisions.md` now incorporates the approved self-protection/native-mock, assurance/security-notice, support/toolchain, restore-quarantine, protected setup-disclosure and Debian13-runtime baseline. The acceptance/control documents below are part of that design. Product test specifications are **not executed results**. Step0 expects a reviewed design and implementation-ready backlog, not an application, CI installation, benchmark, tested image or operational deployment.
 
@@ -27,7 +27,7 @@ Nico approved all six qualified final recommendations. `technical-decisions.md` 
 
 ## 3. Every exact roadmap Step 0 exit criterion
 
-The quoted criteria are unchanged from `roadmap.md`. Main-agent design assessment is not the independent verdict. Reviewer must independently record PASS/FAIL for each and inspect the related detailed deliverables rather than trusting this crosswalk.
+The quoted criteria are unchanged from `roadmap.md`. The table below records the main-agent design precheck, not the final independent verdict. The reviewer subsequently inspected actual deliverables and independently recorded PASS for every criterion in §6; the precheck is retained as traceability, not substituted for review.
 
 | Exact criterion | Evidence to examine | Main-agent design assessment |
 | --- | --- | --- |
@@ -73,8 +73,24 @@ The existing `reviewer` profile independently reviewed actual artifacts at **977
 
 **F2 — Low, nonblocking:** the review observed an earlier stale PR narrative. The orchestrator had refreshed PR#2 through the existing App during the review; readback confirms current approved-baseline and12-completed-prerequisite statements. Re-review must verify the current PR body rather than preserve superseded claims as present state.
 
-Native changes-request returned the original card to `default`; an automatically dispatched triage run17 correctly left it blocked because reviewer-only no-edit wording was ambiguous for implementer rework. The interactive orchestrator's original user authority covers the narrow documentation correction/publication; that role distinction is clarified on the existing task. No extra Nico architectural approval is needed and no parent task is reopened. The gate stays uncompleted pending native reviewer re-review.
+Native changes-request returned the original card to `default`; an automatically dispatched triage run17 correctly left it blocked because reviewer-only no-edit wording was ambiguous for implementer rework. The interactive orchestrator's original user authority covers the narrow documentation correction/publication; that role distinction is clarified on the existing task. No extra Nico architectural approval was needed and no parent task was reopened. At that point,the gate remained uncompleted pending native reviewer re-review.
 
-### Round2 — pending
+### Round2 — PASS, native reviewer run19/comment33
 
-The existing reviewer profile must review the corrected exact head,verify F1/F2 and rerun relevant regression/coverage/graph/scope checks. Final PASS/FAIL must be recorded on original0.13 and read back before final closure. A final PASS means Step0 is finished and ready to request Nico's separate Phase1 authorization,nothing more.
+**Reviewed exact design commit:** `5c7fdb831ec93086143c6e87b945be68b796ecc9`; base/main `1d36737101e410de49a3517712b0cbbb58362085`. The unchanged native reviewer configuration (`gpt-6.1-sol`/`openai-codex`,reasoning `xhigh`) independently re-reviewed actual corrected artifacts and the controlling NIST erasure requirement,carrying forward the unchanged-artifact round1 audit with targeted current regressions. Full final review is preserved in original0.13 comment33 and run19 structured metadata; the orchestrator read back the exact comment,verdict,reviewed SHA,completed status and all12 edges.
+
+| Exact roadmap Step0 criterion (see full wording in §3) | Final independent outcome / evidence |
+| --- | --- |
+| Explicit outcomes or bounded owner/deadline/nonblocking deferrals | **PASS** — TD1–12,final approvals,all12 actual original parent threads and seven-row later-phase register. |
+| No unresolved foundational development-blocking decision | **PASS** — all6 qualified approvals incorporated;no new architecture or owner decision required. Implementation/provider/governance particulars retain owning acceptance/release gates. |
+| Foundational threat/architecture/operations/NIST/data/deployment workflow reviewed | **PASS** — actual cross-document audit and corrected W04/MFCTORS-8 evidence,not merely a row-count check. |
+| Numeric budgets,operation list,environments and test commands explicit | **PASS** — six keys,≤60MB compressed/≤50MB idle/≤150MB workload RSS,explicit workload/OS/CPU/Engine/API/Compose/browser/dev/test targets. No measurement/build claim. |
+| Accepted requirement→phase/test traceability and candidate dispositions | **PASS** — preserved roadmap/crosswalk,25node/67edge acyclic plan,all required checkpoint edges,full applicable maps and bounded deferrals. |
+
+**F1 CLOSED:** the signed-UV/retained-transient-material counterexample explicitly cannot pass the W04 erasure examination. Applicable device/provider erasure evidence remains P1.07/16/19–20+independent reviewer work; missing evidence cannot become passed or silently N/A. No persistent credential/reference/PIN-verifier deletion or new allowlist is required. **F2 CLOSED:** fresh App REST read confirmed the updated PR narrative and exact reviewed head. The final independent review lists **no blocking or nonblocking findings**.
+
+**Independent checks actually executed:** actual12 prerequisite acceptance bodies/comments/statuses read;all12 edges/no unsatisfied parent;all9 package Markdown files and3 preserved repository skills inspected;actual977d233..5c7fdb8 scope inspected;fresh private-repository/PR body/head/base/draft/file reads;independent scratch structural/cold-audit scripts exited0;25nodes/67edges/zero unknown references or missing checkpoint edges/all nodes feed C5;105 NIST rows/119 distinct future specs/exact313 official controls/no linked-test mismatches;13 SELF/11 RESTORE/12 SETUP complete unique registers;7 original roadmap exit/shared sections unchanged;requirement crosswalk assertions passed;`.agents` unchanged versus previous design and main;whitespace checks and exact clean design head passed. NIST final §3.1.7.1 and fresh official authenticator text were examined against the semantic correction. `gh pr checks` reported no checks,not passing or failed CI.
+
+**Evidence limits retained:** this is a design-only gate,not implemented NIST/FIPS/federal/privacy conformance or proof of future behavior. Product builds/tests/operational CI,benchmarks,image scans,device/provider evidence,concrete artifact/CLI/mount/UID/TLS/delivery/governance and runtime/filesystem qualification remain **NOT RUN** and mandatory under their owning P1 acceptance/release gates. Not every unchanged upstream URL/prose clause was re-fetched this round;the explicit unchanged-artifact round1 audit was carried forward with current regressions. Public licensing/legal/branding and Phase2–5 bounded details retain the owners/deadlines in reconciliation.
+
+**Formal disposition:** all13 original Step0 tasks are complete. **Ready to request Nico's separate explicit Phase1 authorization.** P1.01–P1.20/C1–C5 remain a proposal,not runnable cards. No product coding,deployment,merge or automatic decomposition is authorized. This final status/evidence append is an orchestrator audit-only publication after the reviewed design commit,not a claim that the reviewer assessed a later commit hash.
