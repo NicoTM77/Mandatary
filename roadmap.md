@@ -2,7 +2,7 @@
 
 ## Status and interpretation
 
-This roadmap organizes the requirements in `project-notes.md`. The capabilities are requested requirements unless explicitly marked as candidates. Phase boundaries and acceptance criteria below remain the release plan, not evidence of completed work. `technical-decisions.md` is the approved Step 0 architecture baseline; selected technologies must not be reopened. `step-0-reconciliation.md` records readiness gaps and the conditional Phase 1 plan.
+This roadmap organizes the requirements in `project-notes.md`. The capabilities are requested requirements unless explicitly marked as candidates. Phase boundaries and acceptance criteria below remain the release plan, not evidence of completed work. `technical-decisions.md` is the approved Step 0 architecture baseline; selected technologies must not be reopened. `step-0-reconciliation.md` records readiness gaps and the conditional Phase 1 plan. The P1.01–P1.20 structure is provisionally approved, subject to Step 0 completion and final backlog review. `step-0-readiness.md` now records the criterion-by-criterion precheck and material decision requests; the full NIST mapping, fail-closed/restore/setup contracts and sourced support matrix are separate attachments. No proposed change to the approved image, optional workflow, recovery semantics or phase boundaries is adopted by these references.
 
 Step 0 produces decisions and a testable plan, not a product. Every subsequent phase must end with a deployable, documented, independently useful product that retains the capabilities of earlier releases. No phase is complete merely because its code exists.
 
