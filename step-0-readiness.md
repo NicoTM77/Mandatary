@@ -68,3 +68,11 @@ Apply only Nico-approved amendments to the baseline; record approval references 
 - `git diff --check`: passed. Only explicitly staged project markdown belongs in the PR; no application/build/workflow/authentication configuration is changed.
 - Read back all five exact substantive task targets and 0.13 after writing decision/evidence comments: all remain blocked with preserved dependencies. The lifecycle API refused re-blocking already-classified blocked tasks, so existing blocker events were not rewritten or bypassed; the latest comments contain the narrowed current reasons. No unblock/reblock cycle or direct database editing was used.
 - **Not executed:** product unit/integration/browser/Compose/benchmark/restore tests. Their contracts and future evidence IDs are specified; none is reported as passed.
+
+## 8. Independent final design review
+
+A separate critical reviewer read the security contracts, support matrix, full NIST mapping, Phase 1 plan and baseline/roadmap. Verdict: **all five substantive cards remain open; final 0.13 cannot pass while their actual approvals remain unresolved.** Earlier high-impact restore and token-reveal corrections were accepted at design level; no new high-impact fix was identified in those contracts. The Debian12 support conflict and distinction between published pins and unexecuted compatibility were independently confirmed/accepted.
+
+Required final clarifications were applied: S4 explicitly requires Nico's §S1.4 native-development disposition before 0.02 closure; Phase 1 coverage distinguishes proposed security notices from Phase 2 request/approval notifications; 0.04 closure explicitly requires D-02's no-password-only-fallback invariant plus notification/recovery disposition. User-directed assurance separation remains settled, and none of these edits adopts a material proposal.
+
+Reviewer independently validated the **25-node checkpoint/task graph, 67 edges, acyclic** and early continuous security gates. This was a bounded design review and primary-source spot-check, not certification of every NIST interpretation, full reproduction of all version retrievals, formal GitHub human approval or product execution. Final documentation/source/dependency checks are rerun on the resulting commit; Nico alone controls merging.

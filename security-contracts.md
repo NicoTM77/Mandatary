@@ -147,9 +147,9 @@ P1.04 owns logging canaries; P1.08 owns assurance/session boundaries; P1.09 impl
 
 ## S4 — Approval and closure rules
 
-- S1 follows the user's explicit fail-closed direction. Close 0.02 only after independent consistency review confirms trust assumptions, state transitions, every negative test and Phase 1 ownership; no runtime pass is asserted.
+- S1 follows the user's explicit fail-closed direction. Close 0.02 only after **Nico explicitly disposes of the native real-socket development conflict in §S1.4** and independent consistency review accepts trust assumptions, state transitions, every negative test and Phase 1 ownership. Containerized contract acceptance alone does not silently remove the approved optional native path; no runtime pass is asserted.
 - S2 activation/reissuance/reapproval restrictions and S3 disclosure mechanism are **proposals requiring approval**, because they materially qualify full-restore continuity and bootstrap operator UX. Keep 0.06 and the affected portion of 0.10 open until accepted. Prefer these secure proposals over weakening the existing requirements.
-- 0.04 additionally requires the full standards applicability mapping and explicit unresolved-conflict disposition. 0.05/0.10 require the sourced version/environment proposals plus review. A document's existence alone does not satisfy those cards.
+- 0.04 additionally requires the full standards applicability mapping and explicit unresolved-conflict disposition. Before closure, Nico/reviewer must accept D-02's invariant (8–14 characters only while the password can never authenticate alone, including removal/recovery/restore/policy transitions), the D-03 security-notification phase disposition and recovery boundaries. Simply removing an AAL2 badge does not automatically satisfy the existing Phase 1 assurance target. 0.05/0.10 require the sourced version/environment proposals plus review. A document's existence alone does not satisfy those cards.
 - Readiness gate 0.13 cannot close while a substantive parent needs approval or evidence. A non-final criterion-by-criterion precheck may be recorded, but the final dependency-gated readiness review occurs only after all 12 parents are complete. No Phase 1 dispatch or auto-decomposition is enabled by any Step 0 transition.
 
 ## Primary-source checks informing S1 (retrieved 2026-10-26)
