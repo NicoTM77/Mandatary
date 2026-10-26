@@ -2,7 +2,7 @@
 
 ## 1. Authority and current gate
 
-**Decision date:2026-10-26. Status: final design prepared; independent 0.13 review pending.** No PASS is asserted before the `reviewer` profile independently examines the actual documents after all twelve prerequisite tasks are complete. Original gate **0.13 `t_ddd96736`** and its twelve parent edges are preserved; no duplicate gate is created.
+**Decision date:2026-10-26. Status: independent round1 FAIL; narrow mapping correction prepared, exact-head re-review pending.** No PASS is asserted before the `reviewer` profile independently examines the actual documents after all twelve prerequisite tasks are complete. Original gate **0.13 `t_ddd96736`** and its twelve parent edges are preserved; no duplicate gate is created.
 
 Nico approved all six qualified final recommendations. `technical-decisions.md` now incorporates the approved self-protection/native-mock, assurance/security-notice, support/toolchain, restore-quarantine, protected setup-disclosure and Debian13-runtime baseline. The acceptance/control documents below are part of that design. Product test specifications are **not executed results**. Step0 expects a reviewed design and implementation-ready backlog, not an application, CI installation, benchmark, tested image or operational deployment.
 
@@ -57,4 +57,24 @@ Mapping checks passed: **105** main NIST design rows each reference named tests 
 
 ## 6. Independent review and final disposition
 
-**Pending — no final PASS/FAIL yet.** Route existing0.13 through native review to `reviewer` after all twelve parent cards complete. The reviewer must read actual files and approvals, inspect the exact review commit, independently check all five criteria above and the detailed security/storage/support/traceability/backlog contracts, and record actionable findings or an explicit **PASS**. Preserve task graph and inspect the resulting live task/run. Final task completion must follow the verified verdict; failures retain/restore an appropriate blocked or changes-required state. A final PASS means Step0 is finished and ready to request Nico's separate Phase1 authorization, nothing more.
+### Round1 — FAIL, native reviewer run16
+
+The existing `reviewer` profile independently reviewed actual artifacts at **977d23344feeab7e919fe5f246b8618d3498ea30**, preserving the12 parent edges. Full criterion-by-criterion review and source/check evidence are in original0.13 comment29 and its attached report; historical failure evidence is retained. The reviewer independently confirmed25 nodes/67 edges,105 main rows/119 named specs/exact313 official controls,unchanged roadmap exit/shared sections and `.agents`,and no executed product tests.
+
+| Roadmap Step0 criterion | Round1 result |
+| --- | --- |
+| Explicit decision outcomes/bounded owner+deadline deferrals | PASS |
+| No unresolved foundational decision | PASS for decision disposition |
+| Foundational artifacts including NIST mapping reviewed | FAIL — F1 |
+| Numeric budgets/operations/environments/commands explicit | PASS |
+| Requirement/phase/test/candidate traceability | FAIL — F1 |
+
+**F1 — Medium, blocking:** `MFCTORS-8` (NIST §3.1.7.1 activation-secret erasure) linked only to W03/`N63B4-WA-UV`. Signed UV flags cannot establish authenticator-internal transient input erasure. The correction extends W04's existing `N63B4-WA-DEVICE-EVIDENCE` specification with explicit post-transaction activation-secret/biometric-sample/derived-data erasure evidence,distinguishes it from RP tests,and remaps MFCTORS-8 to W04/P1.07/16/19–20 with independent review. Unknown evidence stays unresolved for applicable release/conformance; no persistent credential/PIN-verifier deletion,new allowlist,product test or architecture selection is introduced. Exact-head re-review is required before declaring this finding closed.
+
+**F2 — Low, nonblocking:** the review observed an earlier stale PR narrative. The orchestrator had refreshed PR#2 through the existing App during the review; readback confirms current approved-baseline and12-completed-prerequisite statements. Re-review must verify the current PR body rather than preserve superseded claims as present state.
+
+Native changes-request returned the original card to `default`; an automatically dispatched triage run17 correctly left it blocked because reviewer-only no-edit wording was ambiguous for implementer rework. The interactive orchestrator's original user authority covers the narrow documentation correction/publication; that role distinction is clarified on the existing task. No extra Nico architectural approval is needed and no parent task is reopened. The gate stays uncompleted pending native reviewer re-review.
+
+### Round2 — pending
+
+The existing reviewer profile must review the corrected exact head,verify F1/F2 and rerun relevant regression/coverage/graph/scope checks. Final PASS/FAIL must be recorded on original0.13 and read back before final closure. A final PASS means Step0 is finished and ready to request Nico's separate Phase1 authorization,nothing more.
