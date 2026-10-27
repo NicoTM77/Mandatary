@@ -8,7 +8,7 @@ All decisions in this document are evaluated against Mandatary's two primary eng
 1. **Security-First Architecture:** Default-deny authorization, defense-in-depth around the Docker socket, NIST SP 800-63B-4 AAL2 compliance, strict parameter validation, and zero raw Docker API proxying.
 2. **Long-Term Maintainability:** Type-safe code generation, minimal external runtime dependencies, single static binary deployment, deterministic migrations, and fast container-free local iteration.
 
-No implementation or changes to `/workspaces` are performed by this document.
+**Final decision authorization: 2026-10-26.** Nico approved the six final Step 0 recommendations with qualifications recorded below and in `step-0-reconciliation.md`. This baseline and its security/NIST/support contracts are approved design, not an implementation, compatibility-test result, or NIST conformance assertion. The existing 0.13 independent readiness gate determines Step 0 completion; a separate explicit Nico authorization is required for Phase 1 coding. No production deployment or PR merge is authorized.
 
 ---
 
@@ -42,7 +42,7 @@ Mandatary **never** forwards raw HTTP requests or arbitrary query parameters to 
 
 ### 2.1 Trust Boundaries & Actors
 - **Host Docker Socket (`/var/run/docker.sock`):** Treated as root-equivalent privilege on the target Docker host. Mandatary is the sole intermediary.
-- **Self-Protection Invariant:** Mandatary **automatically identifies and blocks all visibility, inspection, and operations targeting its own container** (matched via container ID/cgroup, `MANDATARY_SELF_CONTAINER_ID`, or label `io.mandatary.self=true`) across all interfaces (API, MCP, and Operations UI). No policy rule can override self-protection.
+- **Self-Protection Invariant:** Mandatary blocks all visibility, inspection and operations targeting itself or protected Mandatary peers across API, MCP and later Operations UI. Identity is endpoint/daemon-qualified and corroborated from runtime/container identity, configured ID and protected labels; none is a name-only or unverified override. Missing/conflicting identity, recreation or lost event continuity closes the operational boundary and cancels active streams until trustworthy re-identification completes. `security-contracts.md` §S1 defines states, peer inventory, immutable-target dispatch and SELF negative acceptance cases. No policy, administrator or native-runtime exemption bypasses this invariant.
 - **Policy Administrators:** Trusted to manage users, groups, agents, policies, and endpoints via the Policy Administration UI (`:8080`). Policy Administrators hold **zero** implicit container operation privileges.
 - **Container Operators / Human Users:** Authenticated human users who may own agents or use the Phase 4 Operations UI (`:8081`) within their explicitly granted container permissions.
 - **Non-Human Agents (API / MCP Clients):** Untrusted/semi-trusted automated principals constrained strictly by scoped Bearer tokens and default-deny policies.
@@ -99,11 +99,12 @@ Mandatary targets **NIST SP 800-63B-4 (July 2025) Authentication Assurance Level
 - Offers a **phishing-resistant authenticator** option via **FIDO2 / WebAuthn** (supporting YubiKey 5 series, security keys, and platform passkeys with UV/resident key options) in Phase 1.
 - Also supports **TOTP** (RFC 6238, SHA-1/SHA-256, 6 digits, 30s period) as a configurable second factor.
 - **Role Enforcement:** MFA (WebAuthn or TOTP) is **mandatory for all Policy Administrators** (enforced immediately upon initial setup/first login) and configurable as mandatory or optional for non-admin human users. Admins can further require phishing-resistant WebAuthn-only MFA per role/account.
+- **Assurance separation:** AAL2 is a property of a successfully authenticated session/path with verified factors, not an account flag. Password-only, preauthentication, setup/recovery-only capabilities and agent bearer tokens are never represented as human AAL2 and cannot satisfy an AAL2 requirement. Server-bound assurance, authentication time, methods and current credential/control generation govern step-up. Applicable requirements, SHOULD dispositions, external/provider evidence limits and acceptance tests are maintained in `nist-authentication-mapping.md`; the approved architecture alone is not a conformance claim.
 
 ### 4.2 Local Password Policy (NIST SP 800-63B-4 Section 3.1.1)
 - **Length Defaults:**
   - Minimum **15 characters** when an account uses password-only authentication (if permitted for non-admin accounts).
-  - Minimum **8 characters** when MFA is enabled/required on the account.
+  - Minimum **8 characters** only while MFA is compulsory on every password-authentication path with no weaker fallback. Optional MFA alone does not qualify: a password usable alone must be at least 15 characters. Removing mandatory MFA first requires a compliant replacement password and invalidation of incompatible sessions.
   - Maximum length: **128 characters** (exceeding NIST's >= 64 minimum); all printable ASCII and Unicode characters (including spaces and emojis) are accepted without truncation.
 - **No Composition or Periodic Expiry Rules:** Never require upper/lowercase/number/symbol mixtures or periodic scheduled password resets.
 - **Compromised Password Screening:**
@@ -114,10 +115,11 @@ Mandatary targets **NIST SP 800-63B-4 (July 2025) Authentication Assurance Level
 - **Frontend UX:** Full support for password manager autofill, copy/paste in password fields, and a password visibility toggle.
 
 ### 4.3 Throttling, Recovery & Session Management
-- **Rate Limiting & Brute-Force Protection:** Per-account and per-IP token-bucket rate limiting on login, MFA verification, and recovery endpoints (exponential backoff + temporary lockout after 5 consecutive failures, logged as security warnings).
+- **Rate Limiting & Brute-Force Protection:** Per-account and per-IP controls, five-failure escalating throttling and durable retry limits follow the NIST mapping. The consecutive-failure ceiling is at most 100 attempts for the specific authenticator, surviving restart/concurrency; it is not an unauthenticated whole-account lock switch. Bound attacker work before expensive verification, avoid extending lockouts indefinitely with rejected traffic, preserve independently bound authenticators/recovery, and test account-lockout denial-of-service resistance. Disable/rebind the exhausted authenticator via the approved recovery safeguards; never bypass assurance to unlock it.
 - **Authenticator Lifecycle & Recovery:**
   - Upon enrolling MFA, the user receives **10 single-use high-entropy recovery codes** (stored hashed with Argon2id/SHA-256).
   - Users can enroll multiple WebAuthn security keys (e.g., primary YubiKey + backup YubiKey) and revoke individual authenticators after reauthenticating.
+- **Phase 1 security notices:** Advance only security-relevant authenticator binding/removal/recovery and notification-address management from the existing SMTP design. Support at least two independently verified notification addresses, TLS-verified delivery, durable secret-free event/outbox state, bounded retry/failure visibility and safe repudiation. Recovery-only capabilities cannot authorize normal administration or mint AAL2; recognized recovery requires approved proofs, credential rebind and fresh authentication. `nist-authentication-mapping.md` specifies assurance, old/new-address notices, delivery-failure safeguards and tests. General access-request/approval notifications and webhooks remain Phase 2; no extra service/provider is selected.
 - **Session Timeouts & Reauthentication:**
   - Maximum session lifetime: **12 hours** (configurable).
   - Idle session timeout: **30 minutes** (configurable).
@@ -135,14 +137,16 @@ Mandatary targets **NIST SP 800-63B-4 (July 2025) Authentication Assurance Level
 
 | Layer | Selected Technology | Rationale (Security & Maintainability) |
 | :--- | :--- | :--- |
-| **Backend Language** | **Go (1.23+)** | Memory-safe, strongly typed, compiles to a single static binary (`CGO_ENABLED=0`), minimal attack surface, first-party `moby/client` Docker SDK. |
+| **Backend Language** | **Go 1.27.3 primary; Go 1.26.10 compatibility CI** | Static binary (`CGO_ENABLED=0`); newest two upstream-supported security-patched lines per the approved support policy; full module graph/build verification required. |
 | **HTTP Router & API** | Standard library `net/http` (`http.ServeMux`) + strict JSON schema middleware (or `chi` + `huma` / OpenAPI 3.1 validation) | Zero heavy framework lock-in; strict request validation rejects unknown fields (`DisallowUnknownFields`). |
 | **MCP Server** | Streamable HTTP (`/mcp`) + optional CLI bridge (`mandatary mcp-stdio`) using `mcp-go` / official MCP JSON-RPC 2.0 spec | Supports both remote/containerized agents over HTTP with Bearer auth and local desktop MCP clients expecting `stdio`. |
 | **Frontend Framework** | **React 19 + TypeScript + Vite (SPA)** | Mature ecosystem, strict TypeScript type safety, compiled to static assets and embedded directly into the Go binary via `embed.FS`. |
 | **UI Styling & Theme** | **Tailwind CSS + shadcn/ui (Radix Primitives)** | Accessible (WAI-ARIA compliant), built-in support for **Dark and Light modes** from Phase 1, no runtime CSS-in-JS overhead. |
 | **Database & Queries** | **SQLite (`modernc.org/sqlite`) + `sqlc` + `goose`** | Pure-Go SQLite (`CGO_ENABLED=0`), compile-time type-safe SQL via `sqlc` (eliminates SQL injection), and deterministic SQL migrations via `goose`. |
-| **Cryptography & Auth** | `golang.org/x/crypto` (Argon2id, ChaCha20-Poly1305 / AES-256-GCM), `go-webauthn/webauthn` (FIDO2), `pquerna/otp` (TOTP) | Audited, standards-compliant Go libraries for NIST AAL2 authentication and envelope encryption. |
-| **Container Base Image** | `gcr.io/distroless/static-debian12:nonroot` | Contains no shell, no package manager, and no unnecessary binaries; minimal CVE footprint and tiny image size. |
+| **Cryptography & Auth** | `golang.org/x/crypto` (Argon2id, ChaCha20-Poly1305 / AES-256-GCM), `go-webauthn/webauthn` (FIDO2), `pquerna/otp` (TOTP) | Retained approved selections; library names do not establish conformance, FIPS validation, supported authenticator internals or actual compatibility. Evidence and applicable dispositions follow the NIST mapping. |
+| **Container Base Image** | `gcr.io/distroless/static-debian13:nonroot`, production pinned to reviewed digest | Approved replacement for Debian 12; static Go + embedded SPA, no shell/package manager. Verify multi-architecture runtime, vulnerability status and budgets before release. |
+
+**Development toolchain:** Node.js **24.22.1 LTS** and npm **11.19.1**; Node is not a production runtime. React 19, TypeScript, Vite, Tailwind CSS, shadcn/ui and the remaining selections stay unchanged. `support-and-deployment-matrix.md` is the approved maintenance/support contract: weekly advisory review, monthly patch review, quarterly line review, two-business-day advisory triage, immediate active-exploitation triage, tested/reviewed updates before merge, bounded deprecation and no upstream-EOL support guarantee. Candidate library pins are not verified builds: P1.01 must lock and actually exercise the entire graph. A failed approved toolchain/environment requirement is escalated, not silently replaced.
 
 ### Module Boundaries
 - `internal/domain`: Pure domain types, identifiers, and error definitions.
@@ -161,6 +165,7 @@ Mandatary targets **NIST SP 800-63B-4 (July 2025) Authentication Assurance Level
 ### 6.1 Embedded SQLite Configuration
 - Stored in a dedicated persistent volume (`/data/mandatary.db`) with strict file permissions (`0600`).
 - Initialized with `PRAGMA journal_mode = WAL;`, `PRAGMA synchronous = NORMAL;`, `PRAGMA foreign_keys = ON;`, and `PRAGMA busy_timeout = 5000;`.
+- **Security-control durability qualification:** `NORMAL` remains the ordinary-storage baseline; security-control commits that authorize disclosure, consumption, revocation, retry disablement, quarantine or a related security-transition acknowledgement require a verified `synchronous=FULL` WAL writer in service and host-local helper, with the shared lock/order and file/directory synchronization in security-contracts §S3.1a. This is the selected SQLite stack's necessary durability detail for the approved atomic single-use/crash/revocation contract, not a new store or general power-loss guarantee. Sync failures fail closed; actual filesystem/hardware sync behavior must be tested. Logical restore cannot overwrite current control state.
 - Separate read and write connection pools in Go (`MaxOpenConns(1)` for writer to prevent `SQLITE_BUSY`, concurrent readers for fast policy checks).
 
 ### 6.2 Secret Encryption at Rest (`MANDATARY_MASTER_KEY`)
@@ -174,9 +179,10 @@ Mandatary targets **NIST SP 800-63B-4 (July 2025) Authentication Assurance Level
   - Included as **envelope-encrypted ciphertext** (bound to `MANDATARY_MASTER_KEY`): Password hashes, TOTP seeds, WebAuthn credential records, active agent token hashes, and remote endpoint credentials.
   - **Excluded:** Active browser sessions and ephemeral rate-limit buckets.
 - **Restore Modes:**
-  1. **Full Restore (Same Master Key):** Restores all policies, accounts, MFA enrollments, and agent token hashes transactionally; **all active browser sessions are invalidated**.
-  2. **Clean Migration Restore (Strip Secrets / New Master Key):** Restores users, groups, agents, and policies while stripping credentials/MFA, requiring administrators/users to re-enroll credentials and re-issue agent tokens.
+  1. **Full Restore (Same Master Key):** Imports the complete supported data transactionally, but imported credentials, historical roles/policies/grants and sensitive security settings remain inactive/quarantined absent trustworthy current revocation information. Explicit credential reissuance and administrative scope/setting reapproval are required; all browser sessions are invalidated. Import is not activation.
+  2. **Clean Migration Restore (Strip Secrets / New Master Key):** Imports supported data with credentials/MFA stripped; re-enrollment/reissuance and explicit authorization/security-setting reapproval apply, not automatic historical policy activation.
 - **Verification:** Every restore executes inside a single SQLite transaction, validates schema compatibility, and runs post-restore integrity checks before committing.
+- **Authority and recovery:** `security-contracts.md` §S2 defines quiescence, current control generations, expired-grant preservation, quarantine, emergency-administrator recovery and RESTORE acceptance tests. Historical backup integrity cannot reconstruct unknown post-backup revocations without an external trusted current source. Host-controlled emergency recovery is outside ordinary AAL2 recovery and requires restricted re-enrollment before administration. There is no guarantee against malicious full-host rollback; no external revocation service is introduced.
 
 ---
 
@@ -219,6 +225,7 @@ Because Docker container IDs change whenever a container is recreated (e.g., `do
 - **Approval Options:** Administrators can **Deny**, **Approve Permanently** (creates a standard policy rule), or **Approve Temporarily** (creates a time-bounded grant with presets: `15m`, `1h`, `4h`, `24h`, or custom timestamp).
 - **Expiration & In-Flight Operations:** A background ticker checks active grants every second; when a temporary grant expires or is manually revoked, any in-flight `logs --follow` or `exec` stream authorized by that grant has its Go `context.Context` immediately canceled.
 - **Notification Channels:**
+  - This section governs **Phase 2 access-request/approval notifications**. The approved Phase 1 security-lifecycle/address subset follows TD §4 and the NIST mapping's stricter durable delivery/failure contract; the three-attempt request-notice policy does not silently apply to security notices.
   - **Email (SMTP/Submission over TLS)** and **Outbound Webhooks (HTTPS)** with exponential backoff retry (3 attempts).
   - Outbound webhooks include an `X-Mandatary-Signature-256` HMAC-SHA256 header signed with the endpoint's encrypted webhook secret, and only deliver a deep-link to the Admin UI inbox (never embedding one-click unauthenticated approval tokens in emails or webhooks).
 
@@ -266,16 +273,16 @@ Every phase release is measured against these concrete budgets in CI:
 
 ### 10.3 First-Admin Bootstrap & Emergency Recovery
 - **No Default Credentials:** Mandatary never ships with a default `admin/admin` password.
-- **First-Start Bootstrap:** When starting with an empty database, Mandatary generates a high-entropy, single-use **Setup Token** (valid for 30 minutes) and logs a setup URL to `stdout`. The administrator visits the setup URL, supplies the token, creates their initial administrator account, sets a NIST-compliant password, and enrolls MFA (WebAuthn or TOTP) before the system unlocks.
-- **Emergency Recovery CLI:** If the sole administrator loses all MFA authenticators and recovery codes, an operator with host container access can run `docker compose exec mandatary mandatary admin reset-mfa --user <username>` to generate a one-time local recovery token.
+- **First-Start Bootstrap:** Empty-store-only high-entropy setup capability, **30-minute absolute lifetime**, atomic single-use consumption, and mandatory administrator password + MFA enrollment before setup completes. Log only a **secret-free setup URL**. Retrieve the token through the protected host-local control mechanism specified by `security-contracts.md` §S3; never put it in URL query strings, ordinary logs, errors or unrelated responses. Restrictive ownership/modes must match the actual runtime UID and Compose/Unraid host mapping. No interactive shell inside the distroless container is needed. Concurrent consumption, failure, expiry, restart/crash, reveal and log-canary acceptance tests are mandatory.
+- **Emergency Recovery:** The host-local runbook in §§S2/S3 supports Compose and Unraid administration without an application-container shell. It grants only a one-time restricted re-enrollment capability, not direct administrator/AAL2 access, and cannot reactivate historical authority or bypass self-protection. Host control is an explicit trusted boundary, not protection against a malicious host.
 
 ### 10.4 Container-Free Local Development & CI Workflow
 - **Local Iteration Without Container Rebuilds:**
-  - `DockerBackend` has a full in-memory mock/fixture implementation (`MANDATARY_DEV_MOCK_DOCKER=true`) populated with realistic sample containers, logs, and states, alongside optional binding to a local Docker/OrbStack/Colima socket.
+  - `DockerBackend` has a full in-memory mock/fixture implementation (`MANDATARY_DEV_MOCK_DOCKER=true`) populated with realistic sample containers, logs, and states. This is the guaranteed container-build-free workflow. Native real-socket access has **no exemption** from reliable self-identification: it remains operationally fail-closed when own-container identity cannot be proven; desktop socket availability is not proof.
   - Developers run `make dev` (or `go run ./cmd/mandatary` + `npm --prefix web run dev` with Vite proxy) directly on macOS/Linux without building any Docker image.
 - **Automated Testing:**
   - `go test -race ./...` and `npm --prefix web test` run all unit and authorization matrix tests in seconds using in-memory/temp-file SQLite and the mock `DockerBackend`.
-  - CI additionally executes an end-to-end Docker Compose integration test suite against real test containers (`container-a`, `container-b`) before building the release image.
+  - CI additionally executes real-Docker integration against disposable fixtures in an isolated controlled environment, using a dedicated test daemon where practical. Mandatary runs containerized where needed to prove its own identity. Fixtures must assert the approved daemon/endpoint and reject a production socket; **never mount or operate against production Unraid's Docker socket**. See §S1.4. These are future implementation/release checks, not tests executed during Step 0.
 
 ---
 
