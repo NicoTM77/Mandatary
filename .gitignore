@@ -3,4 +3,5 @@
 /web/dist/
 /coverage/
 /.toolchains/
+/.worktrees/
 *.log
