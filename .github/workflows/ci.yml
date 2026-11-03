@@ -21,8 +21,6 @@ jobs:
         go: ['1.27.3', '1.26.10']
     env:
       MANDATARY_GO_VERSION: ${{ matrix.go }}
-      # Temporary acceptance probe: this revision MUST fail the ordinary race gate.
-      MANDATARY_NEGATIVE_FIXTURE: exposed-route
       GOTOOLCHAIN: local
       GOMAXPROCS: '2'
       GOFLAGS: '-mod=readonly -p=1'
