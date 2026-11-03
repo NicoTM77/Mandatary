@@ -6,10 +6,16 @@ administrator-defined, per-container permissions.
 
 ## Current status
 
-This repository currently contains planning documentation only. There is no
-runnable application, Docker Compose deployment, or automated test suite yet.
-Commands, configuration examples, and capabilities in the planning documents
-describe the intended implementation, not features available in this checkout.
+Step 0 passed independent review; Nico merged the decision package in PR #2
+and authorized the Phase 1 kickoff on 2026-11-03. Only P1.01 is released for
+implementation. This checkout adds a loopback-only static development skeleton,
+embedded React assets, locked developer commands and baseline tests/PR CI.
+See [Container-free development](development.md) for exact setup and checks.
+
+Authentication, policy enforcement, Docker access, MCP, storage and deployment
+are **not available**. Architecture documents describe later planned product
+capabilities, not implemented features or NIST conformance. Other Phase 1 cards
+remain held for phased release, independent review and Nico-controlled merges.
 
 ## Documentation guide
 

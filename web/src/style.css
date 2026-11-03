@@ -1,0 +1,9 @@
+@import 'tailwindcss';
+
+:root { font-family: system-ui, sans-serif; color-scheme: light dark; }
+body { margin: 0; }
+main { min-height: 100vh; padding: 4rem 2rem; box-sizing: border-box; }
+main[data-theme='light'] { background: #f8fafc; color: #0f172a; color-scheme: light; }
+main[data-theme='dark'] { background: #0f172a; color: #f8fafc; color-scheme: dark; }
+button { font: inherit; padding: .6rem 1rem; cursor: pointer; }
+button:focus-visible { outline: 3px solid #0284c7; outline-offset: 4px; }
