@@ -22,7 +22,15 @@ Read task-specific sections of `roadmap.md`, `technical-decisions.md`, `step-0-r
 5. Apply `mandatary-security` rigorously: authorization precedence, self-protection, secret redaction, session assurance, restoration, negative tests and trust-boundary violation. Review both allow and deny cases.
 6. Run available targeted checks plus project CI commands where practical; distinguish independently executed checks from logs supplied by another agent. For docs-only PRs, verify internal cross-references and gate language rather than claiming nonexistent product tests.
 7. Check `roadmap.md` phase-specific and shared release gates and any applicable support matrix. Report CVSS>=7 reachable unresolved issues and failed negative authz tests as blocking; do not waive release criteria.
-8. Issue a structured verdict and send it through the **existing native Kanban review workflow**. A new commit requires re-evaluating the exact new head. Do not merge, auto-merge, enable merge queues or deploy; Nico controls merge.
+8. Issue a structured verdict and send it through the **existing native Kanban review workflow**. After approval and successful exact-head native CI acceptance, perform the human-review handoff in `mandatary-engineering` §PR lifecycle and human-review handoff: mark the PR ready, ensure `NicoTM77` is assigned, request his review, and verify the unchanged head/base and remote handoff state before native task completion. A new commit requires re-evaluating the exact new head. Do not merge, auto-merge, enable merge queues or deploy; Nico controls merge.
+
+## Approved PR handoff — completion condition
+
+- Read and follow `.agents/skills/mandatary-engineering/SKILL.md` §PR lifecycle and human-review handoff. Nico has authorized the reviewer to change an approved, CI-accepted PR from draft to ready and request his review; the implementer still creates a draft.
+- Use the existing approved GitHub wrapper. The relevant commands are `gh pr ready NUMBER`, `gh pr edit NUMBER --add-assignee NicoTM77`, and, when not already requested, `gh pr edit NUMBER --add-reviewer NicoTM77`, with the repository specified. Inspect current state first and make only missing changes. Do not remove other assignees or reviewers.
+- Read back `state`, `isDraft`, `headRefOid`, `baseRefName`, `assignees`, and `reviewRequests`; check submitted reviews when needed to distinguish an already fulfilled request. Persist the PR URL, approved SHA/base, required-CI evidence and verified human-handoff state in the native completion summary/metadata.
+- Failure to verify any required handoff step is a completion blocker, not grounds to weaken the acceptance contract. Record the exact failure and required operator action without a blind retry loop. An already merged/closed PR is handled as a verified human action under the shared exception, not converted back to ready.
+- This changes the previous draft-preservation rule only at the successful independent-review handoff. It does not grant merge, auto-merge, deployment, downstream-release, credential or repository-policy authority.
 
 ## Required review output
 
@@ -31,7 +39,7 @@ Read task-specific sections of `roadmap.md`, `technical-decisions.md`, `step-0-r
 - **Findings:** prioritized by severity with file/line reference, exploitation/failure scenario, acceptance impact and actionable remediation. Avoid noisy style-only nitpicks.
 - **Evidence:** checks actually executed and results, targeted negative test coverage, missing tests, CI/head status.
 - **Outstanding authority:** unresolved Step 0 approvals, phase boundaries, or owner decisions. Explicitly list any proposal that cannot be treated as approved.
-- **Handoff:** what the implementer must change; what requires Nico's decision; whether re-review of a new commit is required.
+- **Handoff:** what the implementer must change; what requires Nico's decision; whether re-review of a new commit is required; and, for approved PRs, verified ready state, `NicoTM77` assignment and human review request/review status (or the verified prior human merge/closure).
 
 ## Specific current review concerns
 
