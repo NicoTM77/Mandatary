@@ -4,14 +4,23 @@ import { spawnSync } from 'node:child_process';
 import { mkdtempSync, writeFileSync, rmSync, mkdirSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { resolveResources } from './resource-profile.mjs';
+import { inspectAllocation, resolveResources } from './resource-profile.mjs';
 
 const local = { GOMAXPROCS: '2', GOFLAGS: '-mod=readonly -p=1', GOMEMLIMIT: '768MiB', GOGC: '25', GOTOOLCHAIN: 'local' };
 const allocation = { cpus: 8, memoryBytes: 16 * 1024 ** 3 };
 
 test('default and incidental CI=true stay conservative, standard Go overrides cannot widen', () => {
   for (const env of [{}, { CI: 'true', GITHUB_ACTIONS: 'true' }, { GOMAXPROCS: '64', GOFLAGS: '-mod=mod -p=64', GOGC: 'off', GOMEMLIMIT: 'off', GOTOOLCHAIN: 'auto' }]) {
-    assert.deepEqual(values(probe(env)), local);
+    const expected = { ...local, GOMAXPROCS: String(Math.min(2, inspectAllocation().cpus)) };
+    assert.deepEqual(values(probe(env)), expected);
+  }
+});
+
+test('a single allocated CPU lowers local defaults without elevating incidental CI environments', () => {
+  const singleCPU = { ...allocation, cpus: 1 };
+  for (const env of [{}, { MANDATARY_BUILD_PROFILE: 'local' }, { CI: 'true', GITHUB_ACTIONS: 'true' }]) {
+    assert.deepEqual(resolveResources(env, singleCPU), { ...local, GOMAXPROCS: '1' });
+    assert.throws(() => resolveResources({ ...env, MANDATARY_GO_PROCS: '2' }, singleCPU), /BUILD_RESOURCE_ERROR/);
   }
 });
 
