@@ -5,18 +5,29 @@
 P1.01 is a **development skeleton**, not a Docker-access product. It embeds a
 React 19 / TypeScript / Vite / Tailwind SPA in a static Go binary. The listener
 is fixed to `127.0.0.1:8080`; only `/` and compiled `/assets/*` files are served.
-There is no SPA fallback, directory listing, API, MCP, login, setup, database,
-Docker backend, credential handling or mail delivery. Unknown routes return
+There is no SPA fallback, directory listing, API, MCP, login, setup,
+Docker backend, credential issuance or mail delivery. Unknown routes return
 404 and non-read methods return 405. Do not expose this skeleton as production.
 Do not mount, connect to or test against any production Docker socket.
 
 P1.02 adds domain identifiers and structural SQLite/goose/sqlc models with real
-file-backed tests; the server still does not open the database. See the
+file-backed tests. See the
 [schema/coverage contract](docs/storage-schema.md) and
 [isolated sqlc dependency disposition](docs/sqlc-dependencies.md).
 The approved `internal/{domain,auth,authz,docker,store,api,mcp,backup}` boundaries
-remain in force. Runtime repository/encryption, authentication, authorization,
-mail and Docker behavior stay in their owning later cards. No fake endpoints.
+remain in force. P1.03 adds the runtime repository/encryption and requires the
+master key before the static server opens its store/listener. Authentication,
+authorization, mail and Docker behavior stay in their later cards. No fake endpoints.
+See [repository configuration/durability and test boundaries](docs/storage-repository.md).
+
+Before `make dev`, provision exactly one master-key source (`MANDATARY_MASTER_KEY`
+or `_FILE`) and set `MANDATARY_DATA_DIR` to a private local directory under an
+existing trusted parent (default `/data`). Use an externally provisioned 32-byte
+hex/base64 key, never a committed example/default key; never print it or place it
+in argv/history. Key files must be owner-only, regular, single-linked and owned
+by the runtime UID/root; data uses the actual runtime UID/GID and 0700/0600.
+Missing/invalid/wrong keys and unsafe storage fail startup. No setup token is
+issued. Tests generate isolated synthetic state and do not require a real key.
 
 ## Prerequisites and isolated setup
 

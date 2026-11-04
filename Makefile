@@ -72,7 +72,8 @@ security: tool-security
 negative-control:
 	bash scripts/negative-control.sh
 
-# The Go server is loopback-only and static-only; no socket/DB/mail access.
+# The Go server is loopback/static-only, with required key/storage initialization.
+# No Docker socket or mail access. See development.md before starting it.
 dev: build
 	./bin/mandatary
 
