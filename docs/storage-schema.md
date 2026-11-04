@@ -10,8 +10,9 @@ of generated `db.go`, `models.go` and `models.sql.go`. Never edit generated Go.
 Use `make generate` to update it and `make generate-check` to compare without
 rewriting. Both approved Go baselines run the generator and model tests.
 
-Runtime pool/WAL/FULL durability, encryption, archive import, authenticators,
-authorization and delivery remain their owning later P1 rows. A valid row is
+P1.03 adds [runtime pool/WAL/FULL and encryption](storage-repository.md).
+Archive import, authenticators, authorization and delivery remain their owning
+later P1 rows. A valid row is
 not proof of authenticated factors, a current generation, trusted UTC, an
 approved manifest, successful SMTP delivery or runtime self-verification.
 

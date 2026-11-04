@@ -72,7 +72,7 @@ func TestFreshDownUpMigration(t *testing.T) {
 		if integer(t, db, "SELECT credential_generation + session_generation + authority_generation + restore_generation FROM installation_control") != 0 {
 			t.Fatal("fresh generation active")
 		}
-		if _, err := p.Down(t.Context()); err != nil {
+		if _, err := p.DownTo(t.Context(), 0); err != nil {
 			t.Fatal(err)
 		}
 		if integer(t, db, "SELECT count(*) FROM sqlite_schema WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name != 'goose_db_version'") != 0 {

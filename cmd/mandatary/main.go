@@ -2,8 +2,10 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/NicoTM77/Mandatary/web"
@@ -22,6 +24,16 @@ func developmentServer() *http.Server {
 }
 
 func main() {
+	repository, err := openRepository(context.Background(), os.Getenv)
+	if err != nil {
+		log.Print(err)
+		os.Exit(1)
+	}
+	defer func() {
+		if err := repository.Close(); err != nil {
+			log.Print(err)
+		}
+	}()
 	log.Print("Mandatary development skeleton: http://127.0.0.1:8080 (no product APIs)")
 	if err := developmentServer().ListenAndServe(); err != nil {
 		log.Fatal(err)
