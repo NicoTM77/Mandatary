@@ -41,10 +41,10 @@ func TestNoticeIntentTransactionRollback(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = tx.Rollback() }()
-	if _, err = tx.ExecContext(t.Context(), `INSERT INTO security_events(id,user_id,event_type,occurred_at,retain_until,deduplication_key) VALUES ('e2','u1','authenticator_removed',2,100,'rollback')`); err != nil {
+	if _, err = tx.ExecContext(t.Context(), `INSERT INTO security_events(id,user_id,event_type,occurred_at,retain_until,deduplication_key) VALUES ('e2','u1','authenticator_bound',2,100,'rollback')`); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = tx.ExecContext(t.Context(), `UPDATE users SET compromised=1 WHERE id='u1'`); err != nil {
+	if _, err = tx.ExecContext(t.Context(), `INSERT INTO authenticators(id,user_id,kind,bound_at) VALUES ('new-binding','u1','totp',2)`); err != nil {
 		t.Fatal(err)
 	}
 	if _, err = tx.ExecContext(t.Context(), `INSERT INTO security_notice_outbox(id,event_id,user_id,address_id,address_version,recipient_snapshot,retain_until) VALUES ('bad','e2','u1','missing',1,'bad@example.invalid',100)`); err == nil {
@@ -53,9 +53,11 @@ func TestNoticeIntentTransactionRollback(t *testing.T) {
 	if err = tx.Rollback(); err != nil {
 		t.Fatal(err)
 	}
-	if integer(t, db, `SELECT count(*) FROM security_events WHERE id='e2'`) != 0 || integer(t, db, `SELECT compromised FROM users WHERE id='u1'`) != 0 {
+	if integer(t, db, `SELECT count(*) FROM security_events WHERE id='e2'`) != 0 || integer(t, db, `SELECT count(*) FROM authenticators WHERE id='new-binding'`) != 0 {
 		t.Fatal("partial security transition committed")
 	}
+	// Ordinary binding must roll back on enqueue failure. This is deliberately
+	// NOT a protective revocation: those must not wait for SMTP/outbox service.
 	// Positive transaction stores both durable intent and synthetic lifecycle state.
 	tx, err = db.BeginTx(t.Context(), nil)
 	if err != nil {
@@ -63,8 +65,8 @@ func TestNoticeIntentTransactionRollback(t *testing.T) {
 	}
 	defer func() { _ = tx.Rollback() }()
 	for _, q := range []string{
-		`INSERT INTO security_events(id,user_id,event_type,occurred_at,retain_until,deduplication_key) VALUES ('e2','u1','authenticator_removed',2,100,'commit')`,
-		`UPDATE users SET compromised=1 WHERE id='u1'`,
+		`INSERT INTO security_events(id,user_id,event_type,occurred_at,retain_until,deduplication_key) VALUES ('e2','u1','authenticator_bound',2,100,'commit')`,
+		`INSERT INTO authenticators(id,user_id,kind,bound_at) VALUES ('new-binding','u1','totp',2)`,
 		`INSERT INTO security_notice_outbox(id,event_id,user_id,address_id,address_version,recipient_snapshot,retain_until) SELECT 'ok','e2','u1',id,version,address,100 FROM notification_addresses WHERE id='n1'`,
 	} {
 		if _, err = tx.ExecContext(t.Context(), q); err != nil {
@@ -74,7 +76,7 @@ func TestNoticeIntentTransactionRollback(t *testing.T) {
 	if err = tx.Commit(); err != nil {
 		t.Fatal(err)
 	}
-	if integer(t, db, `SELECT count(*) FROM security_notice_outbox WHERE event_id='e2'`) != 1 {
+	if integer(t, db, `SELECT count(*) FROM security_notice_outbox WHERE event_id='e2'`) != 1 || integer(t, db, `SELECT count(*) FROM authenticators WHERE id='new-binding'`) != 1 {
 		t.Fatal("notice intent missing")
 	}
 }

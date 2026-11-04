@@ -10,6 +10,12 @@ sql:
         sql_package: database/sql
         emit_empty_slices: true
         overrides:
+          # This scope alone is nullable; keep required endpoint keys typed.
+          - column: administrative_roles.endpoint_id
+            go_type:
+              import: github.com/NicoTM77/Mandatary/internal/domain
+              type: EndpointID
+              pointer: true
           - column: endpoints.id
             go_type:
               import: github.com/NicoTM77/Mandatary/internal/domain

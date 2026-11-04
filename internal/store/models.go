@@ -14,7 +14,7 @@ type AdministrativeRole struct {
 	ID                  string
 	UserID              string
 	Role                string
-	EndpointID          domain.EndpointID
+	EndpointID          *domain.EndpointID
 	State               string
 	AuthorityGeneration int64
 }
