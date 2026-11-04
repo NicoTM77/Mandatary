@@ -262,6 +262,28 @@ func (q *Queries) GetMachineRecord(ctx context.Context, id string) (AgentCredent
 	return i, err
 }
 
+const getRepositoryMetadata = `-- name: GetRepositoryMetadata :one
+SELECT singleton, installation_id, key_check FROM repository_metadata WHERE singleton = 1
+`
+
+func (q *Queries) GetRepositoryMetadata(ctx context.Context) (RepositoryMetadatum, error) {
+	row := q.db.QueryRowContext(ctx, getRepositoryMetadata)
+	var i RepositoryMetadatum
+	err := row.Scan(&i.Singleton, &i.InstallationID, &i.KeyCheck)
+	return i, err
+}
+
+const getSMTPRecord = `-- name: GetSMTPRecord :one
+SELECT ciphertext FROM smtp_secrets WHERE id = ?
+`
+
+func (q *Queries) GetSMTPRecord(ctx context.Context, id string) ([]byte, error) {
+	row := q.db.QueryRowContext(ctx, getSMTPRecord, id)
+	var ciphertext []byte
+	err := row.Scan(&ciphertext)
+	return ciphertext, err
+}
+
 const getSession = `-- name: GetSession :one
 SELECT id, user_id, secret_hash, purpose, achieved_assurance, methods, phishing_resistant, authenticated_at, reauthenticated_at, created_at, expires_at, last_activity_at, idle_timeout_seconds, revoked_at, credential_generation, session_generation, state FROM sessions WHERE id = ?
 `
@@ -308,6 +330,20 @@ func (q *Queries) GetUser(ctx context.Context, id string) (User, error) {
 		&i.AuthorityGeneration,
 	)
 	return i, err
+}
+
+const initializeRepositoryMetadata = `-- name: InitializeRepositoryMetadata :exec
+INSERT INTO repository_metadata(singleton,installation_id,key_check) VALUES (1,?,?)
+`
+
+type InitializeRepositoryMetadataParams struct {
+	InstallationID []byte
+	KeyCheck       []byte
+}
+
+func (q *Queries) InitializeRepositoryMetadata(ctx context.Context, arg InitializeRepositoryMetadataParams) error {
+	_, err := q.db.ExecContext(ctx, initializeRepositoryMetadata, arg.InstallationID, arg.KeyCheck)
+	return err
 }
 
 const listDailyUsage = `-- name: ListDailyUsage :many
@@ -577,4 +613,18 @@ func (q *Queries) ListSelectorsByEndpoint(ctx context.Context, endpointID domain
 		return nil, err
 	}
 	return items, nil
+}
+
+const putSMTPRecord = `-- name: PutSMTPRecord :exec
+INSERT INTO smtp_secrets(id,ciphertext) VALUES (?,?) ON CONFLICT(id) DO UPDATE SET ciphertext=excluded.ciphertext
+`
+
+type PutSMTPRecordParams struct {
+	ID         string
+	Ciphertext []byte
+}
+
+func (q *Queries) PutSMTPRecord(ctx context.Context, arg PutSMTPRecordParams) error {
+	_, err := q.db.ExecContext(ctx, putSMTPRecord, arg.ID, arg.Ciphertext)
+	return err
 }

@@ -66,7 +66,7 @@ func TestPopulatedMigrationReopenAndDown(t *testing.T) {
 	if err != nil || len(outbox) != 2 || outbox[0].Attempts != 2 || outbox[0].DeliveryState != "failed" || outbox[0].DispatchState != "quarantined" || outbox[0].NextAttemptAt.Int64 != 5 {
 		t.Fatal("per-recipient retry state lost or activated", err)
 	}
-	if _, err := migration.Down(t.Context()); err != nil {
+	if _, err := migration.DownTo(t.Context(), 0); err != nil {
 		t.Fatal("populated FK migration down", err)
 	}
 	if _, err := migration.Up(t.Context()); err != nil {

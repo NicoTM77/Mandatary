@@ -39,7 +39,41 @@ jobs:
           node-version: '24.22.1'
           cache: npm
           cache-dependency-path: web/package-lock.json
+      - name: Use a private temporary root for storage fixtures
+        run: |
+          test_root=$(mktemp -d "$HOME/mandatary-tests.XXXXXXXX")
+          printf 'TMPDIR=%s\n' "$test_root" >> "$GITHUB_ENV"
+          stat -c '%a %u:%g %n' / /home "$HOME" "$test_root"
       - run: make install check negative-control
+  storage-arm64:
+    name: Storage (linux/arm64)
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 20
+    env:
+      GOTOOLCHAIN: local
+      GOMAXPROCS: '2'
+      GOFLAGS: '-mod=readonly -p=1'
+      GOMEMLIMIT: 768MiB
+      GOGC: '25'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version: '1.27.3'
+          cache: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24.22.1'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Use a private temporary root for storage fixtures
+        run: |
+          test_root=$(mktemp -d "$HOME/mandatary-tests.XXXXXXXX")
+          printf 'TMPDIR=%s\n' "$test_root" >> "$GITHUB_ENV"
+          stat -c '%a %u:%g %n' / /home "$HOME" "$test_root"
+      - run: uname -m && make install build && go test -race -count=1 -v ./...
   security:
     name: Security
     needs: baseline

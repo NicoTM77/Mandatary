@@ -59,3 +59,15 @@ SELECT * FROM usage_stats_daily WHERE endpoint_id = ? ORDER BY bucket_start,id;
 
 -- name: ListRecentUsage :many
 SELECT * FROM usage_recent_events WHERE endpoint_id = ? ORDER BY occurred_at,id;
+
+-- name: GetRepositoryMetadata :one
+SELECT * FROM repository_metadata WHERE singleton = 1;
+
+-- name: InitializeRepositoryMetadata :exec
+INSERT INTO repository_metadata(singleton,installation_id,key_check) VALUES (1,?,?);
+
+-- name: PutSMTPRecord :exec
+INSERT INTO smtp_secrets(id,ciphertext) VALUES (?,?) ON CONFLICT(id) DO UPDATE SET ciphertext=excluded.ciphertext;
+
+-- name: GetSMTPRecord :one
+SELECT ciphertext FROM smtp_secrets WHERE id = ?;

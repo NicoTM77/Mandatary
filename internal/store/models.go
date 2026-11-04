@@ -168,6 +168,12 @@ type Policy struct {
 	StopTimeoutMax      sql.NullInt64
 }
 
+type RepositoryMetadatum struct {
+	Singleton      int64
+	InstallationID []byte
+	KeyCheck       []byte
+}
+
 type SecurityEvent struct {
 	ID               string
 	UserID           string
@@ -218,6 +224,11 @@ type SessionAuthenticator struct {
 	SessionID       string
 	AuthenticatorID string
 	UserID          string
+}
+
+type SmtpSecret struct {
+	ID         string
+	Ciphertext []byte
 }
 
 type UsageRecentEvent struct {
