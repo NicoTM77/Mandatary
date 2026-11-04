@@ -67,6 +67,18 @@ function values(result) {
   return JSON.parse(result.stdout.trim());
 }
 
+test('fresh-checkout recipes work without relying on untracked executable filesystem bits', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'mandatary-resource-checkout-'));
+  try {
+    mkdirSync(join(dir, 'scripts'));
+    for (const name of ['resource-shell.mjs', 'resource-profile.mjs']) writeFileSync(join(dir, 'scripts', name), readFileSync(join('scripts', name)), { mode: 0o644 });
+    writeFileSync(join(dir, 'Makefile'), readFileSync('Makefile'));
+    const result = spawnSync('make', ['--no-print-directory', '-s', 'resources'], { cwd: dir, encoding: 'utf8', env: process.env });
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+    assert.equal(JSON.parse(result.stdout).resolved.GOTOOLCHAIN, 'local');
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
 test('workflow opts in explicitly, separates jobs and caches every locked module', () => {
   const workflow = readFileSync('.github/workflows/ci.yml', 'utf8');
   assert.match(workflow, /MANDATARY_BUILD_PROFILE: github-ci/);

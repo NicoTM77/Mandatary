@@ -1,5 +1,6 @@
 # Resolve from this Makefile, not cwd: generator fixtures invoke it externally.
-SHELL := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))scripts/resource-shell.mjs
+SHELL := node
+.SHELLFLAGS := "$(dir $(abspath $(lastword $(MAKEFILE_LIST))))scripts/resource-shell.mjs" -c
 export MANDATARY_BUILD_PROFILE ?= local
 export MANDATARY_GO_PROCS
 export MANDATARY_GO_PACKAGES
