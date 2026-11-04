@@ -39,6 +39,11 @@ jobs:
           node-version: '24.22.1'
           cache: npm
           cache-dependency-path: web/package-lock.json
+      - name: Use a private temporary root for storage fixtures
+        run: |
+          test_root=$(mktemp -d "$HOME/mandatary-tests.XXXXXXXX")
+          printf 'TMPDIR=%s\n' "$test_root" >> "$GITHUB_ENV"
+          stat -c '%a %u:%g %n' / /home "$HOME" "$test_root"
       - run: make install check negative-control
   storage-arm64:
     name: Storage (linux/arm64)
@@ -63,6 +68,11 @@ jobs:
           node-version: '24.22.1'
           cache: npm
           cache-dependency-path: web/package-lock.json
+      - name: Use a private temporary root for storage fixtures
+        run: |
+          test_root=$(mktemp -d "$HOME/mandatary-tests.XXXXXXXX")
+          printf 'TMPDIR=%s\n' "$test_root" >> "$GITHUB_ENV"
+          stat -c '%a %u:%g %n' / /home "$HOME" "$test_root"
       - run: uname -m && make install build && go test -race -count=1 -v ./...
   security:
     name: Security

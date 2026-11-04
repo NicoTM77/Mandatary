@@ -47,12 +47,26 @@ ignored directory (never system or Hermes tooling):
 ```bash
 bash scripts/bootstrap.sh
 export PATH="$PWD/.toolchains/go1.27.3/bin:$PWD/.toolchains/node24.22.1/bin:$PATH"
+mkdir -p -m 0700 "$PWD/.toolchains/test-tmp"
+export TMPDIR="$PWD/.toolchains/test-tmp"
 make install
 make check
 make negative-control
 make tools
 make security
 ```
+
+Storage/key integration fixtures enforce the production ancestor policy. Their
+`TMPDIR` must be beneath trusted owner/root-controlled, non-group/world-writable
+directories; a private leaf beneath system `/tmp` or `/var/tmp` does not satisfy
+that policy, even with a sticky ancestor. The example uses the ignored local
+`.toolchains` tree; check that its ancestors are trusted too. An existing unsafe
+directory is refused, not permission-repaired. Export the same `TMPDIR` before
+direct `go test` and compatibility commands. GitHub's disposable runners create
+an owner-only temporary root directly beneath the runner home and record its
+ancestor modes before running these same tests. This changes the test location,
+not the production safety checks. Restricted workers retain their separately
+authorized `/opt/data/scratch` temporary root.
 
 `MANDATARY_TOOLCHAIN_DIR` can select another private writable installation root.
 Bootstrap downloads official archives over HTTPS, checks the reviewed SHA-256

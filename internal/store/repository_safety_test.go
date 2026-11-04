@@ -144,6 +144,23 @@ func TestRepositoryRejectsUnsafeStorage(t *testing.T) {
 			})
 		}
 	}
+	t.Run("unsafe-ancestor", func(t *testing.T) {
+		parent := filepath.Join(t.TempDir(), "untrusted")
+		if err := os.Mkdir(parent, 0700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Chmod(parent, 0777|os.ModeSticky); err != nil {
+			t.Fatal(err)
+		}
+		o := Options{DataDir: filepath.Join(parent, "data"), MasterKey: testKey(t), OwnerUID: os.Geteuid(), OwnerGID: os.Getegid()}
+		if bad, err := Open(t.Context(), o); err == nil {
+			_ = bad.Close()
+			t.Fatal("writable sticky ancestor accepted")
+		}
+		if _, err := os.Lstat(o.DataDir); !os.IsNotExist(err) {
+			t.Fatal("unsafe ancestor allowed storage creation")
+		}
+	})
 	t.Run("unsafe-directory", func(t *testing.T) {
 		r, o := openFixture(t)
 		if err := os.Chmod(o.DataDir, 0755); err != nil {
