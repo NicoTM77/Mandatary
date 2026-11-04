@@ -38,6 +38,11 @@ verification remain their owning rows, not callable placeholders.
   opening files; this card neither implements privilege drop nor claims the
   Compose/Unraid mappings are qualified.
 - `ExistingOnly` refuses missing files/stores and schema creation/upgrades.
+  Existing installations are preflighted with Goose's non-creating store query,
+  never `Provider.GetDBVersion` (which can initialize a missing version table).
+  Missing/empty/incomplete/duplicate/unapplied/unknown migration history denies
+  without repairing the schema or version rows. Only a fresh service open may
+  initialize history; a recognized v1 service open may upgrade to v2.
   The P1.09 helper must additionally verify the trusted build/schema/
   installation and host/container mount mapping. This primitive is not a
   runnable recovery helper or a detector of malicious host/copied-volume rollback.
@@ -75,6 +80,11 @@ must not disclose/acknowledge before commit. Commit/sync/uncertain delivery
 failure poisons the handle: no new operation may continue through it. Returning
 an error after commit does not imply rollback; future protocols must reconcile
 persisted non-revealable state, never infer successful delivery or reuse a token.
+Reads recheck handle health after waiting for their pool slot, before invoking
+record callbacks and before reporting success. Callers must discard callback
+results on any error; a read callback must not disclose data or acknowledge
+success before `Read` returns. This is not cancellation of an already-running
+callback or a replacement for the owning service's dispatch revalidation.
 P1.09 owns the actual PENDING/AVAILABLE/CLAIMED/RETRIEVED protocol, terminal
 checks, file issuance/unlink/expiry and reconciliation; these are not implemented
 by a generic transaction callback.
@@ -161,9 +171,9 @@ substituting cross-compilation. Exact-head results belong in the PR/card handoff
 | Contract / bounded portion | Executable evidence |
 | --- | --- |
 | TD6.1 / SUP-02 actual SQLite, WAL/FKs/busy/pools, 0600, concurrent readers/writers and restart | `TestRepositoryRestartConcurrencyAndPragmas`; all inherited migration/owner/FK/usage/reopen tests |
-| R1 / S3.1a lock first, shared persistent inode, FULL not NORMAL | `TestWriterSyncFailureAndLockOrder`, `TestServiceAndHelperSharePersistentLock`, `TestControlDurableCallback`, `TestQueuedControlDeniesAfterUncertainDelivery` |
+| R1 / S3.1a lock first, shared persistent inode, FULL not NORMAL, poisoned-handle denial | `TestWriterSyncFailureAndLockOrder`, `TestServiceAndHelperSharePersistentLock`, `TestControlDurableCallback`, `TestQueuedControlDeniesAfterUncertainDelivery`, `TestQueuedReadRechecksHealth` (Read/ReadActive, healthy/poisoned), `TestReadDeniesPoisonDuringCallback` |
 | R1 actual SQLite sync denial / modeled persistence loss | `TestSQLiteSyncFailurePreventsAcknowledgement`, `TestSQLiteFULLSurvivesModeledPersistenceLoss` (real adverse NORMAL control) |
-| SETUP-01/03 storage portion | `TestRepositoryRejectsUnsafeStorage`, `TestHelperCannotCreateOrMigrate`, `TestUnrecognizedExistingStoreNeverBecomesFresh`, `TestStartupRequiresKeyBeforeOpeningStorage` |
+| SETUP-01/03/11 storage portion | `TestRepositoryRejectsUnsafeStorage`, `TestHelperCannotCreateOrMigrate`, `TestExistingOpenRejectsInvalidMetadataWithoutMutation` (helper/service; schema/version-row snapshots), `TestExistingV1UpgradePreservesRowsAndHelperDoesNotMigrate`, `TestUnrecognizedExistingStoreNeverBecomesFresh`, `TestStartupRequiresKeyBeforeOpeningStorage` |
 | TD6.2 / N1 encrypted SMTP, startup key check, canaries | `TestMasterKeyBoundary`, `TestZeroKeyIsInvalid`, `TestRepositoryKeyAndEncryptedSMTPPersistence`, `TestKeyBindingCannotBeReinitialized` |
 | N63B4-OTP-SEED / CRYPTO-INVENTORY / RANDOM-EVIDENCE primitive portion | `TestAuthenticatedRecordEncryption`: positive, wrong-key/installation, every-byte tamper, truncation, purpose/ID substitution, fresh nonce/salt and entropy-failure cases |
 | RESTORE-05/06/07/11 / N63B4-RESTORE-AUTH-STATE local control portion | `TestAuthorityNeverDefaultsActive`; inherited generation/retry/outbox structural tests |

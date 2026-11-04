@@ -14,6 +14,7 @@ import (
 	"sync/atomic"
 
 	"github.com/pressly/goose/v3"
+	"github.com/pressly/goose/v3/database"
 	sqlite "modernc.org/sqlite"
 )
 
@@ -110,19 +111,14 @@ func Open(ctx context.Context, options Options) (_ *Repository, result error) {
 	if err := verifyWriter(ctx, r.writer); err != nil {
 		return nil, ErrStorage
 	}
-	migrationFS, err := fs.Sub(migrations, "migrations")
-	if err != nil {
-		return nil, ErrStorage
-	}
-	provider, err := goose.NewProvider(goose.DialectSQLite3, r.writer, migrationFS)
-	if err != nil {
-		return nil, ErrStorage
-	}
-	current, err := provider.GetDBVersion(ctx)
-	if err != nil || current < 0 || current > 2 || (!fresh && current < 1) {
-		return nil, ErrStorage
-	}
+	var current int64
 	if !fresh {
+		// Provider.GetDBVersion initializes missing migration metadata. Existing
+		// installations must be recognized without any creating/repairing API.
+		current, err = existingSchemaVersion(ctx, r.writer)
+		if err != nil {
+			return nil, ErrStorage
+		}
 		if _, err := New(r.writer).GetInstallationControl(ctx); err != nil {
 			return nil, ErrStorage
 		}
@@ -131,8 +127,18 @@ func Open(ctx context.Context, options Options) (_ *Repository, result error) {
 		if current != 2 {
 			return nil, ErrStorage
 		}
-	} else if _, err = provider.Up(ctx); err != nil {
-		return nil, ErrStorage
+	} else {
+		migrationFS, err := fs.Sub(migrations, "migrations")
+		if err != nil {
+			return nil, ErrStorage
+		}
+		provider, err := goose.NewProvider(goose.DialectSQLite3, r.writer, migrationFS)
+		if err != nil {
+			return nil, ErrStorage
+		}
+		if _, err = provider.Up(ctx); err != nil {
+			return nil, ErrStorage
+		}
 	}
 	if _, err := New(r.writer).GetInstallationControl(ctx); err != nil {
 		return nil, ErrStorage
@@ -161,6 +167,26 @@ func Open(ctx context.Context, options Options) (_ *Repository, result error) {
 		r.sidecarIdentities[name] = st
 	}
 	return r, nil
+}
+
+// existingSchemaVersion uses only Goose's non-creating store query. Supported
+// installations have one applied row for each version, including zero. Refuse
+// incomplete, duplicate, unapplied or unknown history instead of repairing it.
+func existingSchemaVersion(ctx context.Context, db *sql.DB) (int64, error) {
+	metadata, err := database.NewStore(database.DialectSQLite3, "goose_db_version")
+	if err != nil {
+		return 0, ErrStorage
+	}
+	versions, err := metadata.ListMigrations(ctx, db)
+	if err != nil || len(versions) < 2 || len(versions) > 3 {
+		return 0, ErrStorage
+	}
+	for i, version := range versions {
+		if !version.IsApplied || version.Version != int64(len(versions)-1-i) {
+			return 0, ErrStorage
+		}
+	}
+	return versions[0].Version, nil
 }
 
 func openPool(path string, reader bool) (*sql.DB, error) {
@@ -328,14 +354,19 @@ func (r *Repository) Read(ctx context.Context, fn func(*Queries) error) error {
 		return ErrStorage
 	}
 	defer func() { _ = tx.Rollback() }() // also after commit; ErrTxDone is expected
+	// BeginTx can wait for a reader-pool slot while Control poisons this
+	// handle. Revalidate before allowing the queued callback to inspect data.
+	if r.poisoned.Load() || r.verifyFiles() != nil {
+		return ErrStorage
+	}
 	q := New(tx)
-	if _, err := q.GetInstallationControl(ctx); err != nil {
+	if _, err := q.GetInstallationControl(ctx); err != nil || r.poisoned.Load() {
 		return ErrStorage
 	}
-	if err := fn(q); err != nil {
+	if err := fn(q); err != nil || r.poisoned.Load() {
 		return ErrStorage
 	}
-	if err := tx.Commit(); err != nil {
+	if err := tx.Commit(); err != nil || r.poisoned.Load() {
 		return ErrStorage
 	}
 	return nil
