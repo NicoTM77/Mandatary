@@ -31,8 +31,34 @@ publication and version comparisons do not establish security/compatibility.
 | `go.opentelemetry.io/otel`, `/metric`, `/sdk`, `/sdk/metric`, `/trace` | 1.39.0 → **1.44.0** (go.sum only) | grpc1.83.2 requires1.44; dependency test closure retained by tidy, no new direct dependency |
 
 These are the entire changed module/version set in `tools/sqlc/go.mod`/`go.sum`;
-all changed checksum pairs follow the same versions. Other existing historical
-checksum entries remain, not new selected runtime dependencies. Inspect
+all changed checksum pairs follow the same versions. The **full MVS graph** also
+contains the following required changes, even where Go's lazy package closure
+needs no new local go.sum entry. These are not discretionary extra upgrades;
+`go list -m all` was compared against a pristine scratch copy of the WIP module.
+
+| Additional graph-only module | WIP → selected | Required edge |
+| --- | --- | --- |
+| `cloud.google.com/go/auth` | absent → 0.18.2 | grpc1.83.2 |
+| `github.com/GoogleCloudPlatform/opentelemetry-operations-go/detectors/gcp` | 1.31.0 → 1.33.0 | grpc1.83.2 |
+| `github.com/cncf/xds/go` | 20251210132809-ee656c7534f5 → 20260202195803-dba9d589def2 (v0.0.0 pseudo-versions) | grpc1.83.2 |
+| `github.com/envoyproxy/go-control-plane/envoy` | 1.36.0 → 1.37.0 | grpc1.83.2 |
+| `github.com/envoyproxy/protoc-gen-validate` | 1.3.0 → 1.3.3 | grpc1.83.2 |
+| `github.com/felixge/httpsnoop` | absent → 1.0.4 | grpc1.83.2 |
+| `github.com/go-jose/go-jose/v4` | 4.1.3 → 4.1.4 | grpc1.83.2 |
+| `github.com/google/s2a-go` | absent → 0.1.9 | grpc1.83.2 |
+| `github.com/googleapis/enterprise-certificate-proxy` | absent → 0.3.11 | grpc1.83.2 |
+| `github.com/googleapis/gax-go/v2` | absent → 2.17.0 | grpc1.83.2 |
+| `github.com/spiffe/go-spiffe/v2` | 2.6.0 → 2.7.0 | grpc1.83.2 |
+| `go.opentelemetry.io/contrib/detectors/gcp` | 1.39.0 → 1.44.0 | grpc1.83.2 |
+| `go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp` | absent → 0.61.0 | grpc1.83.2 |
+| `golang.org/x/crypto` | 0.48.0 → 0.58.0 | net0.62 |
+| `golang.org/x/mod` | 0.34.0 → 0.41.0 | text0.43 |
+| `golang.org/x/oauth2` | 0.34.0 → 0.36.0 | grpc1.83.2 |
+| `golang.org/x/term` | 0.39.0 → 0.47.0 | net0.62 |
+| `golang.org/x/tools` | 0.43.0 → 0.51.0 | text0.43 |
+
+Other existing historical checksum entries remain, not new selected runtime
+dependencies. Inspect
 `go -C tools/sqlc mod graph` and the downloaded, checksum-verified module files
 for the exact edges. net/text remain Go1.26.0, grpc Go1.25.0, within the existing
 approved minimum. Compatibility is nevertheless proved by actual locked builds,

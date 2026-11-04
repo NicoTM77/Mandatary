@@ -59,7 +59,3 @@ SELECT * FROM usage_stats_daily WHERE endpoint_id = ? ORDER BY bucket_start,id;
 
 -- name: ListRecentUsage :many
 SELECT * FROM usage_recent_events WHERE endpoint_id = ? ORDER BY occurred_at,id;
-
--- Deliberately ungenerated query: temporary CI drift negative control.
--- name: GenerationGateProbe :one
-SELECT singleton FROM installation_control WHERE singleton = 1;
