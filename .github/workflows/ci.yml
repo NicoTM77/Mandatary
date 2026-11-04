@@ -6,6 +6,10 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+env:
+  MANDATARY_BUILD_PROFILE: github-ci
+  GOTOOLCHAIN: local
+  GOFLAGS: '-mod=readonly'
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -16,16 +20,11 @@ jobs:
     timeout-minutes: 20
     strategy:
       fail-fast: false
-      max-parallel: 1
+      max-parallel: 2
       matrix:
         go: ['1.27.3', '1.26.10']
     env:
       MANDATARY_GO_VERSION: ${{ matrix.go }}
-      GOTOOLCHAIN: local
-      GOMAXPROCS: '2'
-      GOFLAGS: '-mod=readonly -p=1'
-      GOMEMLIMIT: 768MiB
-      GOGC: '25'
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -33,24 +32,26 @@ jobs:
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version: ${{ matrix.go }}
-          cache: false
+          cache: true
+          cache-dependency-path: |
+            go.mod
+            go.sum
+            tools/go.mod
+            tools/go.sum
+            tools/sqlc/go.mod
+            tools/sqlc/go.sum
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '24.22.1'
           cache: npm
           cache-dependency-path: web/package-lock.json
+      - run: make resources
       - run: make install check negative-control
+      - run: git diff --exit-code -- go.mod go.sum tools/go.mod tools/go.sum tools/sqlc/go.mod tools/sqlc/go.sum web/package.json web/package-lock.json
   security:
     name: Security
-    needs: baseline
     runs-on: ubuntu-24.04
     timeout-minutes: 30
-    env:
-      GOTOOLCHAIN: local
-      GOMAXPROCS: '2'
-      GOFLAGS: '-mod=readonly -p=1'
-      GOMEMLIMIT: 768MiB
-      GOGC: '25'
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -58,10 +59,19 @@ jobs:
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version: '1.27.3'
-          cache: false
+          cache: true
+          cache-dependency-path: |
+            go.mod
+            go.sum
+            tools/go.mod
+            tools/go.sum
+            tools/sqlc/go.mod
+            tools/sqlc/go.sum
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '24.22.1'
           cache: npm
           cache-dependency-path: web/package-lock.json
+      - run: make resources
       - run: make install build tools security
+      - run: git diff --exit-code -- go.mod go.sum tools/go.mod tools/go.sum tools/sqlc/go.mod tools/sqlc/go.sum web/package.json web/package-lock.json

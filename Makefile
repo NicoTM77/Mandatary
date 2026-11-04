@@ -1,13 +1,18 @@
-SHELL := /bin/bash
-export GOTOOLCHAIN := local
-export GOFLAGS := -mod=readonly -p=1
-export GOMAXPROCS := 2
-export GOMEMLIMIT := 768MiB
-export GOGC := 25
+# Resolve from this Makefile, not cwd: generator fixtures invoke it externally.
+SHELL := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))scripts/resource-shell.mjs
+export MANDATARY_BUILD_PROFILE ?= local
+export MANDATARY_GO_PROCS
+export MANDATARY_GO_PACKAGES
+export MANDATARY_GO_MEMORY_MIB
+export MANDATARY_GO_GC
 SQLC ?= bin/tools/sqlc
 
 .NOTPARALLEL:
-.PHONY: versions install build test check security tools sqlc generate generate-check tool-security negative-control dev frontend-dev
+.DEFAULT_GOAL := versions
+.PHONY: resources versions install build test check security tools sqlc generate generate-check tool-security negative-control dev frontend-dev
+resources:
+	node scripts/resource-profile.mjs
+
 versions:
 	bash scripts/check-toolchains.sh
 
@@ -40,9 +45,9 @@ tools:
 	go -C tools mod download
 	go -C tools mod verify
 	mkdir -p bin/tools
-	GOMAXPROCS=2 go -C tools build -p=1 -trimpath -o ../bin/tools/govulncheck golang.org/x/vuln/cmd/govulncheck
-	GOMAXPROCS=2 go -C tools build -p=1 -trimpath -o ../bin/tools/gosec github.com/securego/gosec/v2/cmd/gosec
-	GOMAXPROCS=2 go -C tools build -p=1 -trimpath -o ../bin/tools/golangci-lint github.com/golangci/golangci-lint/v2/cmd/golangci-lint
+	go -C tools build -trimpath -o ../bin/tools/govulncheck golang.org/x/vuln/cmd/govulncheck
+	go -C tools build -trimpath -o ../bin/tools/gosec github.com/securego/gosec/v2/cmd/gosec
+	go -C tools build -trimpath -o ../bin/tools/golangci-lint github.com/golangci/golangci-lint/v2/cmd/golangci-lint
 
 sqlc:
 	go -C tools/sqlc mod download
