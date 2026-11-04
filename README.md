@@ -7,13 +7,15 @@ administrator-defined, per-container permissions.
 ## Current status
 
 Step 0 passed independent review; Nico merged the decision package in PR #2
-and authorized the Phase 1 kickoff on 2026-11-03. Only P1.01 is released for
-implementation. This checkout adds a loopback-only static development skeleton,
-embedded React assets, locked developer commands and baseline tests/PR CI.
-See [Container-free development](development.md) for exact setup and checks.
+and authorized the Phase 1 kickoff on 2026-11-03. P1.01 is merged; Nico has
+released P1.02 only for the next implementation slice. This checkout adds domain
+identifiers, an initial SQLite migration and generated persistence models/tests
+to the loopback-only static skeleton and existing locked developer commands/CI.
+See [Container-free development](development.md) for setup/checks and the
+[storage contract](docs/storage-schema.md) for schema coverage and boundaries.
 
-Authentication, policy enforcement, Docker access, MCP, storage and deployment
-are **not available**. Architecture documents describe later planned product
+Authentication, policy enforcement, Docker access, MCP, runtime storage services
+and deployment are **not available**. Architecture documents describe later planned product
 capabilities, not implemented features or NIST conformance. Other Phase 1 cards
 remain held for phased release, independent review and Nico-controlled merges.
 

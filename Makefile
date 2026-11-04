@@ -2,8 +2,12 @@ SHELL := /bin/bash
 export GOTOOLCHAIN := local
 export GOFLAGS := -mod=readonly -p=1
 export GOMAXPROCS := 2
+export GOMEMLIMIT := 768MiB
+export GOGC := 25
+SQLC ?= bin/tools/sqlc
 
-.PHONY: versions install build test check security tools negative-control dev frontend-dev
+.NOTPARALLEL:
+.PHONY: versions install build test check security tools sqlc generate generate-check tool-security negative-control dev frontend-dev
 versions:
 	bash scripts/check-toolchains.sh
 
@@ -17,13 +21,14 @@ build: versions
 	npm --prefix web run build
 	CGO_ENABLED=0 go build -trimpath -o bin/mandatary ./cmd/mandatary
 
-test: versions
+test: versions sqlc
 	node --test scripts/*.test.mjs
 	npm --prefix web test
 	go test -race -count=1 ./...
 
-check: build
-	test -z "$$(gofmt -l cmd web/*.go tests/security)"
+check: build sqlc
+	$(MAKE) generate-check
+	test -z "$$(gofmt -l cmd internal web/*.go tests/security)"
 	go vet ./...
 	npm --prefix web run typecheck
 	npm --prefix web run lint
@@ -39,7 +44,26 @@ tools:
 	GOMAXPROCS=2 go -C tools build -p=1 -trimpath -o ../bin/tools/gosec github.com/securego/gosec/v2/cmd/gosec
 	GOMAXPROCS=2 go -C tools build -p=1 -trimpath -o ../bin/tools/golangci-lint github.com/golangci/golangci-lint/v2/cmd/golangci-lint
 
-security:
+sqlc:
+	go -C tools/sqlc mod download
+	go -C tools/sqlc mod verify
+	mkdir -p bin/tools
+	go -C tools/sqlc build -trimpath -o ../../bin/tools/sqlc github.com/sqlc-dev/sqlc/cmd/sqlc
+	$(SQLC) version
+
+generate: sqlc
+	$(SQLC) generate --no-remote
+
+# sqlc diff compares in memory and never repairs stale committed output.
+# Kept standalone so the real positive/negative generator fixture can invoke it.
+generate-check:
+	$(SQLC) diff --no-remote
+
+tool-security: sqlc
+	bin/tools/govulncheck -mode=binary $(SQLC)
+	cd tools/sqlc && ../../bin/tools/govulncheck -show traces github.com/sqlc-dev/sqlc/cmd/sqlc
+
+security: tool-security
 	bin/tools/govulncheck ./...
 	bin/tools/gosec ./...
 	bin/tools/golangci-lint run ./...

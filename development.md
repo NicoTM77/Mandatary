@@ -10,11 +10,13 @@ Docker backend, credential handling or mail delivery. Unknown routes return
 404 and non-read methods return 405. Do not expose this skeleton as production.
 Do not mount, connect to or test against any production Docker socket.
 
+P1.02 adds domain identifiers and structural SQLite/goose/sqlc models with real
+file-backed tests; the server still does not open the database. See the
+[schema/coverage contract](docs/storage-schema.md) and
+[isolated sqlc dependency disposition](docs/sqlc-dependencies.md).
 The approved `internal/{domain,auth,authz,docker,store,api,mcp,backup}` boundaries
-remain the architecture for their owning later cards. Empty implementations or
-fake product endpoints are intentionally absent. SQLite/sqlc/goose, shadcn/Radix,
-authentication and Docker libraries will be added when actually needed; their
-approved selection is not changed by leaving unused dependencies uninstalled.
+remain in force. Runtime repository/encryption, authentication, authorization,
+mail and Docker behavior stay in their owning later cards. No fake endpoints.
 
 ## Prerequisites and isolated setup
 
@@ -68,15 +70,20 @@ MANDATARY_GO_VERSION=1.26.10 make install check negative-control
 | `make build` | TypeScript no-emit check + Vite/Tailwind build, then `CGO_ENABLED=0 go build -trimpath` with real embedded assets. |
 | `make test` | Node tooling tests, non-watch Vitest/Testing Library tests, `go test -race -count=1 ./...`. Run `make build` first in a fresh checkout. |
 | `make check` | Build, formatting, Go vet, strict typecheck, ESLint + security/hooks rules and all tests. |
+| `make sqlc` | Verify/download the isolated locked `tools/sqlc` module, build approved sqlc1.31.1 locally. |
+| `make generate` | Rebuild sqlc and regenerate models/queries from goose SQL and `sqlc.yaml`. |
+| `make generate-check` | Require previously built sqlc; non-mutating generated-output comparison. `make check` builds it and invokes this automatically. |
+| `make tool-security` | Require existing pinned govulncheck; build/verify sqlc, then scan BOTH binary and isolated tool source. Automatically required by `make security`. |
 | `make tools` | Build pinned govulncheck/gosec/golangci-lint from separate `tools/go.mod` + `tools/go.sum` into ignored `bin/tools`. Requires primary Go. |
 | `make security` | Run all three Go scanners and `npm audit --audit-level=high`; tool/advisory errors fail the command. Requires install/build/tools. |
 | `make negative-control` | Inject an intentionally invalid route-denial expectation into the ordinary race suite; require exit 1 and exact assertion signature. Build/setup/race-detector failures do not qualify. |
 | `make dev` | Build and serve the embedded SPA at `http://127.0.0.1:8080`; Ctrl-C to stop. |
 | `make frontend-dev` | Vite loopback-only frontend iteration; no API proxy or Docker access. |
 
-The root Go module intentionally has no external dependencies yet, so it has no
-`go.sum`. Scanner dependencies are isolated in `tools/`; they are not linked into
-the shipped binary. Frontend direct versions and all transitive integrities are
+The root Go module now locks the approved SQLite/goose test/model dependencies in
+`go.mod`/`go.sum`. Scanner dependencies are isolated in `tools/`; the generator
+has its separate `tools/sqlc/` module. Neither is linked into the shipped binary.
+Frontend direct versions and all transitive integrities are
 locked in `web/package-lock.json`; `.npmrc` enforces engines and exact saves.
 Vitest + jsdom + Testing Library exercise rendering/theme behavior without a
 browser service; they do **not** establish branded-browser/WebAuthn qualification.
@@ -94,6 +101,8 @@ machines. No platform-specific CPU-affinity helper is a product prerequisite.
 In the restricted Hermes execution environment, use the separately authorized
 local launcher and resource ceiling; positive niceness does not limit memory.
 Do not run multiple memory-heavy tool builds concurrently.
+Make additionally bounds its child processes with GOMEMLIMIT=768MiB/GOGC25 and
+serializes targets; these are local process settings, not runtime configuration.
 
 ## Tests and CI
 
