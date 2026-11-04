@@ -121,13 +121,89 @@ focused on repository code without excluding an application package. npm audit
 still sees the full dependency graph. Do not use `--ignore-scripts` and then
 claim this setup succeeded.
 
-Go package compilation defaults to serial (`-p=1`, `GOMAXPROCS=2`) for small
-machines. No platform-specific CPU-affinity helper is a product prerequisite.
-In the restricted Hermes execution environment, use the separately authorized
-local launcher and resource ceiling; positive niceness does not limit memory.
-Do not run multiple memory-heavy tool builds concurrently.
-Make additionally bounds its child processes with GOMEMLIMIT=768MiB/GOGC25 and
-serializes targets; these are local process settings, not runtime configuration.
+## Build-resource profiles (maintenance, not product runtime settings)
+
+Every Make recipe goes through `scripts/resource-shell.mjs`, including recursive
+Make, app/race builds, nested scanner modules, sqlc and scanner subprocesses.
+Bash and the approved Node toolchain are already development prerequisites; no
+Linux affinity helper is required for ordinary developers. `.NOTPARALLEL` stays
+in force even with `make -j`. Do not start separate heavy Make processes together.
+
+| Explicit profile | Go execution threads (`GOMAXPROCS`) | Go package builds (`-p`) | Per-Go-process soft GC memory | `GOGC` |
+| --- | --- | --- | --- | --- |
+| `local` (default) | min(2, available CPUs) | 1 | 768MiB | 25 |
+| `github-ci`, allocation >=6GiB | min(4, available CPUs) | min(2, available CPUs) | 2048MiB (2GiB) | 100 |
+| `github-ci`, allocation 2–<6GiB | min(2, available CPUs) | 1 | 768MiB | 25 |
+| `github-ci`, allocation <2GiB | 1 | 1 | 384MiB | 25 |
+
+Available CPUs include inherited affinity and the visible cgroup-v2 CPU quota;
+allocated memory is the minimum of physical memory and the visible cgroup memory
+limit (v2, or v1 memory fallback). `make resources` prints this allocation, the
+resolved settings and available cgroup memory counters. This is tuning, **not**
+a whole-job RSS/cgroup cap: multiple Go/compiler processes, race instrumentation,
+Node, native allocations and the OS consume additional memory. Finite successful
+samples do not guarantee no OOM. Keep headroom and stop/reassess on pressure.
+
+```bash
+make resources                         # conservative, including with CI=true
+make install check negative-control
+make tools security                    # after the preceding pipeline, not beside it
+MANDATARY_GO_PROCS=1 make check         # explicit lower local bound
+make check MANDATARY_GO_MEMORY_MIB=512  # command line wins over environment
+# GitHub-hosted runner only for real heavy execution in restricted Hermes work:
+MANDATARY_BUILD_PROFILE=github-ci make resources
+MANDATARY_BUILD_PROFILE=github-ci make install check negative-control
+```
+
+`CI=true`/`GITHUB_ACTIONS=true` never select a faster profile. Only
+`MANDATARY_BUILD_PROFILE=github-ci` opts in. Optional `MANDATARY_GO_PROCS`,
+`MANDATARY_GO_PACKAGES`, `MANDATARY_GO_MEMORY_MIB` and `MANDATARY_GO_GC` accept
+positive decimal integers no higher than the resolved profile/allocation ceilings;
+empty/unset means the profile default. Invalid/unknown settings deny before the
+recipe runs. Make command-line values override environment values and propagate
+to recursive Make. Standard `GOMAXPROCS`, `GOFLAGS`, `GOMEMLIMIT`, `GOGC` and
+`GOTOOLCHAIN` overrides are deliberately replaced **inside recipe processes**;
+use the documented bounded variables instead. All profiles enforce
+`GOFLAGS='-mod=readonly -p=<resolved>'` and `GOTOOLCHAIN=local`. Nothing writes
+persistent `go env` or global configuration. The wrapper can also protect a
+direct command: `node scripts/resource-shell.mjs -c 'go test -race -count=1 -v ./...'`.
+
+Hermes workers additionally retain the separately authorized existing local
+four-logical-CPU launcher, inherited niceness+10 and container memory controls.
+Check affinity/niceness on parent **and child**, memory counters and competing
+heavy work before/between steps; scratch remains `/opt/data/scratch/`. Never
+execute the faster profile as an unrestricted heavy Hermes build or widen host,
+container, cgroup or launcher settings. Positive niceness is not a memory limit.
+
+CI runs the two unchanged Baseline contexts concurrently (`max-parallel: 2`),
+with independent Security and the existing native ARM64 storage job (at most
+four jobs here). Timeouts remain 20/20/30 minutes. ARM64 still runs the complete
+verbose Go race suite on native hardware through the same environment boundary;
+trusted-home TMPDIR setup and production storage checks are unchanged. Vitest
+already bounds workers to two and disables file parallelism; no second/conflicting
+worker-control layer is added. Every ordinary race gate retains `-count=1`.
+
+Pinned setup-go caches only module downloads and Go's content-addressed build
+cache, separated by OS, architecture, runner image, **exact** Go version and the
+hash of all six app/scanner/sqlc `go.mod`/`go.sum` files. All three modules are
+present on current merged main; no missing optional module is represented as
+verified. npm caching retains only its download cache; every job still uses
+`npm ci`. Module verification, readonly builds, real tests/scanners and explicit
+lockfile-diff checks execute regardless of a cache hit. Cache data is untrusted
+performance assistance, not test/security evidence. Source changes invalidate
+Go's internal content keys; race tests always rerun. No worktree, `node_modules`,
+scanner verdict, secret or `bin/tools` executable is cached. Standalone pinned
+binary caching was deliberately declined: trustworthy reuse would additionally
+need source/lock/toolchain/platform keys and executable identity validation.
+Tools are rebuilt from verified locked source instead. Standard PR-scoped cache
+permissions are not elevated; no `pull_request_target`, privileged publication,
+new artifact uploader or write permission is introduced.
+
+Rollback: select `MANDATARY_BUILD_PROFILE=local` explicitly in workflow env,
+restore matrix `max-parallel: 1`/Security dependency and disable setup-go caching
+in a reviewed change if needed. Locally unset the optional bounded overrides or
+select `local`; no global cleanup or host reconfiguration is required. Never
+rollback by removing tests, readonly/toolchain checks or resource protection.
 
 ## Tests and CI
 
