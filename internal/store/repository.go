@@ -124,7 +124,7 @@ func Open(ctx context.Context, options Options) (_ *Repository, result error) {
 		}
 	}
 	if options.ExistingOnly {
-		if current != 2 {
+		if current != 3 {
 			return nil, ErrStorage
 		}
 	} else {
@@ -178,7 +178,7 @@ func existingSchemaVersion(ctx context.Context, db *sql.DB) (int64, error) {
 		return 0, ErrStorage
 	}
 	versions, err := metadata.ListMigrations(ctx, db)
-	if err != nil || len(versions) < 2 || len(versions) > 3 {
+	if err != nil || len(versions) < 2 || len(versions) > 4 {
 		return 0, ErrStorage
 	}
 	for i, version := range versions {
@@ -267,6 +267,11 @@ func verifyWriter(ctx context.Context, db DBTX) error {
 func (r *Repository) Write(ctx context.Context, fn func(*Queries) error) error {
 	return r.Control(ctx, fn, nil)
 }
+
+// FailClosed marks a protocol-level security-control uncertainty. It only
+// removes availability: no caller can clear it or grant authority through it.
+// The owner must repair/reconcile the failed control before opening anew.
+func (r *Repository) FailClosed() { r.poisoned.Store(true) }
 
 // Control retains the shared lock through durable-before-delivery work. The
 // afterDurable callback runs ONLY after FULL commit, file and directory sync,

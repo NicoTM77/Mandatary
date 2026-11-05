@@ -1,0 +1,185 @@
+{
+  "module": "golang.org/x/text",
+  "version": "v0.43.0",
+  "origin": "https://go.googlesource.com/text",
+  "commit": "ac40b0f06c159afb5bfca4d1860f8b4b60dbc160",
+  "module_sum": "h1:1QivrlhwAsnMOcqgOdl9my7s9OyZl8O5/UGUTJVXoWc=",
+  "go_mod_sum": "h1:hbSIYA/amXcRXTFSZqh8tWHEoqRvvbKPJ2uz/KU+a+s=",
+  "unicode": "17.0.0",
+  "profile": "mdt-pwd-u17-nfc-cn-v1",
+  "license_sha256": "911f8f5782931320f5b8d1160a76365b83aea6447ee6c04fa6d5591467db9dad",
+  "adapted_sha256": {
+    "forminfo.go": "2f269087cea8c9d399c2626a8d7da1bc5888f3af47601d0f31e5ee6a71381e6f",
+    "composition.go": "d24d4470df1b90ade9bdd3c99dd6e3d397a18dba62062e5a818dfa447151e2c7",
+    "tables.go": "26a93c5da20c2a936876df93e46ff8ac9fbd7d0a69e2dec1fae8bce591896d79",
+    "input.go": "26acf30f4082450eacd8d4b84865245586993ad554b8cb9bfdb85229ab3a7c60",
+    "normalize.go": "8e9330e273693427c5e7e87483f39ef8e9b53ffed493ae84a9b52148251f29c7",
+    "trie.go": "6dba7961a35214b969b39b2956a648e7b391d8ede1cf1f0a84e29371e9c8d9e3"
+  },
+  "adaptation_sha256": "39967133f57dad25a84cef63dfb3ec3310d4d1f538841dc1364808c68ac9e2de",
+  "retained_upstream_ranges": {
+    "normalize.go": [
+      [
+        1,
+        4
+      ],
+      [
+        44,
+        56
+      ],
+      [
+        182,
+        189
+      ],
+      [
+        251,
+        257
+      ],
+      [
+        300,
+        355
+      ],
+      [
+        501,
+        555
+      ]
+    ],
+    "composition.go": [
+      [
+        1,
+        112
+      ],
+      [
+        133,
+        156
+      ],
+      [
+        181,
+        228
+      ],
+      [
+        246,
+        275
+      ],
+      [
+        277,
+        332
+      ],
+      [
+        334,
+        378
+      ],
+      [
+        380,
+        384
+      ],
+      [
+        408,
+        524
+      ]
+    ],
+    "forminfo.go": [
+      [
+        1,
+        60
+      ],
+      [
+        90,
+        228
+      ],
+      [
+        250,
+        296
+      ]
+    ],
+    "input.go": [
+      [
+        1,
+        25
+      ],
+      [
+        32,
+        48
+      ],
+      [
+        61,
+        83
+      ],
+      [
+        92,
+        109
+      ]
+    ]
+  },
+  "retained_functions": {
+    "forminfo.go": [
+      "(p Properties) BoundaryBefore() bool {",
+      "(p Properties) BoundaryAfter() bool {",
+      "(p Properties) isInvalid() bool { return p.flags == 0x80 }",
+      "(p Properties) isYesC() bool { return p.flags&0x10 == 0 }",
+      "(p Properties) isYesD() bool { return p.flags&0x4 == 0 }",
+      "(p Properties) combinesForward() bool  { return p.flags&0x20 != 0 }",
+      "(p Properties) combinesBackward() bool { return p.flags&0x8 != 0 } // == isMaybe",
+      "(p Properties) hasDecomposition() bool { return p.flags&0x4 != 0 } // == isNoD",
+      "(p Properties) isInert() bool {",
+      "(p Properties) multiSegment() bool {",
+      "(p Properties) nLeadingNonStarters() uint8 {",
+      "(p Properties) nTrailingNonStarters() uint8 {",
+      "(p Properties) Decomposition() []byte {",
+      "(p Properties) Size() int {",
+      "(p Properties) CCC() uint8 {",
+      "(p Properties) LeadCCC() uint8 {",
+      "(p Properties) TrailCCC() uint8 {",
+      "buildRecompMap() {",
+      "combine(a, b rune) rune {",
+      "lookupInfoNFC(b input, i int) Properties {",
+      "compInfo(v uint16, sz int) Properties {"
+    ],
+    "composition.go": [
+      "(ss *streamSafe) next(p Properties) ssState {",
+      "(rb *reorderBuffer) reset() {",
+      "(rb *reorderBuffer) doFlush() bool {",
+      "appendFlush(rb *reorderBuffer) bool {",
+      "(rb *reorderBuffer) insertOrdered(info Properties) {",
+      "(rb *reorderBuffer) insertFlush(src input, i int, info Properties) insertErr {",
+      "(rb *reorderBuffer) insertDecomposed(dcomp []byte) insertErr {",
+      "(rb *reorderBuffer) insertSingle(src input, i int, info Properties) {",
+      "(rb *reorderBuffer) appendRune(r rune) {",
+      "(rb *reorderBuffer) assignRune(pos int, r rune) {",
+      "(rb *reorderBuffer) runeAt(n int) rune {",
+      "(rb *reorderBuffer) bytesAt(n int) []byte {",
+      "isHangul(b []byte) bool {",
+      "isHangulString(b string) bool {",
+      "isJamoVT(b []byte) bool {",
+      "(rb *reorderBuffer) decomposeHangul(r rune) {",
+      "(rb *reorderBuffer) combineHangul(s, i, k int) {",
+      "(rb *reorderBuffer) compose() {",
+      "(rb *reorderBuffer) reserve(n int) bool {",
+      "(rb *reorderBuffer) validIndex(i int) bool {",
+      "(rb *reorderBuffer) valid() bool {"
+    ],
+    "input.go": [
+      "inputBytes(str []byte) input {",
+      "inputString(str string) input {",
+      "(in *input) setBytes(str []byte) {",
+      "(in *input) _byte(p int) byte {",
+      "(in *input) skipASCII(p, max int) int {",
+      "(in *input) appendSlice(buf []byte, b, e int) []byte {",
+      "(in *input) copySlice(buf []byte, b, e int) int {",
+      "(in *input) charinfoNFC(p int) (uint16, int) {",
+      "(in *input) hangul(p int) (r rune) {",
+      "(in *input) length() int {"
+    ],
+    "normalize.go": [
+      "Bytes(b []byte) ([]byte, error) {",
+      "bounded(b []byte, slots, byteBudget, output, counter int) ([]byte, error) {",
+      "appendQuick(rb *reorderBuffer, i int) int {",
+      "doAppendInner(rb *reorderBuffer, p int) []byte {",
+      "(f *formInfo) quickSpan(src input, i, end int, atEOF bool) (n int, ok bool) {",
+      "decomposeSegment(rb *reorderBuffer, sp int, atEOF bool) int {"
+    ],
+    "trie.go": [
+      "(t *sparseBlocks) lookup(n uint32, b byte) uint16 {"
+    ]
+  }
+}

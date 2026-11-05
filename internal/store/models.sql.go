@@ -12,6 +12,30 @@ import (
 	"github.com/NicoTM77/Mandatary/internal/domain"
 )
 
+const clearCompromiseFlag = `-- name: ClearCompromiseFlag :execrows
+UPDATE users SET compromised=0,password_revision=password_revision+1 WHERE id=? AND state='active'
+`
+
+func (q *Queries) ClearCompromiseFlag(ctx context.Context, id string) (int64, error) {
+	result, err := q.db.ExecContext(ctx, clearCompromiseFlag, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const compromiseUser = `-- name: CompromiseUser :execrows
+UPDATE users SET compromised=1,password_revision=password_revision+1 WHERE id=? AND state='active'
+`
+
+func (q *Queries) CompromiseUser(ctx context.Context, id string) (int64, error) {
+	result, err := q.db.ExecContext(ctx, compromiseUser, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
 const createAgent = `-- name: CreateAgent :exec
 INSERT INTO agents(id,name,owner_user_id,owner_group_id) VALUES (?,?,?,?)
 `
@@ -219,6 +243,44 @@ func (q *Queries) GetInstallationControl(ctx context.Context) (InstallationContr
 	return i, err
 }
 
+const getLocalBinding = `-- name: GetLocalBinding :one
+SELECT id, user_id, kind, state, credential_generation, created_at, bound_at, changed_at, revoked_at, expires_at, verifier_hash, encrypted_secret, public_key, external_credential_id, password_codepoints, password_format, max_assurance, phishing_resistant, retry_ceiling, failed_attempts, next_attempt_at, last_accepted_totp_step, sign_count, backup_eligible, backup_state, user_verified FROM authenticators WHERE user_id = ? AND kind = 'password' AND state = 'active'
+`
+
+func (q *Queries) GetLocalBinding(ctx context.Context, userID string) (Authenticator, error) {
+	row := q.db.QueryRowContext(ctx, getLocalBinding, userID)
+	var i Authenticator
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Kind,
+		&i.State,
+		&i.CredentialGeneration,
+		&i.CreatedAt,
+		&i.BoundAt,
+		&i.ChangedAt,
+		&i.RevokedAt,
+		&i.ExpiresAt,
+		&i.VerifierHash,
+		&i.EncryptedSecret,
+		&i.PublicKey,
+		&i.ExternalCredentialID,
+		&i.PasswordCodepoints,
+		&i.PasswordFormat,
+		&i.MaxAssurance,
+		&i.PhishingResistant,
+		&i.RetryCeiling,
+		&i.FailedAttempts,
+		&i.NextAttemptAt,
+		&i.LastAcceptedTotpStep,
+		&i.SignCount,
+		&i.BackupEligible,
+		&i.BackupState,
+		&i.UserVerified,
+	)
+	return i, err
+}
+
 const getLocalEndpoint = `-- name: GetLocalEndpoint :one
 SELECT id, slug, name, transport, state, authority_generation FROM endpoints WHERE slug = 'local'
 `
@@ -314,7 +376,7 @@ func (q *Queries) GetSession(ctx context.Context, id string) (Session, error) {
 }
 
 const getUser = `-- name: GetUser :one
-SELECT id, username, state, mfa_requirement, compromised, credential_generation, authority_generation FROM users WHERE id = ?
+SELECT id, username, state, mfa_requirement, compromised, credential_generation, authority_generation, password_revision FROM users WHERE id = ?
 `
 
 func (q *Queries) GetUser(ctx context.Context, id string) (User, error) {
@@ -328,8 +390,51 @@ func (q *Queries) GetUser(ctx context.Context, id string) (User, error) {
 		&i.Compromised,
 		&i.CredentialGeneration,
 		&i.AuthorityGeneration,
+		&i.PasswordRevision,
 	)
 	return i, err
+}
+
+const getUserByUsername = `-- name: GetUserByUsername :one
+SELECT id, username, state, mfa_requirement, compromised, credential_generation, authority_generation, password_revision FROM users WHERE username = ?
+`
+
+// P1.05 internal proof service. Call only under Repository.Control. These
+// queries do not establish sessions, setup authority or AAL2.
+func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User, error) {
+	row := q.db.QueryRowContext(ctx, getUserByUsername, username)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Username,
+		&i.State,
+		&i.MfaRequirement,
+		&i.Compromised,
+		&i.CredentialGeneration,
+		&i.AuthorityGeneration,
+		&i.PasswordRevision,
+	)
+	return i, err
+}
+
+const hasStrongerAuthenticator = `-- name: HasStrongerAuthenticator :one
+SELECT EXISTS(SELECT 1 FROM authenticators WHERE user_id = ?1
+ AND kind IN ('totp','webauthn') AND state = 'active'
+ AND credential_generation=?2 AND bound_at IS NOT NULL AND revoked_at IS NULL
+ AND (expires_at IS NULL OR expires_at>?3) AND failed_attempts<retry_ceiling) AS present
+`
+
+type HasStrongerAuthenticatorParams struct {
+	UserID               string
+	CredentialGeneration int64
+	Now                  sql.NullInt64
+}
+
+func (q *Queries) HasStrongerAuthenticator(ctx context.Context, arg HasStrongerAuthenticatorParams) (bool, error) {
+	row := q.db.QueryRowContext(ctx, hasStrongerAuthenticator, arg.UserID, arg.CredentialGeneration, arg.Now)
+	var present bool
+	err := row.Scan(&present)
+	return present, err
 }
 
 const initializeRepositoryMetadata = `-- name: InitializeRepositoryMetadata :exec
@@ -627,4 +732,84 @@ type PutSMTPRecordParams struct {
 func (q *Queries) PutSMTPRecord(ctx context.Context, arg PutSMTPRecordParams) error {
 	_, err := q.db.ExecContext(ctx, putSMTPRecord, arg.ID, arg.Ciphertext)
 	return err
+}
+
+const recordProofFailure = `-- name: RecordProofFailure :execrows
+UPDATE authenticators SET failed_attempts=failed_attempts+1,
+ state=CASE WHEN failed_attempts+1 >= retry_ceiling THEN 'disabled' ELSE state END,
+ next_attempt_at=?1
+WHERE id=?2 AND kind='password' AND state='active'
+ AND failed_attempts=?3 AND failed_attempts<retry_ceiling
+`
+
+type RecordProofFailureParams struct {
+	NextAttemptAt    sql.NullInt64
+	ID               string
+	ObservedFailures int64
+}
+
+func (q *Queries) RecordProofFailure(ctx context.Context, arg RecordProofFailureParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, recordProofFailure, arg.NextAttemptAt, arg.ID, arg.ObservedFailures)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const resetProofFailures = `-- name: ResetProofFailures :execrows
+UPDATE authenticators SET failed_attempts=0,next_attempt_at=NULL
+WHERE id=? AND kind='password' AND state='active' AND failed_attempts<retry_ceiling
+`
+
+func (q *Queries) ResetProofFailures(ctx context.Context, id string) (int64, error) {
+	result, err := q.db.ExecContext(ctx, resetProofFailures, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const revokeUserSessions = `-- name: RevokeUserSessions :exec
+UPDATE sessions SET state='revoked',revoked_at=?1 WHERE user_id=?2 AND state!='revoked'
+`
+
+type RevokeUserSessionsParams struct {
+	Now    sql.NullInt64
+	UserID string
+}
+
+func (q *Queries) RevokeUserSessions(ctx context.Context, arg RevokeUserSessionsParams) error {
+	_, err := q.db.ExecContext(ctx, revokeUserSessions, arg.Now, arg.UserID)
+	return err
+}
+
+const updateVerifier = `-- name: UpdateVerifier :execrows
+UPDATE authenticators SET verifier_hash=?1,password_format=?2,password_codepoints=?3,changed_at=?4,failed_attempts=0,next_attempt_at=NULL
+WHERE id=?5 AND kind='password' AND state='active' AND verifier_hash=?6 AND credential_generation=?7
+`
+
+type UpdateVerifierParams struct {
+	VerifierHash         []byte
+	PasswordFormat       sql.NullString
+	PasswordCodepoints   sql.NullInt64
+	Now                  sql.NullInt64
+	ID                   string
+	ObservedVerifier     []byte
+	CredentialGeneration int64
+}
+
+func (q *Queries) UpdateVerifier(ctx context.Context, arg UpdateVerifierParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, updateVerifier,
+		arg.VerifierHash,
+		arg.PasswordFormat,
+		arg.PasswordCodepoints,
+		arg.Now,
+		arg.ID,
+		arg.ObservedVerifier,
+		arg.CredentialGeneration,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }

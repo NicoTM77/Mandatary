@@ -85,3 +85,26 @@ The superseded image was **`gcr.io/distroless/static-debian12:nonroot`**. The li
 ## 6. Deployment workflow qualification
 
 Compose and Unraid operator runbooks must both demonstrate the host-local setup/recovery procedure in security-contracts.md §S3, using the actual container UID/GID and host data mapping without an interactive application-container shell. Unraid workflow compatibility is a required fixture/runbook outcome, not blanket certification of every Unraid/embedded-Engine version; record the exact tested host/Engine/API tuple before any support claim. Qualification uses an isolated controlled test environment or documented operator validation, never production Unraid Docker integration tests. Neither this matrix nor Step 0 approval authorizes a live deployment.
+
+## 7. P1.05 approved frozen-password amendment and maintenance
+
+Nico's original P1.05 comments95/98/99 select a portable pure-Go, fixed Unicode17
+stabilized ordinary-NFC profile with version-matched assigned repertoire and a
+narrow reviewed x/text0.43.0 source/table adaptation. This is an explicit password
+compatibility contract across Go1.27.3 and1.26.10, not an upstream-current-Unicode
+or general OS/browser support claim. Reject malformed/non-scalars/frozen17 Cn;
+retain assigned/private-use/control/format characters and explicit user CGJ,
+without inserted stream-safe CGJ, NFKC, trim or casefold. Immutable verifier
+profile/version and bounded licensed reproduction/update rules are in
+[the password contract](docs/password-authentication.md). The unchanged approved
+x/crypto0.58.0 candidate is used for Argon2id; no alternate crypto/normalization
+service, module replacement, build-tag spoof or toolchain downgrade is selected.
+
+The project maintainers/coder must track upstream security changes to copied
+normalization code explicitly under §3; module advisory scanning alone cannot
+recognize/remediate the snapshot. Independent update review requires the official
+fixed17 corpus, full repertoire/decomposition bounds, negative/fuzz/race tests,
+both locked compiler semantics/golden outputs and full security regressions.
+Stored canonicalization semantics are not silently upgraded with dependency pins.
+Comment101's task-local finite race virtual-memory allowance does not change
+production footprint promises, runtime configuration or any supported matrix gate.

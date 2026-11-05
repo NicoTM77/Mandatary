@@ -277,6 +277,7 @@ type User struct {
 	Compromised          int64
 	CredentialGeneration int64
 	AuthorityGeneration  int64
+	PasswordRevision     int64
 }
 
 type UserGroupMembership struct {

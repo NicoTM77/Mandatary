@@ -40,7 +40,7 @@ for exact scope, schema, tests, privacy and protected-control-channel boundaries
 
 ## Prerequisites and isolated setup
 
-Use Git, Bash, Make, curl, tar, SHA-256 tooling (`sha256sum` or macOS `shasum`),
+Use Git, Bash, Make, Python3 (stdlib-only snapshot regeneration), curl, tar, SHA-256 tooling (`sha256sum` or macOS `shasum`),
 and a C compiler for Go's race detector. No container build or Docker is needed.
 Linux/macOS amd64/arm64 are bootstrap targets; cross-platform runtime qualification
 is not implied by the installer or a Linux test. Windows is not first-class.
@@ -107,6 +107,7 @@ MANDATARY_GO_VERSION=1.26.10 make install check negative-control
 | `make sqlc` | Verify/download the isolated locked `tools/sqlc` module, build approved sqlc1.31.1 locally. |
 | `make generate` | Rebuild sqlc and regenerate models/queries from goose SQL and `sqlc.yaml`. |
 | `make generate-check` | Require previously built sqlc; non-mutating generated-output comparison. `make check` builds it and invokes this automatically. |
+| `make password-check` | Verify/reproduce fixed Unicode17 snapshot/repertoire and public full-password blocklist without repairing committed output; requires the already downloaded tools/sqlc graph. Both locked CI baselines run this through `make check`. |
 | `make tool-security` | Require existing pinned govulncheck; build/verify sqlc, then scan BOTH binary and isolated tool source. Automatically required by `make security`. |
 | `make tools` | Build pinned govulncheck/gosec/golangci-lint from separate `tools/go.mod` + `tools/go.sum` into ignored `bin/tools`. Requires primary Go. |
 | `make security` | Run all three Go scanners and `npm audit --audit-level=high`; tool/advisory errors fail the command. Requires install/build/tools. |
@@ -162,6 +163,19 @@ owning later cards. There is no image to scan in P1.01 and no NIST/FIPS, runtime
 release-readiness or production compatibility claim from this skeleton.
 
 ## Support and updates
+
+P1.05 adds internal password services only; the static server still has no login,
+MFA, session, reset or HIBP-configured route. See the [password contract](docs/password-authentication.md)
+for strict original decoding, supported Unicode repertoire, immutable profiles,
+list provenance/updates, privacy, retry limits, migration and the NIST test map.
+Copied normalization source needs explicit upstream-advisory review; scanners do
+not automatically identify its parent module. No production footprint budget or
+NIST/FIPS claim changes. In this task's restricted worker, necessary Go race
+children use the owner-approved finite4GiB address-space allowance; this is virtual
+space, not a RAM reservation. Ordinary tools retain2GiB, and the task-local monitor
+retains physical headroom/abort thresholds. Local Node builds fit that cap with
+bounded V8 heap/semispace, allocator arenas and worker pools; these launcher-only
+settings do not alter repository toolchain pins or the deployed application.
 
 The approved [support matrix](support-and-deployment-matrix.md) remains binding:
 weekly advisory review, monthly patch review, quarterly supported-line review;

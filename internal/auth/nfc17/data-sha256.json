@@ -1,0 +1,30 @@
+{
+  "NormalizationTest.txt": {
+    "sha256": "5019ffd530751a741900c849c0e010332f142a3612234639bd200b82138a87db",
+    "bytes": 2827429
+  },
+  "DerivedNormalizationProps.txt": {
+    "sha256": "71fd6a206a2c0cdd41feb6b7f656aa31091db45e9cedc926985d718397f9e488",
+    "bytes": 1377582
+  },
+  "CompositionExclusions.txt": {
+    "sha256": "2f239196ef3b5b61db5cc476e9bd80f534d15aa1b74e1be1dea5d042a344c85f",
+    "bytes": 9007
+  },
+  "LICENSE-UNICODE": {
+    "sha256": "e7a93b009565cfce55919a381437ac4db883e9da2126fa28b91d12732bc53d96",
+    "bytes": 1995
+  },
+  "UnicodeData.txt": {
+    "sha256": "2e1efc1dcb59c575eedf5ccae60f95229f706ee6d031835247d843c11d96470c",
+    "bytes": 2198209
+  },
+  "DerivedGeneralCategory.txt": {
+    "sha256": "d62e5bab70ca74f099343f71224fa051cb1fdd61a1ab45c0488c44cfc0b6102e",
+    "bytes": 277514
+  },
+  "ReadMe.txt": {
+    "sha256": "9fe1a90bd32659d7953616283dc2bffaa165518aae9ace026040c42c559ba606",
+    "bytes": 740
+  }
+}

@@ -1,0 +1,323 @@
+--- a/forminfo.go
++++ b/forminfo.go
+@@ -44 +44 @@
+-	pos   uint8  // start position in reorderBuffer; used in composition.go
++	pos   int    // start position in reorderBuffer; used in composition.go
+@@ -192 +192,3 @@
+-	key := uint64(a)<<recompShift | uint64(b)
++	// Callers supply validated Unicode scalars. Mask only unused sign/high bits
++	// explicitly so packed-table arithmetic is visible to integer analysis.
++	key := uint64(a&0x1fffff)<<recompShift | uint64(b&0x1fffff)
+@@ -212 +214 @@
+-		return Properties{size: uint8(sz)}
++		return Properties{size: uint8(sz & 7)}
+@@ -215,3 +217,3 @@
+-			size:  uint8(sz),
+-			ccc:   uint8(v),
+-			tccc:  uint8(v),
++			size:  uint8(sz & 7),
++			ccc:   uint8(v & 0xff),
++			tccc:  uint8(v & 0xff),
+@@ -228 +230 @@
+-	p := Properties{size: uint8(sz), flags: f, index: v}
++	p := Properties{size: uint8(sz & 7), flags: f, index: v}
+--- a/composition.go
++++ b/composition.go
+@@ -10,8 +10,5 @@
+-	maxNonStarters = 30
+-	// The maximum number of characters needed for a buffer is
+-	// maxNonStarters + 1 for the starter + 1 for the GCJ
+-	maxBufferSize    = maxNonStarters + 2
+-	maxNFCExpansion  = 3  // NFC(0x1D160)
+-	maxNFKCExpansion = 18 // NFKC(0xFDFA)
+-
+-	maxByteBufferSize = utf8.UTFMax * maxBufferSize // 128
++	maxNonStarters = 2048
++	// Whole-input canonical decomposition is at most 2048 scalars. Retain two
++	// spare upstream slots; neither is used for synthesized stream-safe CGJ.
++	maxBufferSize     = maxNonStarters + 2
++	maxByteBufferSize = utf8.UTFMax * maxBufferSize
+@@ -29 +26 @@
+-	// Indicates a rune caused a segment overflow and a CGJ should be inserted.
++	// Indicates an invariant/resource failure; callers return no partial output.
+@@ -33,8 +30,3 @@
+-// streamSafe implements the policy of when a CGJ should be inserted.
+-type streamSafe uint8
+-
+-// first inserts the first rune of a segment. It is a faster version of next if
+-// it is known p represents the first rune in a segment.
+-func (ss *streamSafe) first(p Properties) {
+-	*ss = streamSafe(p.nTrailingNonStarters())
+-}
++// streamSafe retains upstream segment accounting, widened above the proven
++// admitted-input bound. Overflow fails closed rather than inserting CGJ.
++type streamSafe int
+@@ -46 +38 @@
+-		panic("streamSafe was not reset")
++		return ssOverflow
+@@ -67,26 +58,0 @@
+-// backwards is used for checking for overflow and segment starts
+-// when traversing a string backwards. Users do not need to call first
+-// for the first rune. The state of the streamSafe retains the count of
+-// the non-starters loaded.
+-func (ss *streamSafe) backwards(p Properties) ssState {
+-	if *ss > maxNonStarters {
+-		panic("streamSafe was not reset")
+-	}
+-	c := *ss + streamSafe(p.nTrailingNonStarters())
+-	if c > maxNonStarters {
+-		return ssOverflow
+-	}
+-	*ss = c
+-	if p.nLeadingNonStarters() == 0 {
+-		return ssStarter
+-	}
+-	return ssSuccess
+-}
+-
+-func (ss streamSafe) isMax() bool {
+-	return ss == maxNonStarters
+-}
+-
+-// GraphemeJoiner is inserted after maxNonStarters non-starter runes.
+-const GraphemeJoiner = "\u034F"
+-
+@@ -101 +67 @@
+-	nbyte uint8                     // Number or bytes.
++	nbyte int                       // Number or bytes.
+@@ -110,2 +76,4 @@
+-	out    []byte
+-	flushF func(*reorderBuffer) bool
++	out                           []byte
++	flushF                        func(*reorderBuffer) bool
++	err                           bool
++	slots, bytes, output, counter int
+@@ -120,0 +89,3 @@
++	if !rb.valid() {
++		return false
++	}
+@@ -122,0 +94,3 @@
++	}
++	if rb.err {
++		return false
+@@ -133 +107,5 @@
+-		end := start + rb.rune[i].size
++		end := start + int(rb.rune[i].size)
++		if end < start || start < 0 || end > rb.bytes || end-start > rb.output-len(rb.out) {
++			rb.err = true
++			return false
++		}
+@@ -142,0 +121,3 @@
++	if !rb.reserve(1) {
++		return
++	}
+@@ -156 +137 @@
+-	pos := uint8(rb.nbyte)
++	pos := rb.nbyte
+@@ -176,0 +158,4 @@
++	if rb.err || int(rb.ss) > rb.counter {
++		rb.err = true
++		return iShortDst
++	}
+@@ -178,0 +164,3 @@
++		if rb.err {
++			return iShortDst
++		}
+@@ -184,0 +173,3 @@
++	if rb.err {
++		return iShortDst
++	}
+@@ -191,0 +183,3 @@
++	if !utf8.Valid(dcomp) || !rb.reserve(utf8.RuneCount(dcomp)) {
++		return iShortDst
++	}
+@@ -201 +195,6 @@
+-		i += copy(rb.byte[rb.nbyte:], dcomp[i:i+int(info.size)])
++		if info.isInvalid() || info.size == 0 || int(info.size) > len(dcomp)-i || !rb.reserve(1) {
++			rb.err = true
++			return iShortDst
++		}
++		copy(rb.byte[rb.nbyte:rb.nbyte+int(info.size)], dcomp[i:i+int(info.size)])
++		i += int(info.size)
+@@ -210 +209,8 @@
+-	src.copySlice(rb.byte[rb.nbyte:], i, i+int(info.size))
++	if !rb.reserve(1) || i < 0 || info.size == 0 || int(info.size) > src.length()-i {
++		rb.err = true
++		return
++	}
++	if src.copySlice(rb.byte[rb.nbyte:rb.nbyte+int(info.size)], i, i+int(info.size)) != int(info.size) {
++		rb.err = true
++		return
++	}
+@@ -212,5 +217,0 @@
+-}
+-
+-// insertCGJ inserts a Combining Grapheme Joiner (0x034f) into rb.
+-func (rb *reorderBuffer) insertCGJ() {
+-	rb.insertSingle(input{str: GraphemeJoiner}, 0, Properties{size: uint8(len(GraphemeJoiner))})
+@@ -220,0 +222,4 @@
++	if !rb.reserve(1) || !utf8.ValidRune(r) {
++		rb.err = true
++		return
++	}
+@@ -224 +229 @@
+-	rb.rune[rb.nrune] = Properties{pos: bn, size: uint8(sz)}
++	rb.rune[rb.nrune] = Properties{pos: bn, size: uint8(sz & 7)} // EncodeRune returns 1..4.
+@@ -229,0 +235,4 @@
++	if !rb.validIndex(pos) || !utf8.ValidRune(r) {
++		rb.err = true
++		return
++	}
+@@ -232 +241 @@
+-	rb.rune[pos] = Properties{pos: bn, size: uint8(sz)}
++	rb.rune[pos] = Properties{pos: bn, size: uint8(sz & 7)} // EncodeRune returns 1..4.
+@@ -236,0 +246,4 @@
++	if !rb.validIndex(n) {
++		rb.err = true
++		return utf8.RuneError
++	}
+@@ -238 +251 @@
+-	r, _ := utf8.DecodeRune(rb.byte[inf.pos : inf.pos+inf.size])
++	r, _ := utf8.DecodeRune(rb.byte[inf.pos : inf.pos+int(inf.size)])
+@@ -244,0 +258,4 @@
++	if !rb.validIndex(n) {
++		rb.err = true
++		return nil
++	}
+@@ -324 +341 @@
+-	return b[0] == jamoLBase0 && (b[1]&0xFC) == jamoLBase1
++	return len(b) >= 2 && b[0] == jamoLBase0 && (b[1]&0xFC) == jamoLBase1
+@@ -330,0 +348,3 @@
++	if !rb.reserve(3) {
++		return
++	}
+@@ -443,0 +464,30 @@
++
++// Independent bounds protect every retained write; stream accounting is NOT
++// the memory-safety guard. Test-only callers can reduce each per-call budget.
++func (rb *reorderBuffer) reserve(n int) bool {
++	if rb.err || n < 0 || rb.slots < 0 || rb.slots > len(rb.rune) || rb.bytes < 0 || rb.bytes > len(rb.byte) || rb.nrune < 0 || rb.nrune > rb.slots || rb.nbyte < 0 || rb.nbyte > rb.bytes || n > rb.slots-rb.nrune || n > (rb.bytes-rb.nbyte)/4 {
++		rb.err = true
++		return false
++	}
++	return true
++}
++func (rb *reorderBuffer) validIndex(i int) bool {
++	if i < 0 || i >= rb.nrune || i >= rb.slots || i >= len(rb.rune) {
++		return false
++	}
++	p := rb.rune[i]
++	return p.pos >= 0 && p.pos <= rb.bytes-4 && p.size > 0 && p.size <= 4 && p.pos <= rb.nbyte-4
++}
++func (rb *reorderBuffer) valid() bool {
++	if !rb.reserve(0) || rb.output < 0 || len(rb.out) > rb.output {
++		rb.err = true
++		return false
++	}
++	for i := 0; i < rb.nrune; i++ {
++		if !rb.validIndex(i) {
++			rb.err = true
++			return false
++		}
++	}
++	return true
++}
+--- a/input.go
++++ b/input.go
+@@ -83,0 +84,7 @@
++
++func (in *input) length() int {
++	if in.bytes != nil {
++		return len(in.bytes)
++	}
++	return len(in.str)
++}
+--- a/normalize.go
++++ b/normalize.go
+@@ -6,0 +7,11 @@
++import (
++	"errors"
++	"unicode/utf8"
++)
++
++var ErrInput = errors.New("password encoding, repertoire or resource limit invalid")
++
++const MaxBytes = 4096
++const MaxScalars = 512
++const MaxOutput = 8192
++
+@@ -11,2 +22,10 @@
+-// Bytes returns f(b). May return b if f(b) = b.
+-func (f Form) Bytes(b []byte) []byte {
++// Bytes is a bounded one-shot ordinary Unicode17 NFC operation. It returns
++// no partial output and never aliases its input. Repertoire is validated by
++// Canonical, separately from the official normalization-conformance core.
++func Bytes(b []byte) ([]byte, error) {
++	return bounded(b, maxBufferSize, maxByteBufferSize, MaxOutput, maxNonStarters)
++}
++func bounded(b []byte, slots, byteBudget, output, counter int) ([]byte, error) {
++	if len(b) > MaxBytes || !utf8.Valid(b) || utf8.RuneCount(b) > MaxScalars || slots < 0 || slots > maxBufferSize || byteBudget < 0 || byteBudget > maxByteBufferSize || output < 0 || output > MaxOutput || counter < 0 || counter > maxNonStarters {
++		return nil, ErrInput
++	}
+@@ -14 +33 @@
+-	ft := formTable[f]
++	ft := formTable[NFC]
+@@ -15,0 +35,3 @@
++	if n < 0 || n > len(b) || n > output {
++		return nil, ErrInput
++	}
+@@ -17 +39 @@
+-		return b
++		return append([]byte{}, b...), nil
+@@ -19,4 +41,8 @@
+-	out := make([]byte, n, len(b))
+-	copy(out, b[0:n])
+-	rb := reorderBuffer{f: *ft, src: src, nsrc: len(b), out: out, flushF: appendFlush}
+-	return doAppendInner(&rb, n)
++	out := make([]byte, n, output)
++	copy(out, b[:n])
++	rb := reorderBuffer{f: *ft, src: src, nsrc: len(b), out: out, flushF: appendFlush, slots: slots, bytes: byteBudget, output: output, counter: counter}
++	result := doAppendInner(&rb, n)
++	if rb.err {
++		return nil, ErrInput
++	}
++	return result, nil
+@@ -23,0 +50 @@
++
+@@ -28,0 +56,4 @@
++	if i < 0 || end < i || end > rb.nsrc || end-i > rb.output-len(rb.out) {
++		rb.err = true
++		return -1
++	}
+@@ -33,0 +65 @@
++		old := p
+@@ -34,0 +67,4 @@
++		if p < 0 || p <= old || rb.err {
++			rb.err = true
++			return nil
++		}
+@@ -35,0 +72,4 @@
++		if p < 0 || rb.err {
++			rb.err = true
++			return nil
++		}
+@@ -97,3 +137,2 @@
+-// decomposeSegment scans the first segment in src into rb. It inserts 0x034f
+-// (Grapheme Joiner) when it encounters a sequence of more than 30 non-starters
+-// and returns the number of bytes consumed from src or iShortDst or iShortSrc.
++// decomposeSegment retains upstream ordering/composition boundaries. Overflow
++// is an invariant failure, never a stream-safe CGJ insertion.
+@@ -107 +146,2 @@
+-		return sp + 1
++		rb.err = true
++		return int(iShortSrc)
+@@ -115,2 +155,2 @@
+-		rb.insertCGJ()
+-		goto end
++		rb.err = true
++		return int(iShortDst)
+@@ -139,2 +179,2 @@
+-			rb.insertCGJ()
+-			break
++			rb.err = true
++			return int(iShortDst)
