@@ -284,6 +284,7 @@ func (s *Service) MarkCompromised(ctx context.Context, userID string) error {
 	// cancel it into an unrecorded report or a process-wide availability failure.
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
 	defer cancel()
+	missing := false
 	e := s.repo.Control(ctx, func(q *store.Queries) error {
 		n, e := q.CompromiseUser(ctx, userID)
 		if e != nil {
@@ -291,6 +292,7 @@ func (s *Service) MarkCompromised(ctx context.Context, userID string) error {
 			return e
 		}
 		if n != 1 {
+			missing = true
 			return ErrDenied
 		}
 		e = q.RevokeUserSessions(ctx, store.RevokeUserSessionsParams{UserID: userID, Now: sql.NullInt64{Int64: s.now().Unix(), Valid: true}})
@@ -300,6 +302,13 @@ func (s *Service) MarkCompromised(ctx context.Context, userID string) error {
 		return e
 	}, nil)
 	if e != nil {
+		// Control can refuse lock/connection/transaction admission before invoking
+		// the callback. That still leaves an authorized protective intent
+		// unpersisted: acceptance must stop until operator repair/reconciliation.
+		// A positively observed absent target is a safe no-op, not uncertainty.
+		if !missing {
+			s.repo.FailClosed()
+		}
 		return ErrDenied
 	}
 	return nil

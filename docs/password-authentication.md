@@ -248,7 +248,10 @@ incorrectly suppress the password-only consecutive-failure reset.
 or permission check. It sets the flag and revokes only affected user sessions,
 without waiting for SMTP. A failed security-control write after real proof work or
 protective report poisons the repository handle before releasing control; no
-subsequent proof may succeed through uncertain state. Repair/reconciliation and
+subsequent proof may succeed through uncertain state. A protective report refused
+before its callback (lock/connection/transaction admission) also poisons the handle
+before returning failure. A positively observed absent target is a safe denied
+no-op, not a reason to disable unrelated accounts. Repair/reconciliation and
 explicit repetition of the failed protective action are required before reopening;
 restart is not a claimed recovery protocol for an unpersisted report. Raw SQL,
 malicious host rollback and uncoordinated external database writers are outside
