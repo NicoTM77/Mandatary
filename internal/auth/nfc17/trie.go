@@ -24,10 +24,7 @@ var nfkcSparse = sparseBlocks{
 	offset: nfkcSparseOffset[:],
 }
 
-var (
-	nfcData  = newNfcTrie(0)
-	nfkcData = newNfkcTrie(0)
-)
+var nfcData = newNfcTrie(0)
 
 // lookup determines the type of block n and looks up the value for b.
 // For n < t.cutoff, the block is a simple lookup table. Otherwise, the block

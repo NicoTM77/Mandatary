@@ -3,22 +3,35 @@
 @@ -44 +44 @@
 -	pos   uint8  // start position in reorderBuffer; used in composition.go
 +	pos   int    // start position in reorderBuffer; used in composition.go
-@@ -192 +192,3 @@
+@@ -58,3 +58,2 @@
+-	form                     Form
+-	composing, compatibility bool // form type
+-	info                     lookupFunc
++	composing bool // form type
++	info      lookupFunc
+@@ -108 +106,0 @@
+-func (p Properties) combinesForward() bool  { return p.flags&0x20 != 0 }
+@@ -114,4 +111,0 @@
+-}
+-
+-func (p Properties) multiSegment() bool {
+-	return p.index >= firstMulti && p.index < endMulti
+@@ -192 +186,3 @@
 -	key := uint64(a)<<recompShift | uint64(b)
 +	// Callers supply validated Unicode scalars. Mask only unused sign/high bits
 +	// explicitly so packed-table arithmetic is visible to integer analysis.
 +	key := uint64(a&0x1fffff)<<recompShift | uint64(b&0x1fffff)
-@@ -212 +214 @@
+@@ -212 +208 @@
 -		return Properties{size: uint8(sz)}
 +		return Properties{size: uint8(sz & 7)}
-@@ -215,3 +217,3 @@
+@@ -215,3 +211,3 @@
 -			size:  uint8(sz),
 -			ccc:   uint8(v),
 -			tccc:  uint8(v),
 +			size:  uint8(sz & 7),
 +			ccc:   uint8(v & 0xff),
 +			tccc:  uint8(v & 0xff),
-@@ -228 +230 @@
+@@ -228 +224 @@
 -	p := Properties{size: uint8(sz), flags: f, index: v}
 +	p := Properties{size: uint8(sz & 7), flags: f, index: v}
 --- a/composition.go
@@ -224,7 +237,20 @@
 +}
 --- a/input.go
 +++ b/input.go
-@@ -83,0 +84,7 @@
+@@ -18,4 +17,0 @@
+-func inputString(str string) input {
+-	return input{str: str}
+-}
+-
+@@ -26,7 +21,0 @@
+-func (in *input) _byte(p int) byte {
+-	if in.bytes == nil {
+-		return in.str[p]
+-	}
+-	return in.bytes[p]
+-}
+-
+@@ -83,0 +73,7 @@
 +
 +func (in *input) length() int {
 +	if in.bytes != nil {
@@ -321,3 +347,11 @@
 -			break
 +			rb.err = true
 +			return int(iShortDst)
+--- a/trie.go
++++ b/trie.go
+@@ -27,4 +27 @@
+-var (
+-	nfcData  = newNfcTrie(0)
+-	nfkcData = newNfkcTrie(0)
+-)
++var nfcData = newNfcTrie(0)

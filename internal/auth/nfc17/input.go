@@ -15,21 +15,10 @@ func inputBytes(str []byte) input {
 	return input{bytes: str}
 }
 
-func inputString(str string) input {
-	return input{str: str}
-}
-
 func (in *input) setBytes(str []byte) {
 	in.str = ""
 	in.bytes = str
 }
-func (in *input) _byte(p int) byte {
-	if in.bytes == nil {
-		return in.str[p]
-	}
-	return in.bytes[p]
-}
-
 func (in *input) skipASCII(p, max int) int {
 	if in.bytes == nil {
 		for ; p < max && in.str[p] < utf8.RuneSelf; p++ {

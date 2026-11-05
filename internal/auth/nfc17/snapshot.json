@@ -9,14 +9,14 @@
   "profile": "mdt-pwd-u17-nfc-cn-v1",
   "license_sha256": "911f8f5782931320f5b8d1160a76365b83aea6447ee6c04fa6d5591467db9dad",
   "adapted_sha256": {
-    "forminfo.go": "2f269087cea8c9d399c2626a8d7da1bc5888f3af47601d0f31e5ee6a71381e6f",
+    "forminfo.go": "89b77a6132841504ceebf3bdbda8baa12691abb4a3c90b88b89a185d7e70000e",
     "composition.go": "d24d4470df1b90ade9bdd3c99dd6e3d397a18dba62062e5a818dfa447151e2c7",
     "tables.go": "26a93c5da20c2a936876df93e46ff8ac9fbd7d0a69e2dec1fae8bce591896d79",
-    "input.go": "26acf30f4082450eacd8d4b84865245586993ad554b8cb9bfdb85229ab3a7c60",
+    "input.go": "f1ac9d99be7a62eaddbc56147aa9534b3356a815ea0c14eea7f83a8248701fc0",
     "normalize.go": "8e9330e273693427c5e7e87483f39ef8e9b53ffed493ae84a9b52148251f29c7",
-    "trie.go": "6dba7961a35214b969b39b2956a648e7b391d8ede1cf1f0a84e29371e9c8d9e3"
+    "trie.go": "e538d138bf8ea31b2d79038e357ba7aaaa84c53a11c7cbab74088523ef12e4e0"
   },
-  "adaptation_sha256": "39967133f57dad25a84cef63dfb3ec3310d4d1f538841dc1364808c68ac9e2de",
+  "adaptation_sha256": "176f6ac90691675301fd9ec33d820f07e3d2ed876c597d91dde19dd9b61ca073",
   "retained_upstream_ranges": {
     "normalize.go": [
       [
@@ -118,11 +118,9 @@
       "(p Properties) isInvalid() bool { return p.flags == 0x80 }",
       "(p Properties) isYesC() bool { return p.flags&0x10 == 0 }",
       "(p Properties) isYesD() bool { return p.flags&0x4 == 0 }",
-      "(p Properties) combinesForward() bool  { return p.flags&0x20 != 0 }",
       "(p Properties) combinesBackward() bool { return p.flags&0x8 != 0 } // == isMaybe",
       "(p Properties) hasDecomposition() bool { return p.flags&0x4 != 0 } // == isNoD",
       "(p Properties) isInert() bool {",
-      "(p Properties) multiSegment() bool {",
       "(p Properties) nLeadingNonStarters() uint8 {",
       "(p Properties) nTrailingNonStarters() uint8 {",
       "(p Properties) Decomposition() []byte {",
@@ -160,9 +158,7 @@
     ],
     "input.go": [
       "inputBytes(str []byte) input {",
-      "inputString(str string) input {",
       "(in *input) setBytes(str []byte) {",
-      "(in *input) _byte(p int) byte {",
       "(in *input) skipASCII(p, max int) int {",
       "(in *input) appendSlice(buf []byte, b, e int) []byte {",
       "(in *input) copySlice(buf []byte, b, e int) int {",

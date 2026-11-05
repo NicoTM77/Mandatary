@@ -59,7 +59,7 @@ func (h *HIBP) Check(ctx context.Context, canonical []byte) (found, available bo
 			return false, false
 		}
 		for _, c := range parts[0] {
-			if !(c >= '0' && c <= '9' || c >= 'A' && c <= 'F') {
+			if (c < '0' || c > '9') && (c < 'A' || c > 'F') {
 				return false, false
 			}
 		}

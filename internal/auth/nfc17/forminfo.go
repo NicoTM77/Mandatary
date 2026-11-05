@@ -55,9 +55,8 @@ type lookupFunc func(b input, i int) Properties
 
 // formInfo holds Form-specific functions and tables.
 type formInfo struct {
-	form                     Form
-	composing, compatibility bool // form type
-	info                     lookupFunc
+	composing bool // form type
+	info      lookupFunc
 }
 
 var formTable = []*formInfo{{composing: true, info: lookupInfoNFC}}
@@ -105,16 +104,11 @@ func (p Properties) isInvalid() bool { return p.flags == 0x80 }
 func (p Properties) isYesC() bool { return p.flags&0x10 == 0 }
 func (p Properties) isYesD() bool { return p.flags&0x4 == 0 }
 
-func (p Properties) combinesForward() bool  { return p.flags&0x20 != 0 }
 func (p Properties) combinesBackward() bool { return p.flags&0x8 != 0 } // == isMaybe
 func (p Properties) hasDecomposition() bool { return p.flags&0x4 != 0 } // == isNoD
 
 func (p Properties) isInert() bool {
 	return p.flags&qcInfoMask == 0 && p.ccc == 0
-}
-
-func (p Properties) multiSegment() bool {
-	return p.index >= firstMulti && p.index < endMulti
 }
 
 func (p Properties) nLeadingNonStarters() uint8 {
