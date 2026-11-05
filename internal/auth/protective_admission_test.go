@@ -31,8 +31,8 @@ func TestProtectiveReportControlAdmissionFailureStopsAcceptance(t *testing.T) {
 	// the report's bounded timeout: failure BEFORE its callback, not a write trigger.
 	report := s.MarkCompromised(t.Context(), "u")
 	close(release)
-	if e := <-done; e != nil {
-		t.Fatal(e)
+	if e := <-done; e != store.ErrStorage {
+		t.Fatal("in-flight lock holder acknowledged after protective failure", e)
 	}
 	if report != ErrDenied || scalarFixture(t, db, `SELECT compromised FROM users WHERE id='u'`) != 0 {
 		t.Fatal("blocked protective intent was acknowledged or unexpectedly persisted")

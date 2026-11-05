@@ -9,6 +9,7 @@ import (
 	"database/sql"
 	"errors"
 	"net/netip"
+	"slices"
 	"sync"
 	"time"
 	"unicode/utf8"
@@ -27,11 +28,13 @@ type Proof struct {
 	RequiresMFA             bool
 }
 type Service struct {
-	repo   *store.Repository
-	policy Policy
-	now    func() time.Time
-	gate   *trafficGate
-	verify func([]byte, []byte, string) bool
+	// Immutable trusted deployment configuration, never a request Host header.
+	hostname string
+	repo     *store.Repository
+	policy   Policy
+	now      func() time.Time
+	gate     *trafficGate
+	verify   func([]byte, []byte, string) bool
 }
 
 // Admission is bounded across Service handles in this process, before any KDF.
@@ -42,7 +45,12 @@ var dummyOnce sync.Once
 var dummyVerifier []byte
 var dummyError error
 
-func NewService(r *store.Repository, p Policy) (*Service, error) {
+// NewService requires the trusted deployment hostname even for offline use.
+// There is deliberately no empty/request-supplied-context fallback.
+func NewService(r *store.Repository, p Policy, hostname string) (*Service, error) {
+	if _, err := nfc17.Canonical([]byte(hostname)); err != nil || hostname == "" {
+		return nil, ErrDenied
+	}
 	if r == nil || p.MinimumPasswordOnly < 15 || p.MinimumPasswordOnly > 128 || p.MinimumMFA < 8 || p.MinimumMFA > 128 {
 		return nil, ErrDenied
 	}
@@ -56,7 +64,7 @@ func NewService(r *store.Repository, p Policy) (*Service, error) {
 	if e != nil {
 		return nil, ErrDenied
 	}
-	return &Service{repo: r, policy: p, now: time.Now, gate: gate, verify: VerifyPassword}, nil
+	return &Service{repo: r, policy: p, hostname: hostname, now: time.Now, gate: gate, verify: VerifyPassword}, nil
 }
 
 // Prove is called only inside a trusted protected-transport adapter. ip is the
@@ -163,6 +171,9 @@ func (s *Service) Prove(ctx context.Context, name string, raw []byte, ip string)
 			}
 			return nil
 		}
+		if s.repo.FailedClosed() {
+			return nil
+		}
 		stronger, e := q.HasStrongerAuthenticator(ctx, store.HasStrongerAuthenticatorParams{UserID: u.ID, CredentialGeneration: control.CredentialGeneration, Now: sql.NullInt64{Int64: s.now().Unix(), Valid: true}})
 		if e != nil {
 			return e
@@ -200,6 +211,7 @@ func (s *Service) ReplacePassword(ctx context.Context, id string, observed, raw 
 	var c store.InstallationControl
 	var u store.User
 	var a store.Authenticator
+	var addresses []store.NotificationAddress
 	e := s.repo.Read(ctx, func(q *store.Queries) error {
 		var e error
 		c, e = q.GetInstallationControl(ctx)
@@ -211,6 +223,10 @@ func (s *Service) ReplacePassword(ctx context.Context, id string, observed, raw 
 			return e
 		}
 		a, e = q.GetLocalBinding(ctx, id)
+		if e != nil {
+			return e
+		}
+		addresses, e = q.ListNotificationAddresses(ctx, id)
 		return e
 	})
 	if e != nil {
@@ -225,7 +241,13 @@ func (s *Service) ReplacePassword(ctx context.Context, id string, observed, raw 
 	if _, _, valid := parseVerifier(a.VerifierHash, a.PasswordFormat.String); !valid {
 		return ErrDenied
 	}
-	canonical, e := s.policy.Validate(ctx, raw, u.MfaRequirement != "optional", []string{u.Username})
+	values := []string{u.Username, s.hostname}
+	for _, address := range addresses {
+		if address.State == "active" && address.VerifiedAt.Valid && !address.RevokedAt.Valid && address.AuthorityGeneration == c.AuthorityGeneration {
+			values = append(values, address.Address)
+		}
+	}
+	canonical, e := s.policy.Validate(ctx, raw, u.MfaRequirement != "optional", values)
 	if e != nil {
 		return e
 	}
@@ -249,7 +271,11 @@ func (s *Service) ReplacePassword(ctx context.Context, id string, observed, raw 
 		if e != nil {
 			return e
 		}
-		if current != c || user != u || !samePassword(a, binding) {
+		currentAddresses, e := q.ListNotificationAddresses(ctx, id)
+		if e != nil {
+			return e
+		}
+		if current != c || user != u || !samePassword(a, binding) || !slices.Equal(addresses, currentAddresses) {
 			return ErrDenied
 		}
 		now := s.now().Unix()

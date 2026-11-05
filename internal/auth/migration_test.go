@@ -64,7 +64,7 @@ func TestPasswordRevisionMigrationPreservesInactiveState(t *testing.T) {
 	if !bytes.Equal(before, after) || scalarFixture(t, db, `SELECT failed_attempts FROM authenticators WHERE id='pwd'`) != 99 || scalarFixture(t, db, `SELECT compromised FROM users WHERE id='u'`) != 1 || scalarFixture(t, db, `SELECT password_revision FROM users WHERE id='u'`) != 0 {
 		t.Fatal("migration relabelled/reactivated/reset historical state")
 	}
-	s, e := NewService(r, DefaultPolicy())
+	s, e := NewService(r, DefaultPolicy(), "synthetic-host.example.invalid")
 	if e != nil {
 		t.Fatal(e)
 	}

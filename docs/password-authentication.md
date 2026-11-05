@@ -48,9 +48,19 @@ CMVP/RBG certification, full-platform or deployment qualification is claimed.
 6. Hash the **full canonical UTF8** with approved Argon2id.
 
 `Policy.Validate` is the shared establishment/change/reset/setup policy entry
-point. The caller supplies trusted contextual username/email/hostname values;
-service replacement currently supplies its stored username, while future account
-ceremonies must provide their applicable verified address/deployment context.
+point. Callers must supply complete trusted applicable username/email/hostname
+context, not request-selected omissions. The implemented replacement reads the
+stored username and every active, verified, unrevoked current-authority-generation
+notification address in its coherent account snapshot. `NewService` requires a
+nonempty supported-profile trusted deployment hostname, captured immutably at
+construction (never inferred from an HTTP Host/forwarded header). Replacement
+screens all these values and selected suffix derivatives through the same frozen
+NFC profile. It rechecks the entire ordered address record snapshot, including
+versions/state/generation, inside the serialized commit transaction; a concurrent
+address addition/change/removal refuses replacement without changing its verifier.
+Inactive/imported/unverified addresses are not treated as current trusted email.
+Future initial/setup/reset ceremonies must enforce the same complete-context
+contract; they are not implemented routes in this slice.
 Browser length display is advisory: later UI must use this server contract,
 retain original input for strict decoding, permit managers/autofill/paste and
 show the endpoint-representation warning. Browser `normalize()` or UTF16 `.length`
@@ -250,7 +260,15 @@ without waiting for SMTP. A failed security-control write after real proof work 
 protective report poisons the repository handle before releasing control; no
 subsequent proof may succeed through uncertain state. A protective report refused
 before its callback (lock/connection/transaction admission) also poisons the handle
-before returning failure. A positively observed absent target is a safe denied
+before returning failure. Poison also terminates already-running success: Control
+observes terminal health after the callback and before delivery, and makes its
+final atomic health observation after connection/shared-lock cleanup the success
+acknowledgement boundary, ordered against the terminal `FailClosed` atomic store.
+An already-poisoned handle cannot acknowledge proof/replacement/control success.
+A successful in-flight transaction still completes FULL commit/sync so an actual
+failed-proof charge is not erased; durability is not acknowledgement or restored
+availability. No after-durable callback starts if poison has already been observed.
+A positively observed absent target is a safe denied
 no-op, not a reason to disable unrelated accounts. Repair/reconciliation and
 explicit repetition of the failed protective action are required before reopening;
 restart is not a claimed recovery protocol for an unpersisted report. Raw SQL,

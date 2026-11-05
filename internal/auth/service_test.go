@@ -44,7 +44,7 @@ func serviceFixture(t *testing.T) (*Service, *store.Repository, *sql.DB) {
 			t.Fatal(e)
 		}
 	}
-	svc, e := NewService(r, DefaultPolicy())
+	svc, e := NewService(r, DefaultPolicy(), "synthetic-host.example.invalid")
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -97,7 +97,7 @@ func TestPasswordThrottleCeilingRestartAndIndependentFactors(t *testing.T) {
 	if e := db.QueryRow(`SELECT failed_attempts,state FROM authenticators WHERE id='pwd'`).Scan(&n, &state); e != nil || n != 100 || state != "disabled" {
 		t.Fatal("ceiling not durable", n, state, e)
 	}
-	s2, e := NewService(r, DefaultPolicy())
+	s2, e := NewService(r, DefaultPolicy(), "synthetic-host.example.invalid")
 	if e != nil {
 		t.Fatal(e)
 	}

@@ -146,7 +146,7 @@ func TestPasswordRealRepositoryRestart(t *testing.T) {
 			t.Error(e)
 		}
 	}()
-	s, e = NewService(reopened, DefaultPolicy())
+	s, e = NewService(reopened, DefaultPolicy(), "synthetic-host.example.invalid")
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -166,7 +166,7 @@ func TestPasswordRealRepositoryRestart(t *testing.T) {
 func TestPasswordConcurrentHandlesCannotOverrunCeiling(t *testing.T) {
 	s, r, db := serviceFixture(t)
 	execFixture(t, db, `UPDATE authenticators SET failed_attempts=99 WHERE id='pwd'`)
-	s2, e := NewService(r, DefaultPolicy())
+	s2, e := NewService(r, DefaultPolicy(), "synthetic-host.example.invalid")
 	if e != nil {
 		t.Fatal(e)
 	}

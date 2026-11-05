@@ -26,7 +26,7 @@ func passwordProcessProof(t *testing.T, path string) {
 			t.Error(e)
 		}
 	}()
-	s, e := NewService(r, DefaultPolicy())
+	s, e := NewService(r, DefaultPolicy(), "synthetic-host.example.invalid")
 	if e != nil {
 		t.Fatal(e)
 	}
