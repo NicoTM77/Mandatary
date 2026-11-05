@@ -29,6 +29,15 @@ by the runtime UID/root; data uses the actual runtime UID/GID and 0700/0600.
 Missing/invalid/wrong keys and unsafe storage fail startup. No setup token is
 issued. Tests generate isolated synthetic state and do not require a real key.
 
+P1.04 adds validated `MANDATARY_LOG_LEVEL` (`debug/info/warn/error`) and
+`MANDATARY_LOG_FORMAT` (`json/text`), stdout-only structured logging and
+fail-closed payload redaction. The binary defaults to JSON; `make dev` selects
+text unless explicitly overridden. Invalid settings fail before storage or a
+listener. Data paths must now be absolute/clean without control characters;
+future TD §13 switches are refused rather than silently acting as no-op security
+controls. See the [configuration/logging reference](docs/configuration-logging.md)
+for exact scope, schema, tests, privacy and protected-control-channel boundaries.
+
 ## Prerequisites and isolated setup
 
 Use Git, Bash, Make, curl, tar, SHA-256 tooling (`sha256sum` or macOS `shasum`),
