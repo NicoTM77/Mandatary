@@ -7,13 +7,14 @@ administrator-defined, per-container permissions.
 ## Current status
 
 Step 0 passed independent review; Nico merged the decision package in PR #2
-and authorized the Phase 1 kickoff on 2026-11-03. P1.01/P1.02 are merged; Nico
-released P1.03 only for this implementation slice. This checkout adds the
-WAL/FULL repository, mandatory startup master-key check, authenticated secret
-encryption and encrypted SMTP storage to the loopback-only static skeleton.
+and authorized the Phase 1 kickoff on 2026-11-03. P1.01–P1.03 are merged.
+This P1.04 slice adds structured configuration, stdout JSON/text logging and
+fail-closed redaction to the loopback-only static skeleton. Mandatory startup
+keys, the WAL/FULL repository and authenticated secret encryption are retained.
 See [Container-free development](development.md) for setup/checks and the
-[schema contract](docs/storage-schema.md) and
-[repository contract](docs/storage-repository.md) for coverage and boundaries.
+[schema contract](docs/storage-schema.md),
+[repository contract](docs/storage-repository.md) and
+[configuration/logging reference](docs/configuration-logging.md) for boundaries.
 
 Authentication, policy enforcement, Docker access, MCP, mail delivery
 and deployment are **not available**. Architecture documents describe later planned product

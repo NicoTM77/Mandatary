@@ -75,7 +75,7 @@ negative-control:
 # The Go server is loopback/static-only, with required key/storage initialization.
 # No Docker socket or mail access. See development.md before starting it.
 dev: build
-	./bin/mandatary
+	MANDATARY_LOG_FORMAT="$${MANDATARY_LOG_FORMAT:-text}" ./bin/mandatary
 
 frontend-dev: versions
 	npm --prefix web run dev
