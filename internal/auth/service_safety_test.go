@@ -141,7 +141,11 @@ func TestPasswordRealRepositoryRestart(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	defer reopened.Close()
+	defer func() {
+		if e := reopened.Close(); e != nil {
+			t.Error(e)
+		}
+	}()
 	s, e = NewService(reopened, DefaultPolicy())
 	if e != nil {
 		t.Fatal(e)

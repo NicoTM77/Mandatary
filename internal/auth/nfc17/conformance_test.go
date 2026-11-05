@@ -26,7 +26,7 @@ func corpus(t *testing.T, name string) []byte {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer z.Close()
+	defer func() { _ = z.Close() }()
 	b, err = io.ReadAll(z)
 	if err != nil {
 		t.Fatal(err)

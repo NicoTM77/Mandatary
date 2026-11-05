@@ -40,7 +40,7 @@ func (h *HIBP) Check(ctx context.Context, canonical []byte) (found, available bo
 	if e != nil {
 		return false, false
 	}
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 	if res.StatusCode != 200 {
 		return false, false
 	}

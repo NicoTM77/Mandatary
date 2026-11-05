@@ -18,14 +18,14 @@ func TestCrossToolchainPasswordContract(t *testing.T) {
 	for _, raw := range []string{"synthetic cafe\u0301 phrase", "synthetic café phrase", strings.Repeat("x", 13) + "\U000105d2\u0307", "q" + strings.Repeat("\u0301", 127), "q" + strings.Repeat("\u0301", 31) + "\u0323", "q\u0323" + strings.Repeat("\u0301", 31), strings.Repeat("\uE000", 15), "\u0378", "\ufdd0", "\ufffd", "Case and spaces ", "case and spaces ", "Ａ compatibility", string([]byte{0xff}), "password1"} {
 		b, e := nfc17.Canonical([]byte(raw))
 		if e != nil {
-			fmt.Fprintln(h, "denied")
+			_, _ = fmt.Fprintln(h, "denied") // hash.Hash writes cannot fail.
 			continue
 		}
 		v, e := hashPassword(b, bytes.NewReader([]byte("0123456789abcdef")))
 		if e != nil {
 			t.Fatal(e)
 		}
-		fmt.Fprintf(h, "%x:%d:%t:%s\n", b, utf8.RuneCount(b), blocked(b), v)
+		_, _ = fmt.Fprintf(h, "%x:%d:%t:%s\n", b, utf8.RuneCount(b), blocked(b), v) // hash.Hash writes cannot fail.
 	}
 	got := fmt.Sprintf("%x", h.Sum(nil))
 	t.Logf("cross-toolchain password contract=%s", got)

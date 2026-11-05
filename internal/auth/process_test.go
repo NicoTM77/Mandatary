@@ -21,7 +21,11 @@ func passwordProcessProof(t *testing.T, path string) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	defer r.Close()
+	defer func() {
+		if e := r.Close(); e != nil {
+			t.Error(e)
+		}
+	}()
 	s, e := NewService(r, DefaultPolicy())
 	if e != nil {
 		t.Fatal(e)

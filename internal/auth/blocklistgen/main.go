@@ -27,12 +27,12 @@ func run(source, target string) error {
 	if e != nil {
 		return e
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	z, e := gzip.NewReader(f)
 	if e != nil {
 		return e
 	}
-	defer z.Close()
+	defer func() { _ = z.Close() }()
 	raw, e := io.ReadAll(io.LimitReader(z, 2000001))
 	if e != nil {
 		return e

@@ -39,7 +39,9 @@ func TestPasswordRevisionMigrationPreservesInactiveState(t *testing.T) {
 	}
 	options := store.Options{DataDir: filepath.Dir(file), MasterKey: key, OwnerUID: os.Geteuid(), OwnerGID: os.Getegid(), ExistingOnly: true}
 	if helper, e := store.Open(t.Context(), options); e == nil {
-		helper.Close()
+		if e := helper.Close(); e != nil {
+			t.Error(e)
+		}
 		t.Fatal("helper migrated old schema")
 	}
 	if n := scalarFixture(t, db, `SELECT count(*) FROM pragma_table_info('users') WHERE name='password_revision'`); n != 0 {
@@ -50,7 +52,11 @@ func TestPasswordRevisionMigrationPreservesInactiveState(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	defer r.Close()
+	defer func() {
+		if e := r.Close(); e != nil {
+			t.Error(e)
+		}
+	}()
 	var after []byte
 	if e := db.QueryRow(`SELECT verifier_hash FROM authenticators WHERE id='pwd'`).Scan(&after); e != nil {
 		t.Fatal(e)
