@@ -209,6 +209,11 @@ state/time recheck and conditional failure/reset; the OS lock precedes SQLite.
 One non-waiting process-wide KDF admission slot bounds multiple Service handles;
 there is no unbounded waiter queue. Separate-process control locks prevent
 speculative concurrent work from exceeding the remaining durable retry budget.
+Admitted control work has an independent10-second deadline. Caller cancellation
+before proof evaluation denies; a disconnect after actual evaluation cannot erase
+the failure charge or poison the service as though storage failed. An already
+authorized protective report also completes under its bounded control context,
+not the untrusted client's transport lifetime. This is not new report authority.
 
 IP mitigation:30 admitted requests per fixed60-second window; IPv4-mapped
 addresses canonicalized; IPv6 grouped by/64. Peer must be a parsed validated

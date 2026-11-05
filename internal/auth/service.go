@@ -66,6 +66,10 @@ func NewService(r *store.Repository, p Policy) (*Service, error) {
 // bounded serialization trades throughput for exact durable ceiling semantics;
 // it does not issue or revive any authority. No external network runs here.
 func (s *Service) Prove(ctx context.Context, name string, raw []byte, ip string) (Proof, error) {
+	if ctx.Err() != nil {
+		return Proof{}, ErrDenied
+	}
+	caller := ctx
 	if len(name) == 0 || len(name) > 256 || !s.gate.allow(ip, s.now()) {
 		return Proof{}, ErrDenied
 	}
@@ -80,6 +84,11 @@ func (s *Service) Prove(ctx context.Context, name string, raw []byte, ip string)
 		return Proof{}, ErrDenied
 	}
 	var result Proof
+	// Once admitted, a bounded control transaction must finish recording actual
+	// proof work even if an untrusted HTTP caller disconnects. Cancellation must
+	// neither erase failures nor be mistaken for storage uncertainty/poisoning.
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
+	defer cancel()
 	e = s.repo.Control(ctx, func(q *store.Queries) (failure error) {
 		evaluated := false
 		defer func() {
@@ -120,6 +129,9 @@ func (s *Service) Prove(ctx context.Context, name string, raw []byte, ip string)
 		}
 		if _, _, valid := parseVerifier(a.VerifierHash, a.PasswordFormat.String); !valid {
 			_ = s.verify(canonical, dummyVerifier, PasswordProfile)
+			return nil
+		}
+		if caller.Err() != nil {
 			return nil
 		}
 		matched := s.verify(canonical, a.VerifierHash, a.PasswordFormat.String)
@@ -268,6 +280,10 @@ func (s *Service) ReplacePassword(ctx context.Context, id string, observed, raw 
 // authorization check. Its later caller must authorize the report; it grants
 // no replacement/session authority. Repository uncertainty poisons acceptance.
 func (s *Service) MarkCompromised(ctx context.Context, userID string) error {
+	// The caller has already authorized this protective intent. A client cannot
+	// cancel it into an unrecorded report or a process-wide availability failure.
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
+	defer cancel()
 	e := s.repo.Control(ctx, func(q *store.Queries) error {
 		n, e := q.CompromiseUser(ctx, userID)
 		if e != nil {
