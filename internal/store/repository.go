@@ -124,7 +124,7 @@ func Open(ctx context.Context, options Options) (_ *Repository, result error) {
 		}
 	}
 	if options.ExistingOnly {
-		if current != 3 {
+		if current != 6 {
 			return nil, ErrStorage
 		}
 	} else {
@@ -178,7 +178,7 @@ func existingSchemaVersion(ctx context.Context, db *sql.DB) (int64, error) {
 		return 0, ErrStorage
 	}
 	versions, err := metadata.ListMigrations(ctx, db)
-	if err != nil || len(versions) < 2 || len(versions) > 4 {
+	if err != nil || len(versions) < 2 || len(versions) > 7 {
 		return 0, ErrStorage
 	}
 	for i, version := range versions {
