@@ -156,6 +156,14 @@ bootstrap/host recovery, actual restore, browser/device/provider/governance and
 packaged runtime evidence remain with their named owning tasks. No public auth
 or mail endpoint is mounted by P1.06; no recovery-only capability becomes AAL2.
 Exact-head executed results and independent review belong to its original card.
+The issued saved-code batch's actual hundredth evaluated failure uses the same
+protective invalidation-notice boundary as bound-TOTP exhaustion: exactly one
+intent with immutable verified-address fanout, never a notice per rejected guess
+or email authentication. `TestRecoveryThresholdInvalidationNoticeConcurrentRestart`,
+`TestRecoveryThresholdNoticeFailureCannotUndoDisablement`,
+`TestRecoveryThresholdSQLiteSyncFailureIsFailClosed` and
+`TestRecoveryOnlyEvaluatedCeilingCrossingNotifies` cover its serialized crossing,
+restart/TLS delivery, storage-failure and no-premature-notice component cases.
 
 ### 4.4 WebAuthn, cryptographic authenticators and syncable passkeys
 

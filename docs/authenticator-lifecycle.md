@@ -73,6 +73,14 @@ credential/control generations. No ordinary session-creation method exists here.
   atomic. This is E08 single-code replacement, not general list regeneration;
   explicit list regeneration revokes previous batches/capabilities. A durable
   shared batch budget prevents alternating codes/IDs to evade100 failures.
+  The hundredth evaluated failure disables that issued batch and commits exactly
+  one protective `authenticator_suspended` intent in the same serialized FULL
+  transaction, using all current verified-address snapshots. Lesser failures and
+  pre-evaluation rejections do not notify. Marker/outbox failure cannot roll back
+  disablement: existing protective repair/manual-incident safeguards apply.
+  Independent authenticators remain usable unless storage uncertainty requires
+  the repository handle to fail closed; no saved code in the disabled batch can
+  regain recovery authority.
 * The resulting ten-minute capability can prove one replacement TOTP, never
   create normal/AAL2 authority. Rebinding revokes prior TOTP bindings and records
   replacement/recovery-completion notices. WebAuthn-only accounts cannot use
@@ -183,6 +191,7 @@ specifications or later integration/device/governance/release gates.
 | NOTIFY-DELIVERY, TLS-BOUNDARY, N1 |TestLifecycleEventsReachIndependentTLSReceiver, TestSecurityNoticesTLSAndFanout, TestNoticesCertificateAndAuthenticationFailures, TestNoticesMissingTLSNeverSubmitOrAuthenticate, TestNoticesPartialFailureKeepsRecipientSnapshots, TestNoticeConfigurationFailsBeforeActivation |
 | NOTIFY-DELIVERY retry/capacity/repair/crash |TestNoticeRetryExhaustionIsDurableAndVisible, TestNoticeBackoffBounds, TestNoticeCapacityRollsBackOrdinaryActivation, TestNoticeSharedLeaseCeilingDoesNotBlockRevocation, TestNoticeMaximumAgeAndRepairCycleBounds, TestNoticeExplicitRepairRequiresFreshAuthority, TestNoticesAmbiguousACKRetriesStableIdentity, TestNoticeCancellationAtTLSHandshakeBoundary |
 | Review242 protective admission/invalidation/delivery corrections |TestTOTPReportAdmissionFailureStopsAcceptance, TestTOTPRemovalAdmissionFailureStopsAcceptance, TestTOTPRemovalAdmissionFailureDeniesInFlightProof, TestInvalidTOTPReportsDoNotPoisonAcceptance, TestInvalidTOTPRemovalDoesNotPoisonAcceptance, TestTOTPThresholdInvalidationNoticeConcurrentRestart, TestTOTPThresholdNoticeFailureCannotUndoDisablement, TestUnboundTOTPExhaustionIsNotInvalidationNotice, TestRecipientlessProtectiveIncidentDoesNotBlockOtherAccounts, TestExhaustedNoticeDoesNotEndDispatchBatch |
+| Review277 recovery-batch invalidation / N1 / N2 / R1 |TestRecoveryThresholdInvalidationNoticeConcurrentRestart (two actual repository handles, exactly one intent/event, close/reopen, immutable original two-address TLS fanout, independent TOTP and disabled-code controls), TestRecoveryThresholdNoticeFailureCannotUndoDisablement (marker/outbox faults, durable disabled state and restart repair/manual visibility), TestRecoveryThresholdSQLiteSyncFailureIsFailClosed (actual WAL xSync faults on threshold and later expansion), TestRecoveryOnlyEvaluatedCeilingCrossingNotifies (lesser failure/backoff/oversize/wrong-password/cancelled denials do not notify or charge the batch) |
 | R1/RESTORE-AUTH-STATE current-component boundary |TestLifecycleSQLiteSyncFailureNeverAcknowledges (actual WAL xSync failure on10 transitions), TestNoticeRestoreRaceDoesNotAcknowledgeStaleGeneration, pending/recovery denial matrices; retained FULL/persistence-loss/repository regressions |
 
 The full NOTIFY-ADDRESSES confirmation/change/removal browser workflow, all

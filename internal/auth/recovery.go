@@ -183,6 +183,12 @@ func (l *Lifecycle) Recover(ctx context.Context, name string, password []byte, c
 				l.repo.FailClosed()
 				return ErrDenied
 			}
+			// The current issued batch is read and charged under the same
+			// serialized control transaction. Only its actual ceiling crossing
+			// invalidates saved codes; notice failure must not undo disablement.
+			if batch.Failures+1 >= 100 {
+				return l.protectiveIntent(ctx, q, c, u.ID, "authenticator_suspended", now)
+			}
 			return nil
 		}
 		if l.repo.FailedClosed() {
