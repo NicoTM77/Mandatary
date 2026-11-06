@@ -50,6 +50,13 @@ func TestLifecycleSQLiteSyncFailureNeverAcknowledges(t *testing.T) {
 				at := l.now().Add(30 * time.Second)
 				l.now = func() time.Time { return at }
 			}
+			if operation == "recover" || operation == "report" {
+				// A compulsory-MFA password observation writes no success reset:
+				// the injected xSync failure must hit the owning lifecycle write.
+				if _, err = db.Exec(`UPDATE users SET mfa_requirement='required' WHERE id='u'`); err != nil {
+					t.Fatal(err)
+				}
+			}
 			probe.mu.Lock()
 			probe.fail = true
 			probe.mu.Unlock()
