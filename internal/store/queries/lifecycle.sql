@@ -28,7 +28,7 @@ WHERE id=sqlc.arg(id) AND kind='totp' AND state IN ('active','pending') AND fail
 INSERT INTO totp_acceptances(authenticator_id,step,verifier_period,output_hash) VALUES(?,?,?,?);
 
 -- name: HasTOTPReplay :one
-SELECT EXISTS(SELECT 1 FROM totp_acceptances WHERE authenticator_id=sqlc.arg(id) AND (step=sqlc.arg(step) OR verifier_period>=sqlc.arg(period) OR (step>=sqlc.arg(earliest) AND output_hash=sqlc.arg(hash)))) AS replay;
+SELECT EXISTS(SELECT 1 FROM totp_acceptances WHERE authenticator_id=sqlc.arg(id) AND (step=sqlc.arg(step) OR verifier_period>=sqlc.arg(period) OR output_hash=sqlc.arg(hash))) AS replay;
 
 -- name: AdvanceTOTPStep :execrows
 UPDATE authenticators SET last_accepted_totp_step=sqlc.arg(step) WHERE id=sqlc.arg(id) AND kind='totp' AND state='active' AND (last_accepted_totp_step IS NULL OR last_accepted_totp_step<sqlc.arg(step));

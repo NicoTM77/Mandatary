@@ -532,7 +532,7 @@ func (q *Queries) ListHourlyUsage(ctx context.Context, endpointID domain.Endpoin
 }
 
 const listNoticeIntents = `-- name: ListNoticeIntents :many
-SELECT id, event_id, user_id, address_id, address_version, recipient_snapshot, delivery_state, dispatch_state, authority_generation, attempts, next_attempt_at, last_attempt_at, failure_code, retain_until, lease_until, worker_token FROM security_notice_outbox WHERE event_id = ? ORDER BY id
+SELECT id, event_id, user_id, address_id, address_version, recipient_snapshot, delivery_state, dispatch_state, authority_generation, attempts, next_attempt_at, last_attempt_at, failure_code, retain_until, lease_until, worker_token, total_attempts, repair_count, retry_started_at FROM security_notice_outbox WHERE event_id = ? ORDER BY id
 `
 
 func (q *Queries) ListNoticeIntents(ctx context.Context, eventID string) ([]SecurityNoticeOutbox, error) {
@@ -561,6 +561,9 @@ func (q *Queries) ListNoticeIntents(ctx context.Context, eventID string) ([]Secu
 			&i.RetainUntil,
 			&i.LeaseUntil,
 			&i.WorkerToken,
+			&i.TotalAttempts,
+			&i.RepairCount,
+			&i.RetryStartedAt,
 		); err != nil {
 			return nil, err
 		}

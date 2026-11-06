@@ -144,6 +144,19 @@ old proposed P04 detail, not other controls or the Step0 evidence boundary.
 | O04 — §3.1.4 replay-denial warnings MAY; §§2.2.2/3.2.5 OTP is not phishing resistant.[1] | Warnings are optional and privacy-safe; do not claim repeated OTP detection is phishing prevention or disclose account existence. | `N63B4-OTP-CLAIMS`: OTP path clearly not phishing resistant; replay/wrong/unknown-account errors do not leak secrets; optional warnings follow approved notification policy. | P1.04, P1.06, P1.16 | P/C |
 | O05 — §§3.1.5.1–3.1.5.2 multi-factor OTP activation/erasure/keying/replay/throttle requirements.[1] | No separate multi-factor-OTP feature/claim in P1. Treat all admitted TOTP as single-factor possession and combine with password. A third-party app's screen unlock does not prove per-operation activation or erasure; no proprietary Yubico OTP/HOTP feature added. | `N63B4-MFOTP-UNSUPPORTED`: TOTP alone never gets MFA/AAL2 because app/vendor name suggests unlock; no MF-OTP/proprietary OTP routes or claims. | P1.06, P1.16, P1.19–20 | O/C if later selected |
 
+### 4.3.1 P1.06 component implementation crosswalk (not conformance)
+
+The [authenticator lifecycle contract](docs/authenticator-lifecycle.md) maps
+O01–05, L01–03, E01–03/E06–10/E12–16 and applicable N1/N2/R1/assurance requirements
+to actual component tests, records the supported algorithm/entropy/recovery
+branches, and defines delivery/capacity/backoff/failure/repair and risk limits.
+This does not replace the stable specifications: full notification-address
+confirmation/change/removal, normal session/API/MCP integration, WebAuthn,
+bootstrap/host recovery, actual restore, browser/device/provider/governance and
+packaged runtime evidence remain with their named owning tasks. No public auth
+or mail endpoint is mounted by P1.06; no recovery-only capability becomes AAL2.
+Exact-head executed results and independent review belong to its original card.
+
 ### 4.4 WebAuthn, cryptographic authenticators and syncable passkeys
 
 | Key / NIST requirement | Mandatary design contract | Stable test specification / expected result (NOT RUN) | Existing P1 owner | Disposition |

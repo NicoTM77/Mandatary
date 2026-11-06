@@ -150,7 +150,7 @@ func TestTOTPBindingRequiresProof(t *testing.T) {
 	if len(cipher) == 0 {
 		t.Fatal("seed not encrypted")
 	}
-	if err = l.ConfirmTOTP(t.Context(), session, e.ID, "000000", "192.0.2.1"); err != ErrDenied {
+	if err = l.ConfirmTOTP(t.Context(), session, e.ID, "abcdef", "192.0.2.1"); err != ErrDenied {
 		t.Fatal("wrong enrollment proof accepted")
 	}
 	code := enrollmentCode(t, e, l.now())

@@ -127,15 +127,14 @@ func (q *Queries) GetSessionByHash(ctx context.Context, secretHash []byte) (Sess
 }
 
 const hasTOTPReplay = `-- name: HasTOTPReplay :one
-SELECT EXISTS(SELECT 1 FROM totp_acceptances WHERE authenticator_id=?1 AND (step=?2 OR verifier_period>=?3 OR (step>=?4 AND output_hash=?5))) AS replay
+SELECT EXISTS(SELECT 1 FROM totp_acceptances WHERE authenticator_id=?1 AND (step=?2 OR verifier_period>=?3 OR output_hash=?4)) AS replay
 `
 
 type HasTOTPReplayParams struct {
-	ID       string
-	Step     int64
-	Period   int64
-	Earliest int64
-	Hash     []byte
+	ID     string
+	Step   int64
+	Period int64
+	Hash   []byte
 }
 
 func (q *Queries) HasTOTPReplay(ctx context.Context, arg HasTOTPReplayParams) (bool, error) {
@@ -143,7 +142,6 @@ func (q *Queries) HasTOTPReplay(ctx context.Context, arg HasTOTPReplayParams) (b
 		arg.ID,
 		arg.Step,
 		arg.Period,
-		arg.Earliest,
 		arg.Hash,
 	)
 	var replay bool

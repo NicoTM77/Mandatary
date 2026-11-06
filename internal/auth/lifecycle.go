@@ -9,9 +9,11 @@ import (
 	"database/sql"
 	"encoding/base32"
 	"encoding/hex"
+	"io"
 	"net"
 	"net/mail"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -35,6 +37,10 @@ func (n NoticeSettings) valid() bool {
 	}
 	host, port, e := net.SplitHostPort(n.Relay)
 	if e != nil || host == "" || port == "" || strings.ContainsAny(n.Relay, "\r\n") {
+		return false
+	}
+	number, e := strconv.Atoi(port)
+	if e != nil || number < 1 || number > 65535 || (n.Username == "") != (n.CredentialID == "") || strings.ContainsAny(n.Username, "\x00\r\n") {
 		return false
 	}
 	return validMailbox(n.Contact) && validMailbox(n.Sender)
@@ -88,7 +94,7 @@ func (Enrollment) GoString() string      { return "[REDACTED]" }
 func (e *Enrollment) ExportOnce() []byte { b := []byte(e.secret); e.secret = ""; return b }
 func randomID() (string, error) {
 	b := make([]byte, 32)
-	if _, e := rand.Read(b); e != nil {
+	if _, e := io.ReadFull(rand.Reader, b); e != nil {
 		return "", ErrDenied
 	}
 	return hex.EncodeToString(b), nil
@@ -180,7 +186,7 @@ func (l *Lifecycle) BeginTOTP(ctx context.Context, session []byte, algorithm str
 		return Enrollment{}, ErrDenied
 	}
 	seed := make([]byte, 32)
-	if _, e = rand.Read(seed); e != nil {
+	if _, e = io.ReadFull(rand.Reader, seed); e != nil {
 		return Enrollment{}, ErrDenied
 	}
 	defer clear(seed)
@@ -229,6 +235,15 @@ func (l *Lifecycle) loadTOTP(ctx context.Context, id string) (store.Authenticato
 	return a, seed, nil
 }
 
+func (l *Lifecycle) failedTOTP(ctx context.Context, q *store.Queries, a store.Authenticator, now int64) error {
+	n, e := q.RecordTOTPFailure(ctx, store.RecordTOTPFailureParams{ID: a.ID, NextAttemptAt: nullable(now + passwordWait(a.FailedAttempts+1))})
+	if e != nil || n != 1 {
+		l.repo.FailClosed()
+		return ErrDenied
+	}
+	return nil
+}
+
 func activeAddresses(ctx context.Context, q *store.Queries, user string, generation int64) ([]store.NotificationAddress, error) {
 	addresses, e := q.ListNotificationAddresses(ctx, user)
 	if e != nil {
@@ -248,6 +263,10 @@ func activeAddresses(ctx context.Context, q *store.Queries, user string, generat
 func (l *Lifecycle) enqueue(ctx context.Context, q *store.Queries, c store.InstallationControl, user, event string, now int64) error {
 	addresses, e := activeAddresses(ctx, q, user, c.AuthorityGeneration)
 	if e != nil || len(addresses) == 0 {
+		return ErrDenied
+	}
+	queued, e := q.NoticeQueueSize(ctx)
+	if e != nil || int64(len(addresses)) > 1024-queued {
 		return ErrDenied
 	}
 	id, e := randomID()
@@ -272,7 +291,7 @@ func (l *Lifecycle) enqueue(ctx context.Context, q *store.Queries, c store.Insta
 	return nil
 }
 func (l *Lifecycle) ConfirmTOTP(ctx context.Context, session []byte, id, code, ip string) error {
-	if !l.gate.allow(ip, l.now()) {
+	if len(code) > 64 || !l.gate.allow(ip, l.now()) {
 		return ErrDenied
 	}
 	observed, seed, err := l.loadTOTP(ctx, id)
@@ -306,8 +325,7 @@ func (l *Lifecycle) ConfirmTOTP(ctx context.Context, session []byte, id, code, i
 		}
 		step, ok := matchTOTP(seed, a.TotpAlgorithm.String, code, now)
 		if !ok {
-			_, e = q.RecordTOTPFailure(ctx, store.RecordTOTPFailureParams{ID: id, NextAttemptAt: nullable(now + passwordWait(a.FailedAttempts+1))})
-			return e
+			return l.failedTOTP(ctx, q, a, now)
 		}
 		if l.repo.FailedClosed() {
 			return ErrDenied
@@ -336,6 +354,12 @@ func (l *Lifecycle) ConfirmTOTP(ctx context.Context, session []byte, id, code, i
 // mandatory MFA or short-password rules. The final required factor cannot be
 // removed; protective compromise reports are a distinct suspension protocol.
 func (l *Lifecycle) RevokeTOTP(ctx context.Context, session []byte, id string) error {
+	if ctx.Err() != nil {
+		return ErrDenied
+	}
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
+	defer cancel()
+	authorized := false
 	e := l.repo.Control(ctx, func(q *store.Queries) error {
 		now := l.now().Unix()
 		c, u, _, e := freshSession(ctx, q, session, now)
@@ -359,6 +383,7 @@ func (l *Lifecycle) RevokeTOTP(ctx context.Context, session []byte, id string) e
 		if u.MfaRequirement != "optional" && !remaining {
 			return ErrDenied
 		}
+		authorized = true
 		n, e := q.RevokeTOTP(ctx, store.RevokeTOTPParams{ID: id, Now: nullable(now)})
 		if e != nil || n != 1 {
 			return ErrDenied
@@ -366,9 +391,16 @@ func (l *Lifecycle) RevokeTOTP(ctx context.Context, session []byte, id string) e
 		if e = q.RevokeUserSessions(ctx, store.RevokeUserSessionsParams{UserID: u.ID, Now: nullable(now)}); e != nil {
 			return e
 		}
-		return l.enqueue(ctx, q, c, u.ID, "authenticator_removed", now)
+		return l.protectiveIntent(ctx, q, c, u.ID, "authenticator_removed", now)
 	}, nil)
 	if e != nil {
+		if authorized {
+			l.repo.FailClosed()
+		}
+		return ErrDenied
+	}
+	if e = l.expandProtectiveIntents(ctx); e != nil {
+		l.repo.FailClosed()
 		return ErrDenied
 	}
 	return nil
@@ -380,7 +412,7 @@ func (l *Lifecycle) RevokeTOTP(ctx context.Context, session []byte, id string) e
 type FactorProof struct{ UserID, AuthenticatorID string }
 
 func (l *Lifecycle) VerifyTOTP(ctx context.Context, user, id, code, ip string) (FactorProof, error) {
-	if ctx.Err() != nil || !l.gate.allow(ip, l.now()) {
+	if ctx.Err() != nil || len(code) > 64 || !l.gate.allow(ip, l.now()) {
 		return FactorProof{}, ErrDenied
 	}
 	observed, seed, err := l.loadTOTP(ctx, id)
@@ -414,13 +446,12 @@ func (l *Lifecycle) VerifyTOTP(ctx context.Context, user, id, code, ip string) (
 		}
 		step, ok := matchTOTP(seed, a.TotpAlgorithm.String, code, now)
 		hash := sha256.Sum256([]byte(code))
-		replay, e := q.HasTOTPReplay(ctx, store.HasTOTPReplayParams{ID: id, Step: step, Period: now / 30, Earliest: now/30 - 1, Hash: hash[:]})
+		replay, e := q.HasTOTPReplay(ctx, store.HasTOTPReplayParams{ID: id, Step: step, Period: now / 30, Hash: hash[:]})
 		if e != nil {
 			return e
 		}
 		if !ok || replay || (a.LastAcceptedTotpStep.Valid && step <= a.LastAcceptedTotpStep.Int64) {
-			_, e = q.RecordTOTPFailure(ctx, store.RecordTOTPFailureParams{ID: id, NextAttemptAt: nullable(now + passwordWait(a.FailedAttempts+1))})
-			return e
+			return l.failedTOTP(ctx, q, a, now)
 		}
 		if l.repo.FailedClosed() {
 			return nil

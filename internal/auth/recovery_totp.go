@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"encoding/base32"
+	"io"
 	"time"
 
 	"github.com/NicoTM77/Mandatary/internal/store"
@@ -53,7 +54,7 @@ func (l *Lifecycle) BeginRecoveredTOTP(ctx context.Context, secret []byte, algor
 		return Enrollment{}, ErrDenied
 	}
 	seed := make([]byte, 32)
-	if _, e = rand.Read(seed); e != nil {
+	if _, e = io.ReadFull(rand.Reader, seed); e != nil {
 		return Enrollment{}, ErrDenied
 	}
 	defer clear(seed)
@@ -82,7 +83,7 @@ func (l *Lifecycle) BeginRecoveredTOTP(ctx context.Context, secret []byte, algor
 	return Enrollment{ID: id, secret: base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(seed)}, nil
 }
 func (l *Lifecycle) ConfirmRecoveredTOTP(ctx context.Context, secret []byte, id, code, ip string) error {
-	if ctx.Err() != nil || !l.gate.allow(ip, l.now()) {
+	if ctx.Err() != nil || len(code) > 64 || !l.gate.allow(ip, l.now()) {
 		return ErrDenied
 	}
 	observed, seed, err := l.loadTOTP(ctx, id)
@@ -112,8 +113,7 @@ func (l *Lifecycle) ConfirmRecoveredTOTP(ctx context.Context, secret []byte, id,
 		}
 		step, ok := matchTOTP(seed, a.TotpAlgorithm.String, code, now)
 		if !ok {
-			_, e = q.RecordTOTPFailure(ctx, store.RecordTOTPFailureParams{ID: id, NextAttemptAt: nullable(now + passwordWait(a.FailedAttempts+1))})
-			return e
+			return l.failedTOTP(ctx, q, a, now)
 		}
 		if l.repo.FailedClosed() {
 			return nil

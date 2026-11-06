@@ -24,9 +24,13 @@ func (l *Lifecycle) DispatchNotices(ctx context.Context, limit int) (int, error)
 	if limit < 1 || limit > 32 || !l.notices.valid() {
 		return 0, ErrDenied
 	}
+	if e := l.expandProtectiveIntents(ctx); e != nil {
+		return 0, ErrDenied
+	}
 	submitted := 0
 	for i := 0; i < limit; i++ {
 		var notice store.NextNoticeRow
+		var observedControl store.InstallationControl
 		var token string
 		claimed := false
 		e := l.repo.Control(ctx, func(q *store.Queries) error {
@@ -37,6 +41,7 @@ func (l *Lifecycle) DispatchNotices(ctx context.Context, limit int) (int, error)
 			if !activeControl(c) {
 				return ErrDenied
 			}
+			observedControl = c
 			now := l.now().Unix()
 			if now < 0 || now > 253402300799 {
 				return ErrDenied
@@ -48,7 +53,14 @@ func (l *Lifecycle) DispatchNotices(ctx context.Context, limit int) (int, error)
 			if e != nil {
 				return e
 			}
-			if notice.Attempts >= 8 || now-notice.OccurredAt >= 72*3600 {
+			ageStart := notice.OccurredAt
+			if notice.RetryStartedAt.Valid {
+				ageStart = notice.RetryStartedAt.Int64
+			}
+			if now < ageStart {
+				return ErrDenied
+			}
+			if notice.Attempts >= 8 || now-ageStart >= 72*3600 {
 				_, e = q.FailExhaustedNotice(ctx, notice.ID)
 				return e
 			}
@@ -71,6 +83,10 @@ func (l *Lifecycle) DispatchNotices(ctx context.Context, limit int) (int, error)
 		}
 		failure := l.sendNotice(ctx, notice)
 		e = l.repo.Control(ctx, func(q *store.Queries) error {
+			current, e := q.GetInstallationControl(ctx)
+			if e != nil || !activeControl(current) || current != observedControl {
+				return ErrDenied
+			}
 			state := "relay-accepted"
 			var fail sql.NullString
 			var next sql.NullInt64
@@ -78,13 +94,14 @@ func (l *Lifecycle) DispatchNotices(ctx context.Context, limit int) (int, error)
 				state = "pending"
 				fail = sql.NullString{String: failure, Valid: true}
 				attempts := notice.Attempts + 1
-				if failure == "permanent" || failure == "recipient" || attempts >= 8 || l.now().Unix()-notice.OccurredAt >= 72*3600 {
+				ageStart := notice.OccurredAt
+				if notice.RetryStartedAt.Valid {
+					ageStart = notice.RetryStartedAt.Int64
+				}
+				if failure == "permanent" || failure == "recipient" || attempts >= 8 || l.now().Unix()-ageStart >= 72*3600 {
 					state = "failed"
 				} else {
-					wait := int64(60) << uint(attempts-1)
-					if wait > 3600 {
-						wait = 3600
-					}
+					wait := noticeWait(attempts)
 					next = nullable(l.now().Unix() + wait)
 				}
 			}
@@ -102,6 +119,25 @@ func (l *Lifecycle) DispatchNotices(ctx context.Context, limit int) (int, error)
 		}
 	}
 	return submitted, nil
+}
+
+func noticeWait(attempt int64) int64 {
+	switch attempt {
+	case 1:
+		return 60
+	case 2:
+		return 120
+	case 3:
+		return 240
+	case 4:
+		return 480
+	case 5:
+		return 960
+	case 6:
+		return 1920
+	default:
+		return 3600
+	}
 }
 
 // Only fixed classified outcomes leave this function; raw server diagnostics,

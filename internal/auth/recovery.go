@@ -7,6 +7,7 @@ import (
 	"crypto/subtle"
 	"database/sql"
 	"encoding/hex"
+	"io"
 	"strings"
 	"time"
 
@@ -42,7 +43,7 @@ func newRecoveryCode() (string, string, error) {
 		return "", "", e
 	}
 	secret := make([]byte, 16)
-	if _, e = rand.Read(secret); e != nil {
+	if _, e = io.ReadFull(rand.Reader, secret); e != nil {
 		return "", "", ErrDenied
 	}
 	defer clear(secret)
@@ -111,7 +112,7 @@ func (l *Lifecycle) IssueRecoveryCodes(ctx context.Context, session []byte) (Rec
 // Lost response: consumption is not rolled back; use another saved code or an
 // independent authenticator/explicit host recovery. There is no redisplay/reuse.
 func (l *Lifecycle) Recover(ctx context.Context, name string, password []byte, code, ip string) (RecoveryResult, error) {
-	if ctx.Err() != nil || !l.gate.allow(ip, l.now()) {
+	if ctx.Err() != nil || len(code) > 128 || !l.gate.allow(ip, l.now()) {
 		return RecoveryResult{}, ErrDenied
 	}
 	// Reuse the same durable password throttle and safe unknown/wrong behavior.
@@ -177,8 +178,12 @@ func (l *Lifecycle) Recover(ctx context.Context, name string, password []byte, c
 		hash := sha256.Sum256([]byte(code))
 		valid = valid && subtle.ConstantTimeCompare(hash[:], saved.VerifierHash) == 1
 		if !valid {
-			_, e = q.RecoveryFailure(ctx, store.RecoveryFailureParams{ID: batch.ID, NextAttemptAt: now + passwordWait(batch.Failures+1)})
-			return e
+			count, writeErr := q.RecoveryFailure(ctx, store.RecoveryFailureParams{ID: batch.ID, NextAttemptAt: now + passwordWait(batch.Failures+1)})
+			if writeErr != nil || count != 1 {
+				l.repo.FailClosed()
+				return ErrDenied
+			}
+			return nil
 		}
 		if l.repo.FailedClosed() {
 			return nil
@@ -205,7 +210,7 @@ func (l *Lifecycle) Recover(ctx context.Context, name string, password []byte, c
 			return e
 		}
 		cap := make([]byte, 32)
-		if _, e = rand.Read(cap); e != nil {
+		if _, e = io.ReadFull(rand.Reader, cap); e != nil {
 			return ErrDenied
 		}
 		digest := sha256.Sum256(cap)

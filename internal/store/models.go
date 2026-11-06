@@ -170,6 +170,16 @@ type Policy struct {
 	StopTimeoutMax      sql.NullInt64
 }
 
+type ProtectiveNoticeIntent struct {
+	ID                  string
+	UserID              string
+	EventType           string
+	OccurredAt          int64
+	AuthorityGeneration int64
+	Recipients          string
+	State               string
+}
+
 type RecoveryBatch struct {
 	ID                   string
 	UserID               string
@@ -225,6 +235,9 @@ type SecurityNoticeOutbox struct {
 	RetainUntil         int64
 	LeaseUntil          int64
 	WorkerToken         sql.NullString
+	TotalAttempts       int64
+	RepairCount         int64
+	RetryStartedAt      sql.NullInt64
 }
 
 type Session struct {
