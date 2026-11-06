@@ -69,8 +69,23 @@ func (l *Lifecycle) expandProtectiveIntents(ctx context.Context) error {
 		}
 		for _, intent := range intents {
 			var recipients []noticeRecipient
-			if e = json.Unmarshal([]byte(intent.Recipients), &recipients); e != nil || len(recipients) == 0 {
-				return ErrDenied
+			valid := json.Unmarshal([]byte(intent.Recipients), &recipients) == nil && len(recipients) > 0 && len(recipients) <= 1024
+			seen := make(map[string]bool)
+			for _, r := range recipients {
+				if r.ID == "" || r.Version < 1 || !validMailbox(r.Address) || seen[r.ID] {
+					valid = false
+				}
+				seen[r.ID] = true
+			}
+			if !valid {
+				// Missing/corrupt immutable destinations cannot be repaired by
+				// retargeting. Keep the incident visibly quarantined for manual
+				// investigation, but do not block other accounts or batches.
+				n, e := q.MarkProtectiveIntentManual(ctx, intent.ID)
+				if e != nil || n != 1 {
+					return ErrDenied
+				}
+				continue
 			}
 			queued, e := q.NoticeQueueSize(ctx)
 			if e != nil {

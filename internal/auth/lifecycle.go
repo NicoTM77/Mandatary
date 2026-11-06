@@ -235,11 +235,17 @@ func (l *Lifecycle) loadTOTP(ctx context.Context, id string) (store.Authenticato
 	return a, seed, nil
 }
 
-func (l *Lifecycle) failedTOTP(ctx context.Context, q *store.Queries, a store.Authenticator, now int64) error {
+func (l *Lifecycle) failedTOTP(ctx context.Context, q *store.Queries, c store.InstallationControl, a store.Authenticator, now int64) error {
 	n, e := q.RecordTOTPFailure(ctx, store.RecordTOTPFailureParams{ID: a.ID, Now: nullable(now), NextAttemptAt: nullable(now + passwordWait(a.FailedAttempts+1))})
 	if e != nil || n != 1 {
 		l.repo.FailClosed()
 		return ErrDenied
+	}
+	// Only the actual serialized crossing of a bound factor is an
+	// invalidation. Pending enrollment never established a binding. Notice
+	// persistence must not roll back this protective retry disablement.
+	if a.BoundAt.Valid && a.FailedAttempts+1 >= a.RetryCeiling {
+		return l.protectiveIntent(ctx, q, c, a.UserID, "authenticator_suspended", now)
 	}
 	return nil
 }
@@ -325,7 +331,7 @@ func (l *Lifecycle) ConfirmTOTP(ctx context.Context, session []byte, id, code, i
 		}
 		step, ok := matchTOTP(seed, a.TotpAlgorithm.String, code, now)
 		if !ok {
-			return l.failedTOTP(ctx, q, a, now)
+			return l.failedTOTP(ctx, q, c, a, now)
 		}
 		if l.repo.FailedClosed() {
 			return ErrDenied
@@ -359,20 +365,19 @@ func (l *Lifecycle) RevokeTOTP(ctx context.Context, session []byte, id string) e
 	}
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
 	defer cancel()
-	authorized := false
-	e := l.repo.Control(ctx, func(q *store.Queries) error {
+	authorize := func(q *store.Queries) (store.InstallationControl, store.User, error) {
 		now := l.now().Unix()
 		c, u, _, e := freshSession(ctx, q, session, now)
 		if e != nil {
-			return e
+			return c, u, e
 		}
 		a, e := q.GetAuthenticator(ctx, id)
-		if e != nil || a.UserID != u.ID || a.Kind != "totp" || a.RevokedAt.Valid {
-			return ErrDenied
+		if e != nil || a.UserID != u.ID || a.Kind != "totp" || a.CredentialGeneration != c.CredentialGeneration || a.RevokedAt.Valid || now < a.CreatedAt {
+			return c, u, ErrDenied
 		}
 		factors, e := q.ListUserAuthenticators(ctx, u.ID)
 		if e != nil {
-			return e
+			return c, u, e
 		}
 		remaining := false
 		for _, f := range factors {
@@ -381,9 +386,30 @@ func (l *Lifecycle) RevokeTOTP(ctx context.Context, session []byte, id string) e
 			}
 		}
 		if u.MfaRequirement != "optional" && !remaining {
-			return ErrDenied
+			return c, u, ErrDenied
 		}
-		authorized = true
+		return c, u, nil
+	}
+	// As for compromise reports, establish valid narrow intent before the
+	// admission boundary; recheck the live session and safeguard in Control.
+	authorized := false
+	e := l.repo.Read(ctx, func(q *store.Queries) error {
+		_, _, e := authorize(q)
+		authorized = e == nil
+		return e
+	})
+	if e != nil {
+		if authorized {
+			l.repo.FailClosed()
+		}
+		return ErrDenied
+	}
+	e = l.repo.Control(ctx, func(q *store.Queries) error {
+		c, u, e := authorize(q)
+		if e != nil {
+			return e
+		}
+		now := l.now().Unix()
 		n, e := q.RevokeTOTP(ctx, store.RevokeTOTPParams{ID: id, Now: nullable(now)})
 		if e != nil || n != 1 {
 			return ErrDenied
@@ -451,7 +477,7 @@ func (l *Lifecycle) VerifyTOTP(ctx context.Context, user, id, code, ip string) (
 			return e
 		}
 		if !ok || replay || (a.LastAcceptedTotpStep.Valid && step <= a.LastAcceptedTotpStep.Int64) {
-			return l.failedTOTP(ctx, q, a, now)
+			return l.failedTOTP(ctx, q, c, a, now)
 		}
 		if l.repo.FailedClosed() {
 			return nil

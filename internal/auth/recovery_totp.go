@@ -113,7 +113,7 @@ func (l *Lifecycle) ConfirmRecoveredTOTP(ctx context.Context, secret []byte, id,
 		}
 		step, ok := matchTOTP(seed, a.TotpAlgorithm.String, code, now)
 		if !ok {
-			return l.failedTOTP(ctx, q, a, now)
+			return l.failedTOTP(ctx, q, c, a, now)
 		}
 		if l.repo.FailedClosed() {
 			return nil

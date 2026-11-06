@@ -28,8 +28,15 @@ func (l *Lifecycle) ReportTOTPCompromise(ctx context.Context, name string, passw
 	}
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
 	defer cancel()
+	// Establish narrow report authority in a coherent read snapshot before
+	// attempting writer admission. A valid owned-target report must remain
+	// fail-closed even when Control cannot enter its callback. This snapshot is
+	// NOT replacement/session authority and is revalidated under the writer.
+	var observedControl store.InstallationControl
+	var observedUser store.User
+	var observedPassword store.Authenticator
 	authorized := false
-	e = l.repo.Control(ctx, func(q *store.Queries) error {
+	e = l.repo.Read(ctx, func(q *store.Queries) error {
 		c, e := q.GetInstallationControl(ctx)
 		if e != nil {
 			return e
@@ -57,7 +64,34 @@ func (l *Lifecycle) ReportTOTPCompromise(ctx context.Context, name string, passw
 		if e != nil || target.UserID != u.ID || target.Kind != "totp" || target.CredentialGeneration != c.CredentialGeneration || target.RevokedAt.Valid || now < target.CreatedAt {
 			return ErrDenied
 		}
+		observedControl, observedUser, observedPassword = c, u, passwordBinding
 		authorized = true
+		return nil
+	})
+	if e != nil {
+		if authorized {
+			l.repo.FailClosed()
+		}
+		return ErrDenied
+	}
+	e = l.repo.Control(ctx, func(q *store.Queries) error {
+		c, e := q.GetInstallationControl(ctx)
+		if e != nil || c != observedControl {
+			return ErrDenied
+		}
+		u, e := q.GetUser(ctx, proof.UserID)
+		if e != nil || u != observedUser {
+			return ErrDenied
+		}
+		binding, e := q.GetAuthenticator(ctx, proof.AuthenticatorID)
+		now := l.now().Unix()
+		if e != nil || !samePassword(binding, observedPassword) || !activeBinding(c, u, binding, now) || (binding.NextAttemptAt.Valid && now < binding.NextAttemptAt.Int64) {
+			return ErrDenied
+		}
+		target, e := q.GetAuthenticator(ctx, id)
+		if e != nil || target.UserID != u.ID || target.Kind != "totp" || target.CredentialGeneration != c.CredentialGeneration || target.RevokedAt.Valid || now < target.CreatedAt {
+			return ErrDenied
+		}
 		n, e := q.RevokeTOTP(ctx, store.RevokeTOTPParams{ID: id, Now: nullable(now)})
 		if e != nil || n != 1 {
 			return ErrDenied

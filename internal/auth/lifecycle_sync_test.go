@@ -7,7 +7,7 @@ import (
 
 // Reuses the test-only real SQLite WAL xSync interposer, not a mock repository.
 func TestLifecycleSQLiteSyncFailureNeverAcknowledges(t *testing.T) {
-	for _, operation := range []string{"bind", "verify", "wrong-proof", "remove", "report", "issue", "recover", "rebind", "dispatch"} {
+	for _, operation := range []string{"bind", "verify", "wrong-proof", "retry-disable", "remove", "report", "issue", "recover", "rebind", "dispatch"} {
 		t.Run(operation, func(t *testing.T) {
 			probe := installAuthSyncProbe(t)
 			l, db, session := lifecycleFixture(t)
@@ -46,7 +46,12 @@ func TestLifecycleSQLiteSyncFailureNeverAcknowledges(t *testing.T) {
 					}
 				}
 			}
-			if operation == "verify" || operation == "wrong-proof" {
+			if operation == "retry-disable" {
+				if _, err = db.Exec(`UPDATE authenticators SET failed_attempts=99 WHERE id=?`, e.ID); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if operation == "verify" || operation == "wrong-proof" || operation == "retry-disable" {
 				at := l.now().Add(30 * time.Second)
 				l.now = func() time.Time { return at }
 			}
@@ -65,7 +70,7 @@ func TestLifecycleSQLiteSyncFailureNeverAcknowledges(t *testing.T) {
 				err = l.ConfirmTOTP(t.Context(), session, e.ID, enrollmentCode(t, e, l.now()), "192.0.2.3")
 			case "verify":
 				_, err = l.VerifyTOTP(t.Context(), "u", e.ID, enrollmentCode(t, e, l.now()), "192.0.2.3")
-			case "wrong-proof":
+			case "wrong-proof", "retry-disable":
 				_, err = l.VerifyTOTP(t.Context(), "u", e.ID, "abcdef", "192.0.2.3")
 			case "remove":
 				err = l.RevokeTOTP(t.Context(), session, e.ID)

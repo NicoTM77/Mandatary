@@ -137,7 +137,7 @@ SELECT
  (SELECT count(*) FROM security_notice_outbox WHERE delivery_state='failed') AS failed,
  (SELECT count(*) FROM security_notice_outbox WHERE delivery_state='bounced') AS bounced,
  (SELECT count(*) FROM security_notice_outbox WHERE dispatch_state='quarantined') AS quarantined,
- CAST(((SELECT count(*) FROM protective_notice_intents WHERE state='pending') +
+ CAST(((SELECT count(*) FROM protective_notice_intents WHERE state IN ('pending','quarantined')) +
   (SELECT count(*) FROM security_events e WHERE e.event_type IN ('authenticator_removed','authenticator_suspended')
    AND NOT EXISTS (SELECT 1 FROM security_notice_outbox o WHERE o.event_id=e.id)
    AND NOT EXISTS (SELECT 1 FROM protective_notice_intents i WHERE i.id=e.id))) AS INTEGER) AS protective
@@ -205,6 +205,19 @@ UPDATE protective_notice_intents SET state='expanded' WHERE id=? AND state='pend
 
 func (q *Queries) MarkProtectiveIntentExpanded(ctx context.Context, id string) (int64, error) {
 	result, err := q.db.ExecContext(ctx, markProtectiveIntentExpanded, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const markProtectiveIntentManual = `-- name: MarkProtectiveIntentManual :execrows
+UPDATE protective_notice_intents SET state='quarantined' WHERE id=? AND state='pending'
+`
+
+// Retain immutable evidence outside automatic expansion; no invented recipient.
+func (q *Queries) MarkProtectiveIntentManual(ctx context.Context, id string) (int64, error) {
+	result, err := q.db.ExecContext(ctx, markProtectiveIntentManual, id)
 	if err != nil {
 		return 0, err
 	}

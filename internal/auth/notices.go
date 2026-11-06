@@ -32,7 +32,7 @@ func (l *Lifecycle) DispatchNotices(ctx context.Context, limit int) (int, error)
 		var notice store.NextNoticeRow
 		var observedControl store.InstallationControl
 		var token string
-		claimed := false
+		claimed, processed := false, false
 		e := l.repo.Control(ctx, func(q *store.Queries) error {
 			c, e := q.GetInstallationControl(ctx)
 			if e != nil {
@@ -61,8 +61,12 @@ func (l *Lifecycle) DispatchNotices(ctx context.Context, limit int) (int, error)
 				return ErrDenied
 			}
 			if notice.Attempts >= 8 || now-ageStart >= 72*3600 {
-				_, e = q.FailExhaustedNotice(ctx, notice.ID)
-				return e
+				n, e := q.FailExhaustedNotice(ctx, notice.ID)
+				if e != nil || n != 1 {
+					return ErrDenied
+				}
+				processed = true
+				return nil
 			}
 			token, e = randomID()
 			if e != nil {
@@ -79,6 +83,9 @@ func (l *Lifecycle) DispatchNotices(ctx context.Context, limit int) (int, error)
 			return submitted, ErrDenied
 		}
 		if !claimed {
+			if processed {
+				continue // Counts against the finite per-invocation record budget.
+			}
 			break
 		}
 		failure := l.sendNotice(ctx, notice)

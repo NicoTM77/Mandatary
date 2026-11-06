@@ -55,6 +55,10 @@ credential/control generations. No ordinary session-creation method exists here.
   attempt or extend a deadline. Independent password/recovery methods remain
   usable. IP admission is the existing bounded ephemeral /64-aware gate; the
   durable authenticator ceiling, not an IP map, survives restart/handle churn.
+  Crossing the ceiling for an already bound factor also commits exactly one
+  protective `authenticator_suspended` intent, with immutable all-address fanout.
+  Outbox/marker failure cannot undo disablement; pending unbound enrollment
+  exhaustion is not a bound-authenticator invalidation notice.
 * Ten recovery-only codes are issued after fresh completed MFA, including the
   first online list. Each has128 random secret bits plus a random record ID;
   exact full encoding is SHA256-hashed. This selects the ≥112-bit storage branch,
@@ -105,8 +109,26 @@ minimal unmatched event where storage permits. Its degraded status survives
 restart. Such an unmatched incident requires operator investigation/manual
 independent notification; do not invent historical recipients or mark it sent.
 If revocation itself cannot commit, deny through the uncertain handle until
-repair. Durable-before-ack relies on real filesystem/hardware honoring sync;
+repair. Report/removal first establish narrow, owned-target authority in a
+coherent read snapshot before writer admission. Report proof is bounded by the
+existing password-work gate; live password/control/user state is rechecked
+under the writer. Removal repeats fresh maximum-assurance/session/last-factor
+checks there. Admission failure after established intent poisons acknowledgement
+and in-flight acceptance just like write/commit/sync failure; invalid password,
+wrong owner, absent target and inadequate session do not poison arbitrary IDs.
+This authority never grants replacement, recovery or ordinary session access.
+Durable-before-ack relies on real filesystem/hardware honoring sync;
 no guarantee against malicious host rollback or arbitrary broken hardware.
+
+A protective snapshot with no usable destinations (or corrupt/invalid immutable
+recipient data) is retained in the existing `quarantined` intent state for manual
+investigation/independent notification. It remains counted by `NoticeHealth` as
+protective/degraded across restart, is never called sent or silently retargeted,
+and is excluded from automatic expansion without blocking valid unrelated work.
+`RetryNotice` cannot invent an outbox recipient for such an incident. A successful
+protective revocation is not a claim that its independent notification succeeded.
+The missing-address fixture is corruption/failure coverage, not permission for
+ordinary address APIs to remove the last confirmed destination.
 
 Worker policy is fixed and bounded:
 
@@ -160,7 +182,8 @@ specifications or later integration/device/governance/release gates.
 | COMPROMISE-REPORT, NOTIFY-DELIVERY protective failures |TestPasswordOnlyCompromiseReportCannotReplaceFactor, TestProtectiveRevocationSurvivesOutboxFailure, TestProtectiveIntentSurvivesRepairAndRestart, TestProtectiveMarkerFailureCannotUndoRevocation, TestProtectiveFallbackIncidentRemainsVisibleAfterRestart |
 | NOTIFY-DELIVERY, TLS-BOUNDARY, N1 |TestLifecycleEventsReachIndependentTLSReceiver, TestSecurityNoticesTLSAndFanout, TestNoticesCertificateAndAuthenticationFailures, TestNoticesMissingTLSNeverSubmitOrAuthenticate, TestNoticesPartialFailureKeepsRecipientSnapshots, TestNoticeConfigurationFailsBeforeActivation |
 | NOTIFY-DELIVERY retry/capacity/repair/crash |TestNoticeRetryExhaustionIsDurableAndVisible, TestNoticeBackoffBounds, TestNoticeCapacityRollsBackOrdinaryActivation, TestNoticeSharedLeaseCeilingDoesNotBlockRevocation, TestNoticeMaximumAgeAndRepairCycleBounds, TestNoticeExplicitRepairRequiresFreshAuthority, TestNoticesAmbiguousACKRetriesStableIdentity, TestNoticeCancellationAtTLSHandshakeBoundary |
-| R1/RESTORE-AUTH-STATE current-component boundary |TestLifecycleSQLiteSyncFailureNeverAcknowledges (actual WAL xSync failure on9 transitions), TestNoticeRestoreRaceDoesNotAcknowledgeStaleGeneration, pending/recovery denial matrices; retained FULL/persistence-loss/repository regressions |
+| Review242 protective admission/invalidation/delivery corrections |TestTOTPReportAdmissionFailureStopsAcceptance, TestTOTPRemovalAdmissionFailureStopsAcceptance, TestTOTPRemovalAdmissionFailureDeniesInFlightProof, TestInvalidTOTPReportsDoNotPoisonAcceptance, TestInvalidTOTPRemovalDoesNotPoisonAcceptance, TestTOTPThresholdInvalidationNoticeConcurrentRestart, TestTOTPThresholdNoticeFailureCannotUndoDisablement, TestUnboundTOTPExhaustionIsNotInvalidationNotice, TestRecipientlessProtectiveIncidentDoesNotBlockOtherAccounts, TestExhaustedNoticeDoesNotEndDispatchBatch |
+| R1/RESTORE-AUTH-STATE current-component boundary |TestLifecycleSQLiteSyncFailureNeverAcknowledges (actual WAL xSync failure on10 transitions), TestNoticeRestoreRaceDoesNotAcknowledgeStaleGeneration, pending/recovery denial matrices; retained FULL/persistence-loss/repository regressions |
 
 The full NOTIFY-ADDRESSES confirmation/change/removal browser workflow, all
 privileged API/MCP/session integration, setup/host controls, actual restore,

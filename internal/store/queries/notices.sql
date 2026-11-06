@@ -7,6 +7,10 @@ SELECT * FROM protective_notice_intents WHERE state='pending' AND authority_gene
 -- name: MarkProtectiveIntentExpanded :execrows
 UPDATE protective_notice_intents SET state='expanded' WHERE id=? AND state='pending';
 
+-- name: MarkProtectiveIntentManual :execrows
+-- Retain immutable evidence outside automatic expansion; no invented recipient.
+UPDATE protective_notice_intents SET state='quarantined' WHERE id=? AND state='pending';
+
 -- name: GetNotice :one
 SELECT * FROM security_notice_outbox WHERE id=?;
 
@@ -20,7 +24,7 @@ SELECT
  (SELECT count(*) FROM security_notice_outbox WHERE delivery_state='failed') AS failed,
  (SELECT count(*) FROM security_notice_outbox WHERE delivery_state='bounced') AS bounced,
  (SELECT count(*) FROM security_notice_outbox WHERE dispatch_state='quarantined') AS quarantined,
- CAST(((SELECT count(*) FROM protective_notice_intents WHERE state='pending') +
+ CAST(((SELECT count(*) FROM protective_notice_intents WHERE state IN ('pending','quarantined')) +
   (SELECT count(*) FROM security_events e WHERE e.event_type IN ('authenticator_removed','authenticator_suspended')
    AND NOT EXISTS (SELECT 1 FROM security_notice_outbox o WHERE o.event_id=e.id)
    AND NOT EXISTS (SELECT 1 FROM protective_notice_intents i WHERE i.id=e.id))) AS INTEGER) AS protective;
