@@ -169,7 +169,11 @@ func (l *Lifecycle) sendNotice(parent context.Context, n store.NextNoticeRow) st
 	if !ok || conn.SetDeadline(deadline) != nil {
 		return "temporary"
 	}
-	stop := context.AfterFunc(ctx, func() { _ = conn.Close() })
+	// Freeze the underlying transport for cancellation. conn is subsequently
+	// replaced with its TLS wrapper; capturing that mutable interface races a
+	// cancellation arriving exactly as HandshakeContext completes.
+	rawConn := conn
+	stop := context.AfterFunc(ctx, func() { _ = rawConn.Close() })
 	defer stop()
 	tlsConfig := &tls.Config{ServerName: host, RootCAs: l.notices.RootCAs, MinVersion: tls.VersionTLS12}
 	if l.notices.Mode == "implicit" {
