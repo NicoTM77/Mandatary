@@ -71,3 +71,41 @@ INSERT INTO smtp_secrets(id,ciphertext) VALUES (?,?) ON CONFLICT(id) DO UPDATE S
 
 -- name: GetSMTPRecord :one
 SELECT ciphertext FROM smtp_secrets WHERE id = ?;
+
+-- P1.05 internal proof service. Call only under Repository.Control. These
+-- queries do not establish sessions, setup authority or AAL2.
+-- name: GetUserByUsername :one
+SELECT * FROM users WHERE username = ?;
+
+-- name: GetLocalBinding :one
+SELECT * FROM authenticators WHERE user_id = ? AND kind = 'password' AND state = 'active';
+
+-- name: HasStrongerAuthenticator :one
+SELECT EXISTS(SELECT 1 FROM authenticators WHERE user_id = sqlc.arg(user_id)
+ AND kind IN ('totp','webauthn') AND state = 'active'
+ AND credential_generation=sqlc.arg(credential_generation) AND bound_at IS NOT NULL AND revoked_at IS NULL
+ AND (expires_at IS NULL OR expires_at>sqlc.arg(now)) AND failed_attempts<retry_ceiling) AS present;
+
+-- name: RecordProofFailure :execrows
+UPDATE authenticators SET failed_attempts=failed_attempts+1,
+ state=CASE WHEN failed_attempts+1 >= retry_ceiling THEN 'disabled' ELSE state END,
+ next_attempt_at=sqlc.arg(next_attempt_at)
+WHERE id=sqlc.arg(id) AND kind='password' AND state='active'
+ AND failed_attempts=sqlc.arg(observed_failures) AND failed_attempts<retry_ceiling;
+
+-- name: ResetProofFailures :execrows
+UPDATE authenticators SET failed_attempts=0,next_attempt_at=NULL
+WHERE id=? AND kind='password' AND state='active' AND failed_attempts<retry_ceiling;
+
+-- name: CompromiseUser :execrows
+UPDATE users SET compromised=1,password_revision=password_revision+1 WHERE id=? AND state='active';
+
+-- name: RevokeUserSessions :exec
+UPDATE sessions SET state='revoked',revoked_at=sqlc.arg(now) WHERE user_id=sqlc.arg(user_id) AND state!='revoked';
+
+-- name: UpdateVerifier :execrows
+UPDATE authenticators SET verifier_hash=sqlc.arg(verifier_hash),password_format=sqlc.arg(password_format),password_codepoints=sqlc.arg(password_codepoints),changed_at=sqlc.arg(now),failed_attempts=0,next_attempt_at=NULL
+WHERE id=sqlc.arg(id) AND kind='password' AND state='active' AND verifier_hash=sqlc.arg(observed_verifier) AND credential_generation=sqlc.arg(credential_generation);
+
+-- name: ClearCompromiseFlag :execrows
+UPDATE users SET compromised=0,password_revision=password_revision+1 WHERE id=? AND state='active';

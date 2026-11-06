@@ -124,7 +124,7 @@ func Open(ctx context.Context, options Options) (_ *Repository, result error) {
 		}
 	}
 	if options.ExistingOnly {
-		if current != 2 {
+		if current != 3 {
 			return nil, ErrStorage
 		}
 	} else {
@@ -178,7 +178,7 @@ func existingSchemaVersion(ctx context.Context, db *sql.DB) (int64, error) {
 		return 0, ErrStorage
 	}
 	versions, err := metadata.ListMigrations(ctx, db)
-	if err != nil || len(versions) < 2 || len(versions) > 3 {
+	if err != nil || len(versions) < 2 || len(versions) > 4 {
 		return 0, ErrStorage
 	}
 	for i, version := range versions {
@@ -268,6 +268,16 @@ func (r *Repository) Write(ctx context.Context, fn func(*Queries) error) error {
 	return r.Control(ctx, fn, nil)
 }
 
+// FailClosed marks a protocol-level security-control uncertainty. It only
+// removes availability: no caller can clear it or grant authority through it.
+// The owner must repair/reconcile the failed control before opening anew.
+func (r *Repository) FailClosed() { r.poisoned.Store(true) }
+
+// FailedClosed is only a terminal denial signal, not an authority/health grant.
+// Protocols may use it inside a Control callback to suppress success-only side
+// effects, but must still rely on Control's final acknowledgement boundary.
+func (r *Repository) FailedClosed() bool { return r.poisoned.Load() }
+
 // Control retains the shared lock through durable-before-delivery work. The
 // afterDurable callback runs ONLY after FULL commit, file and directory sync,
 // and identity verification; it must be bounded and must not reenter Repository.
@@ -276,6 +286,15 @@ func (r *Repository) Write(ctx context.Context, fn func(*Queries) error) error {
 func (r *Repository) Control(ctx context.Context, fn func(*Queries) error, afterDurable func() error) (result error) {
 	r.lifecycle.RLock()
 	defer r.lifecycle.RUnlock()
+	// This final atomic health observation is the acknowledgement boundary,
+	// ordered against FailClosed's terminal atomic store. Run it AFTER connection
+	// and lock cleanup too: a successful callback/commit is not itself success.
+	// Poison completed before this boundary denies even already-running work.
+	defer func() {
+		if r.poisoned.Load() {
+			result = ErrStorage
+		}
+	}()
 	if r.closed || r.poisoned.Load() {
 		return ErrStorage
 	}
@@ -319,6 +338,10 @@ func (r *Repository) Control(ctx context.Context, fn func(*Queries) error, after
 	if err := fn(q); err != nil {
 		return ErrStorage
 	}
+	// A concurrent protective failure forbids acknowledgement, but must not
+	// erase already-evaluated failed-proof charges. Finish the successful
+	// transaction durably, then deny delivery/success through the poisoned handle.
+	poisoned := r.poisoned.Load()
 	if err := tx.Commit(); err != nil {
 		r.poisoned.Store(true)
 		return ErrStorage
@@ -329,6 +352,9 @@ func (r *Repository) Control(ctx context.Context, fn func(*Queries) error, after
 	}
 	if err := r.verifyFiles(); err != nil {
 		r.poisoned.Store(true)
+		return ErrStorage
+	}
+	if poisoned || r.poisoned.Load() {
 		return ErrStorage
 	}
 	if afterDurable != nil {

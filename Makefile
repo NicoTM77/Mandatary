@@ -7,7 +7,7 @@ export GOGC := 25
 SQLC ?= bin/tools/sqlc
 
 .NOTPARALLEL:
-.PHONY: versions install build test check security tools sqlc generate generate-check tool-security negative-control dev frontend-dev
+.PHONY: versions install build test check security tools sqlc generate generate-check password-check tool-security negative-control dev frontend-dev
 versions:
 	bash scripts/check-toolchains.sh
 
@@ -28,6 +28,7 @@ test: versions sqlc
 
 check: build sqlc
 	$(MAKE) generate-check
+	$(MAKE) password-check
 	test -z "$$(gofmt -l cmd internal web/*.go tests/security)"
 	go vet ./...
 	npm --prefix web run typecheck
@@ -58,6 +59,13 @@ generate: sqlc
 # Kept standalone so the real positive/negative generator fixture can invoke it.
 generate-check:
 	$(SQLC) diff --no-remote
+
+# Offline after the existing pinned sqlc tool module has been downloaded.
+# Check mode compares; it never silently repairs reviewed source or blocklist.
+password-check:
+	python3 scripts/regenerate-password-nfc.py --check --upstream "$$(go env GOMODCACHE)/golang.org/x/text@v0.43.0/unicode/norm"
+	@output=$$(mktemp); trap 'rm -f "$$output"' EXIT; \
+	go run ./internal/auth/blocklistgen internal/auth/testdata/blocklist-source.txt.gz "$$output" && cmp internal/auth/blocklist.bin "$$output"
 
 tool-security: sqlc
 	bin/tools/govulncheck -mode=binary $(SQLC)
