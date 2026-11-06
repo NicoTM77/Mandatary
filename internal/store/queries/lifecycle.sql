@@ -21,7 +21,8 @@ SELECT * FROM totp_pending WHERE authenticator_id=?;
 UPDATE authenticators SET state='active',bound_at=sqlc.arg(now),changed_at=sqlc.arg(now),last_accepted_totp_step=sqlc.arg(step) WHERE id=sqlc.arg(id) AND kind='totp' AND state='pending';
 
 -- name: RecordTOTPFailure :execrows
-UPDATE authenticators SET failed_attempts=failed_attempts+1,state=CASE WHEN failed_attempts+1>=retry_ceiling THEN 'disabled' ELSE state END,next_attempt_at=sqlc.arg(next_attempt_at)
+UPDATE authenticators SET failed_attempts=failed_attempts+1,state=CASE WHEN failed_attempts+1>=retry_ceiling THEN 'disabled' ELSE state END,
+changed_at=CASE WHEN failed_attempts+1>=retry_ceiling THEN sqlc.arg(now) ELSE changed_at END,next_attempt_at=sqlc.arg(next_attempt_at)
 WHERE id=sqlc.arg(id) AND kind='totp' AND state IN ('active','pending') AND failed_attempts<retry_ceiling;
 
 -- name: RecordTOTPAcceptance :exec

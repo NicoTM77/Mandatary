@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"github.com/NicoTM77/Mandatary/internal/store"
 	"testing"
 	"time"
 )
@@ -38,6 +39,18 @@ func TestTOTPExhaustionDoesNotDisableRecovery(t *testing.T) {
 		if _, err = l.VerifyTOTP(t.Context(), "u", e.ID, "abcdef", "192.0.2.2"); err != ErrDenied {
 			t.Fatal("wrong OTP accepted")
 		}
+	}
+	if err := l.repo.Read(t.Context(), func(q *store.Queries) error {
+		factor, err := q.GetAuthenticator(t.Context(), e.ID)
+		if err != nil {
+			return err
+		}
+		if factor.State != "disabled" || !factor.ChangedAt.Valid || factor.ChangedAt.Int64 != now.Unix() {
+			t.Fatal("retry disablement lifecycle date not recorded")
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
 	}
 	if _, err = l.VerifyTOTP(t.Context(), "u", e.ID, enrollmentCode(t, e, now), "192.0.2.3"); err != ErrDenied {
 		t.Fatal("exhausted factor revived")

@@ -236,7 +236,7 @@ func (l *Lifecycle) loadTOTP(ctx context.Context, id string) (store.Authenticato
 }
 
 func (l *Lifecycle) failedTOTP(ctx context.Context, q *store.Queries, a store.Authenticator, now int64) error {
-	n, e := q.RecordTOTPFailure(ctx, store.RecordTOTPFailureParams{ID: a.ID, NextAttemptAt: nullable(now + passwordWait(a.FailedAttempts+1))})
+	n, e := q.RecordTOTPFailure(ctx, store.RecordTOTPFailureParams{ID: a.ID, Now: nullable(now), NextAttemptAt: nullable(now + passwordWait(a.FailedAttempts+1))})
 	if e != nil || n != 1 {
 		l.repo.FailClosed()
 		return ErrDenied

@@ -326,17 +326,19 @@ func (q *Queries) RecordTOTPAcceptance(ctx context.Context, arg RecordTOTPAccept
 }
 
 const recordTOTPFailure = `-- name: RecordTOTPFailure :execrows
-UPDATE authenticators SET failed_attempts=failed_attempts+1,state=CASE WHEN failed_attempts+1>=retry_ceiling THEN 'disabled' ELSE state END,next_attempt_at=?1
-WHERE id=?2 AND kind='totp' AND state IN ('active','pending') AND failed_attempts<retry_ceiling
+UPDATE authenticators SET failed_attempts=failed_attempts+1,state=CASE WHEN failed_attempts+1>=retry_ceiling THEN 'disabled' ELSE state END,
+changed_at=CASE WHEN failed_attempts+1>=retry_ceiling THEN ?1 ELSE changed_at END,next_attempt_at=?2
+WHERE id=?3 AND kind='totp' AND state IN ('active','pending') AND failed_attempts<retry_ceiling
 `
 
 type RecordTOTPFailureParams struct {
+	Now           sql.NullInt64
 	NextAttemptAt sql.NullInt64
 	ID            string
 }
 
 func (q *Queries) RecordTOTPFailure(ctx context.Context, arg RecordTOTPFailureParams) (int64, error) {
-	result, err := q.db.ExecContext(ctx, recordTOTPFailure, arg.NextAttemptAt, arg.ID)
+	result, err := q.db.ExecContext(ctx, recordTOTPFailure, arg.Now, arg.NextAttemptAt, arg.ID)
 	if err != nil {
 		return 0, err
 	}
