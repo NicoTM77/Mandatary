@@ -121,15 +121,25 @@ Playwright1.64.1 locks its Chromium revision. The browser test uses a **test-onl
 loopback TLS adapter and virtual CTAP2 authenticator with resident/nonresident,
 valid signed UV, replay and signed UV downgrade cases. It is not the product
 login/session/CSRF/UI or branded-browser/device suite. There is no skip fallback.
-Native browser launch fails with SIGTRAP under the restricted worker's ordinary
-2GiB virtual envelope. Hosted run42329099897 independently reaches Chromium's
-`No usable sandbox` failure on Ubuntu24.04 for both Go baselines. These are
-**failed executions**, not application protocol results. Do not disable Chromium
-sandboxing, weaken runner/host security policy or skip the suite to obtain green
-CI. An approved sandbox-capable isolated browser fixture is needed before
-acceptance. The same run's arm64 ordinary suite hit Go's default10-minute limit;
-the expanded race suites now have an explicit20-minute per-package timeout and
-30-minute finite baseline/arm64 job budgets, with no test removed.
+Browser acceptance requires actual browser/virtual-authenticator execution; it
+is distinct from optional browser-process hardening. The earlier unconditional
+`chromiumSandbox: true` fixture setting and sandbox prohibition were introduced
+in this WIP, not required by the approved baseline. Following the owner’s
+reconciliation, the fixture uses Playwright’s documented default launch security
+configuration (no sandbox override or custom sandbox flags). Only host resolution
+of the synthetic RP to loopback and proxy avoidance are configured. The fixture
+validates the exact synthetic origin/port, blocks requests outside its local
+route/method allowlist and disables service workers. It serves trusted repository
+HTML only, with disposable synthetic account/key material; it must not browse
+arbitrary external content. This is not a production-browser recommendation or
+authority to change host, AppArmor, container or production security settings.
+
+Earlier native SIGTRAP and hosted `No usable sandbox` runs42329099897/42341070413
+are retained as **failed executions**, not protocol evidence. New execution after
+reconciliation must pass the complete suite; there is no skip fallback. The
+separate arm64 default10-minute timeout was addressed with explicit20-minute
+per-package and30-minute job budgets; run42341070413 subsequently passed arm64
+with no test removed. Final-head evidence must still be rechecked.
 
 Resumed component fixtures exercise concurrent one-use/restart/counter retention,
 credential-specific retry ceiling/non-sliding backoff/independent backup key,

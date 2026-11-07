@@ -1,20 +1,25 @@
 import assert from 'node:assert/strict';
 /* global fetch, navigator, PublicKeyCredential, console */
 import process from 'node:process';
-import { URL } from 'node:url';
 import { chromium } from '@playwright/test';
+import { fixtureOrigin, allowsFixtureRequest } from './webauthn-boundary.mjs';
 
 // Test-only browser process, synthetic loopback HTTPS and disposable CTAP keys.
 // No application routes, hardware-provider claims, traces or secret artifacts.
-const origin = new URL(process.argv[2]);
-assert.equal(origin.hostname, 'example.invalid');
-assert.equal(origin.protocol, 'https:');
+const origin = fixtureOrigin(process.argv[2]);
+// Playwright's documented launch defaults; only local routing is customized.
 const browser = await chromium.launch({
-  chromiumSandbox: true,
   args: ['--host-resolver-rules=MAP example.invalid 127.0.0.1', '--no-proxy-server'],
 });
 try {
-  const context = await browser.newContext({ ignoreHTTPSErrors: true });
+  const context = await browser.newContext({ ignoreHTTPSErrors: true, serviceWorkers: 'block' });
+  const blocked = [];
+  await context.route('**/*', async (route) => {
+    const request = route.request();
+    if (allowsFixtureRequest(origin, request.url(), request.method())) return route.continue();
+    blocked.push(request.url());
+    return route.abort('blockedbyclient');
+  });
   const page = await context.newPage();
   await page.goto(origin.href);
   const cdp = await context.newCDPSession(page);
@@ -59,7 +64,8 @@ try {
     });
     await cdp.send('WebAuthn.removeVirtualAuthenticator', { authenticatorId });
   }
-  console.log(JSON.stringify({ browser: browser.version(), resident: true, nonresident: true, signedUV: true, replayRejected: true, signedUVDowngradeRejected: true }));
+  assert.equal(blocked.length, 0, 'fixture attempted a request outside its allowlist');
+  console.log(JSON.stringify({ browser: browser.version(), resident: true, nonresident: true, signedUV: true, replayRejected: true, signedUVDowngradeRejected: true, localRequestsOnly: true }));
 } finally {
   await browser.close();
 }
