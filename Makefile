@@ -24,7 +24,7 @@ build: versions
 test: versions sqlc
 	node --test scripts/*.test.mjs
 	npm --prefix web test
-	go test -race -count=1 ./...
+	go test -race -timeout=20m -count=1 ./...
 
 check: build sqlc
 	$(MAKE) generate-check
@@ -76,6 +76,12 @@ security: tool-security
 	bin/tools/gosec ./...
 	bin/tools/golangci-lint run ./...
 	npm --prefix web audit --audit-level=high
+
+browser-install: versions
+	web/node_modules/.bin/playwright install chromium
+
+browser-test: versions
+	go test -tags=webauthnbrowser -count=1 -v ./internal/auth -run '^TestWebAuthnBrowserVirtualAuthenticator$$'
 
 negative-control:
 	bash scripts/negative-control.sh

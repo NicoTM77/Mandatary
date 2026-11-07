@@ -13,6 +13,12 @@ import (
 // intent, but issues NO replacement, recovery capability, ordinary session or
 // assurance. Removal/binding administration still requires maximum fresh AAL.
 func (l *Lifecycle) ReportTOTPCompromise(ctx context.Context, name string, password []byte, id, ip string) error {
+	return l.reportCompromise(ctx, name, password, id, ip, "totp")
+}
+
+// Both callers select a fixed, internal kind. Report authority is deliberately
+// narrower than removal/replacement and may revoke the last required factor.
+func (l *Lifecycle) reportCompromise(ctx context.Context, name string, password []byte, id, ip, kind string) error {
 	if ctx.Err() != nil || !l.gate.allow(ip, l.now()) {
 		return ErrDenied
 	}
@@ -61,7 +67,7 @@ func (l *Lifecycle) ReportTOTPCompromise(ctx context.Context, name string, passw
 			return ErrDenied
 		}
 		target, e := q.GetAuthenticator(ctx, id)
-		if e != nil || target.UserID != u.ID || target.Kind != "totp" || target.CredentialGeneration != c.CredentialGeneration || target.RevokedAt.Valid || now < target.CreatedAt {
+		if e != nil || target.UserID != u.ID || target.Kind != kind || target.CredentialGeneration != c.CredentialGeneration || target.RevokedAt.Valid || now < target.CreatedAt {
 			return ErrDenied
 		}
 		observedControl, observedUser, observedPassword = c, u, passwordBinding
@@ -89,10 +95,15 @@ func (l *Lifecycle) ReportTOTPCompromise(ctx context.Context, name string, passw
 			return ErrDenied
 		}
 		target, e := q.GetAuthenticator(ctx, id)
-		if e != nil || target.UserID != u.ID || target.Kind != "totp" || target.CredentialGeneration != c.CredentialGeneration || target.RevokedAt.Valid || now < target.CreatedAt {
+		if e != nil || target.UserID != u.ID || target.Kind != kind || target.CredentialGeneration != c.CredentialGeneration || target.RevokedAt.Valid || now < target.CreatedAt {
 			return ErrDenied
 		}
-		n, e := q.RevokeTOTP(ctx, store.RevokeTOTPParams{ID: id, Now: nullable(now)})
+		var n int64
+		if kind == "webauthn" {
+			n, e = q.RevokeWebAuthn(ctx, store.RevokeWebAuthnParams{ID: id, Now: nullable(now)})
+		} else {
+			n, e = q.RevokeTOTP(ctx, store.RevokeTOTPParams{ID: id, Now: nullable(now)})
+		}
 		if e != nil || n != 1 {
 			return ErrDenied
 		}

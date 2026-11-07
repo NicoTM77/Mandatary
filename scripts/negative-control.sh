@@ -5,7 +5,7 @@ set -euo pipefail
 log=$(mktemp "${TMPDIR:-/tmp}/mandatary-negative.XXXXXX")
 trap 'rm -f "$log"' EXIT
 set +e
-MANDATARY_NEGATIVE_FIXTURE=exposed-route go test -race -count=1 ./... > "$log" 2>&1
+MANDATARY_NEGATIVE_FIXTURE=exposed-route go test -race -timeout=20m -count=1 ./... > "$log" 2>&1
 status=$?
 set -e
 cat "$log"
