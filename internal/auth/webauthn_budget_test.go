@@ -29,7 +29,9 @@ func TestWebAuthnConcurrentCeilingHasNoSpeculativeProofs(t *testing.T) {
 		if e != nil {
 			t.Fatal(e)
 		}
-		response := key.assert(t, c.Options.Response.Challenge.String(), "https://example.invalid", 1, 1)
+		impostor := newVirtualKey(t)
+		impostor.id = key.id
+		response := impostor.assert(t, c.Options.Response.Challenge.String(), "https://example.invalid", 5, 1)
 		go func() {
 			<-start
 			_, e := service.FinishAssertion(t.Context(), session, c.ID, response, "192.0.2.61")

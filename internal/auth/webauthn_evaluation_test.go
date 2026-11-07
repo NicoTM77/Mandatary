@@ -1,7 +1,6 @@
 package auth
 
 import (
-	"bytes"
 	"os"
 	"path/filepath"
 	"syscall"
@@ -41,8 +40,9 @@ func TestWebAuthnProofEvaluationHoldsSharedControl(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	response := key.assert(t, c.Options.Response.Challenge.String(), "https://example.invalid", 5, 1)
-	response = alterResponse(t, response, func(m map[string]any) { m["response"].(map[string]any)["signature"] = b64(bytes.Repeat([]byte{1}, 72)) })
+	impostor := newVirtualKey(t)
+	impostor.id = key.id
+	response := impostor.assert(t, c.Options.Response.Challenge.String(), "https://example.invalid", 5, 1)
 	if _, e = w.FinishAssertion(t.Context(), session, c.ID, response, "192.0.2.60"); e != ErrDenied {
 		t.Fatal("invalid signature accepted")
 	}

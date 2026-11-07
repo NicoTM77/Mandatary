@@ -32,7 +32,7 @@ func alterClient(t *testing.T, m map[string]any, fn func(map[string]any)) {
 	r["clientDataJSON"] = b64(jsonBytes(t, data))
 }
 func TestWebAuthnAssertionAdversarialMatrix(t *testing.T) {
-	for _, name := range []string{"origin", "scheme", "port", "type", "challenge", "cross-origin", "top-origin", "signature", "rp-hash", "missing-uv", "missing-up", "backup-invalid", "changed-be", "user-handle", "credential-id", "expired", "clock-rollback", "quarantine", "generation", "revoked-factor", "revoked-session", "recovery-session", "setup-session", "public-key-tamper", "envelope-tamper"} {
+	for _, name := range []string{"origin", "scheme", "port", "type", "challenge", "cross-origin", "top-origin", "signature", "wrong-signing-key", "rp-hash", "missing-uv", "missing-up", "backup-invalid", "changed-be", "user-handle", "credential-id", "expired", "clock-rollback", "quarantine", "generation", "revoked-factor", "revoked-session", "recovery-session", "setup-session", "public-key-tamper", "envelope-tamper"} {
 		t.Run(name, func(t *testing.T) {
 			w, db, session, key, id := webFixture(t)
 			c, e := w.BeginAssertion(t.Context(), session)
@@ -73,6 +73,10 @@ func TestWebAuthnAssertionAdversarialMatrix(t *testing.T) {
 				})
 			case "signature":
 				response = alterResponse(t, response, func(m map[string]any) { r := m["response"].(map[string]any); r["signature"] = b64(make([]byte, 72)) })
+			case "wrong-signing-key":
+				impostor := newVirtualKey(t)
+				impostor.id = key.id
+				response = impostor.assert(t, c.Options.Response.Challenge.String(), "https://example.invalid", 5, 1)
 			case "rp-hash":
 				response = alterResponse(t, response, func(m map[string]any) {
 					r := m["response"].(map[string]any)
@@ -112,7 +116,7 @@ func TestWebAuthnAssertionAdversarialMatrix(t *testing.T) {
 					t.Fatal(e)
 				}
 			}
-			if name != "signature" {
+			if name != "signature" && name != "wrong-signing-key" {
 				response = key.resign(t, response)
 			}
 			if p, e := w.FinishAssertion(t.Context(), session, c.ID, response, "192.0.2.6"); e != ErrDenied || p.AuthenticatorID != "" {
