@@ -166,17 +166,6 @@ func (q *Queries) GetWebAuthnChallenge(ctx context.Context, id string) (GetWebAu
 	return i, err
 }
 
-const getWebAuthnCredential = `-- name: GetWebAuthnCredential :one
-SELECT authenticator_id, label, envelope FROM webauthn_credentials WHERE authenticator_id=?
-`
-
-func (q *Queries) GetWebAuthnCredential(ctx context.Context, authenticatorID string) (WebauthnCredential, error) {
-	row := q.db.QueryRowContext(ctx, getWebAuthnCredential, authenticatorID)
-	var i WebauthnCredential
-	err := row.Scan(&i.AuthenticatorID, &i.Label, &i.Envelope)
-	return i, err
-}
-
 const getWebAuthnHandle = `-- name: GetWebAuthnHandle :one
 SELECT handle FROM webauthn_users WHERE user_id=?
 `
@@ -187,6 +176,17 @@ func (q *Queries) GetWebAuthnHandle(ctx context.Context, userID string) ([]byte,
 	var handle []byte
 	err := row.Scan(&handle)
 	return handle, err
+}
+
+const getWebAuthnKeyRecord = `-- name: GetWebAuthnKeyRecord :one
+SELECT authenticator_id, label, envelope FROM webauthn_credentials WHERE authenticator_id=?
+`
+
+func (q *Queries) GetWebAuthnKeyRecord(ctx context.Context, authenticatorID string) (WebauthnCredential, error) {
+	row := q.db.QueryRowContext(ctx, getWebAuthnKeyRecord, authenticatorID)
+	var i WebauthnCredential
+	err := row.Scan(&i.AuthenticatorID, &i.Label, &i.Envelope)
+	return i, err
 }
 
 const pruneWebAuthnChallenges = `-- name: PruneWebAuthnChallenges :exec
@@ -214,21 +214,6 @@ func (q *Queries) PutWebAuthnChallenge(ctx context.Context, arg PutWebAuthnChall
 	return err
 }
 
-const putWebAuthnCredential = `-- name: PutWebAuthnCredential :exec
-INSERT INTO webauthn_credentials(authenticator_id,label,envelope) VALUES(?,?,?)
-`
-
-type PutWebAuthnCredentialParams struct {
-	AuthenticatorID string
-	Label           string
-	Envelope        []byte
-}
-
-func (q *Queries) PutWebAuthnCredential(ctx context.Context, arg PutWebAuthnCredentialParams) error {
-	_, err := q.db.ExecContext(ctx, putWebAuthnCredential, arg.AuthenticatorID, arg.Label, arg.Envelope)
-	return err
-}
-
 const putWebAuthnHandle = `-- name: PutWebAuthnHandle :exec
 INSERT INTO webauthn_users(user_id,handle) VALUES(?,?) ON CONFLICT(user_id) DO NOTHING
 `
@@ -240,6 +225,21 @@ type PutWebAuthnHandleParams struct {
 
 func (q *Queries) PutWebAuthnHandle(ctx context.Context, arg PutWebAuthnHandleParams) error {
 	_, err := q.db.ExecContext(ctx, putWebAuthnHandle, arg.UserID, arg.Handle)
+	return err
+}
+
+const putWebAuthnKeyRecord = `-- name: PutWebAuthnKeyRecord :exec
+INSERT INTO webauthn_credentials(authenticator_id,label,envelope) VALUES(?,?,?)
+`
+
+type PutWebAuthnKeyRecordParams struct {
+	AuthenticatorID string
+	Label           string
+	Envelope        []byte
+}
+
+func (q *Queries) PutWebAuthnKeyRecord(ctx context.Context, arg PutWebAuthnKeyRecordParams) error {
+	_, err := q.db.ExecContext(ctx, putWebAuthnKeyRecord, arg.AuthenticatorID, arg.Label, arg.Envelope)
 	return err
 }
 
@@ -280,17 +280,17 @@ func (q *Queries) RevokeWebAuthn(ctx context.Context, arg RevokeWebAuthnParams) 
 	return result.RowsAffected()
 }
 
-const updateWebAuthnCredential = `-- name: UpdateWebAuthnCredential :execrows
+const updateWebAuthnKeyRecord = `-- name: UpdateWebAuthnKeyRecord :execrows
 UPDATE webauthn_credentials SET envelope=? WHERE authenticator_id=?
 `
 
-type UpdateWebAuthnCredentialParams struct {
+type UpdateWebAuthnKeyRecordParams struct {
 	Envelope        []byte
 	AuthenticatorID string
 }
 
-func (q *Queries) UpdateWebAuthnCredential(ctx context.Context, arg UpdateWebAuthnCredentialParams) (int64, error) {
-	result, err := q.db.ExecContext(ctx, updateWebAuthnCredential, arg.Envelope, arg.AuthenticatorID)
+func (q *Queries) UpdateWebAuthnKeyRecord(ctx context.Context, arg UpdateWebAuthnKeyRecordParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, updateWebAuthnKeyRecord, arg.Envelope, arg.AuthenticatorID)
 	if err != nil {
 		return 0, err
 	}

@@ -33,8 +33,17 @@ qualification P1.16, restore import P1.18, packaged qualification P1.19/20.
   by the originating session), account/session/purpose/config/generation binding
   and atomic one-use consumption. There are at most16 unconsumed/unexpired
   ceremonies per account. Consumed/expired WebAuthn challenge rows and their
-  envelopes are pruned on the next admitted ceremony. Key-count, parser/work
-  concurrency and broader abuse coverage still need final acceptance review.
+  envelopes are pruned on the next admitted ceremony. At most16 current bound,
+  unrevoked keys are admitted per account (disabled keys still occupy a slot).
+  The final binding transaction rechecks this limit across concurrent completions.
+  Recovery can replace a full set atomically, never leaving17 committed live keys.
+  Input responses are at most32768 bytes, external key IDs at most1024 bytes;
+  four non-waiting process-wide work slots bound ceremony/parser/crypto work
+  across service handles. Saturation denies without consuming proof. Peer traffic
+  admission remains explicit in assertion/report adapters; future public routes
+  must also bound request sizes and validated-peer traffic. No unauthenticated
+  registration route is introduced. Terminal/unowned registration ceremonies are
+  rejected before attestation parsing; all state is rechecked at commit.
 * Credential AEAD envelopes bind account/RP/key association; verification checks
   public key, external credential ID, counter and BE/BS metadata against the
   protected record. The RP never stores an authenticator private key, PIN,
@@ -60,9 +69,16 @@ qualification P1.16, restore import P1.18, packaged qualification P1.19/20.
 * Narrow compromise reporting accepts a still-bound password to revoke an owned
   key and its sessions, including the last required key, with protective notice
   intent. It grants no replacement authority and never relaxes WebAuthn-only
-  policy. The WebAuthn restricted-recovery replacement continuation is still
-  incomplete; the existing TOTP continuation deliberately cannot satisfy that
-  policy. No recovery-only normal session or fallback is introduced.
+  policy. `BeginRecoveredRegistration`/`FinishRecoveredRegistration` consume only
+  the existing saved-code+still-bound-password restricted capability. Their
+  challenge binds that capability ID, account, password revision (through the
+  capability), generations, configuration and absolute deadline, separately from
+  normal session ceremonies. Valid new UP+UV proof atomically binds the new key,
+  revokes previous WebAuthn keys, consumes replacement authority and records both
+  replacement/recovery notice intents; failures roll back authority-increasing
+  changes. The capability cannot issue a session or normal assertion, and the
+  existing TOTP continuation still cannot satisfy WebAuthn-only policy. Fresh
+  policy-satisfying normal authentication remains mandatory after replacement.
 
 ## Device/provider evidence and limits
 
@@ -126,7 +142,10 @@ is distinct from optional browser-process hardening. The earlier unconditional
 `chromiumSandbox: true` fixture setting and sandbox prohibition were introduced
 in this WIP, not required by the approved baseline. Following the owner’s
 reconciliation, the fixture uses Playwright’s documented default launch security
-configuration (no sandbox override or custom sandbox flags). Only host resolution
+configuration (no sandbox override or custom sandbox flags; Playwright documents
+`chromiumSandbox` as false by default at
+https://playwright.dev/docs/api/class-browsertype#browser-type-launch-option-chromium-sandbox).
+Only host resolution
 of the synthetic RP to loopback and proxy avoidance are configured. The fixture
 validates the exact synthetic origin/port, blocks requests outside its local
 route/method allowlist and disables service workers. It serves trusted repository
@@ -141,10 +160,11 @@ separate arm64 default10-minute timeout was addressed with explicit20-minute
 per-package and30-minute job budgets; run42341070413 subsequently passed arm64
 with no test removed. Final-head evidence must still be rechecked.
 
-Resumed component fixtures exercise concurrent one-use/restart/counter retention,
+Component fixtures include concurrent one-use/restart/counter retention,
 credential-specific retry ceiling/non-sliding backoff/independent backup key,
 and actual SQLite WAL xSync failure at challenge creation, binding, good/bad
-assertion, report and removal. Report and retention changes have recorded
-RED→GREEN runs. They do not close the remaining recovery/resource/evidence
-acceptance gaps. Exact commands, logs, SHAs and final regression outcomes belong
-to the original Kanban card; this remains a WIP draft, not review approval.
+assertion, report, removal, recovered binding and terminal retry invalidation/
+notice expansion. The detailed component-to-contract crosswalk is
+[webauthn-acceptance.md](webauthn-acceptance.md). Exact commands, logs, SHAs and
+final regression/CI outcomes belong to the original Kanban card; this remains a
+draft pending complete exact-head checks and independent review, not approval.

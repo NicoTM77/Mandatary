@@ -20,6 +20,20 @@ type WebAuthnService struct {
 	verifier  *wa.WebAuthn
 }
 
+// Process-wide, non-waiting admission across service handles bounds challenge,
+// parser and cryptographic work. Caller adapters still bound request bytes and
+// peer traffic; durable per-key budgets remain independent of this work limit.
+var webAuthnWork = make(chan struct{}, 4)
+
+func admitWebAuthn() bool {
+	select {
+	case webAuthnWork <- struct{}{}:
+		return true
+	default:
+		return false
+	}
+}
+
 func NewWebAuthn(l *Lifecycle, c WebAuthnSettings) (*WebAuthnService, error) {
 	if l == nil || c.RPID != strings.ToLower(c.RPID) || protocol.ValidateRPID(c.RPID) != nil || len(c.Origins) == 0 || len(c.Origins) > 8 {
 		return nil, ErrDenied

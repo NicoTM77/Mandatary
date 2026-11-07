@@ -112,6 +112,9 @@ func TestWebAuthnAssertionAdversarialMatrix(t *testing.T) {
 					t.Fatal(e)
 				}
 			}
+			if name != "signature" {
+				response = key.resign(t, response)
+			}
 			if p, e := w.FinishAssertion(t.Context(), session, c.ID, response, "192.0.2.6"); e != ErrDenied || p.AuthenticatorID != "" {
 				t.Fatal("adversarial assertion accepted", id)
 			}

@@ -39,6 +39,7 @@ func (RegistrationOptions) GoString() string { return "[REDACTED]" }
 type webChallenge struct {
 	Data                                           wa.SessionData
 	User, Session, Purpose, RPID                   string
+	Recovery                                       string
 	Origins                                        []string
 	Generation, SessionGeneration, Issued, Expires int64
 }
@@ -50,15 +51,24 @@ type webCredential struct {
 var webAlgorithms = []protocol.CredentialParameter{{Type: protocol.PublicKeyCredentialType, Algorithm: webauthncose.AlgES256}}
 
 func (w *WebAuthnService) BeginRegistration(ctx context.Context, session []byte, resident bool) (RegistrationOptions, error) {
+	return w.beginRegistration(ctx, session, resident, false)
+}
+
+func (w *WebAuthnService) beginRegistration(ctx context.Context, session []byte, resident, recovered bool) (RegistrationOptions, error) {
+	if ctx.Err() != nil || !admitWebAuthn() {
+		return RegistrationOptions{}, ErrDenied
+	}
+	defer func() { <-webAuthnWork }()
 	l := w.lifecycle
 	var c store.InstallationControl
 	var u store.User
-	var s store.Session
+	var authority webBindingAuthority
 	var handle []byte
 	var exclude []protocol.CredentialDescriptor
 	e := l.repo.Read(ctx, func(q *store.Queries) error {
 		var e error
-		c, u, s, e = freshSession(ctx, q, session, l.now().Unix())
+		authority, e = w.registrationAuthority(ctx, q, session, l.now().Unix(), recovered)
+		c, u = authority.control, authority.user
 		if e != nil {
 			return e
 		}
@@ -67,9 +77,12 @@ func (w *WebAuthnService) BeginRegistration(ctx context.Context, session []byte,
 			return e
 		}
 		for _, a := range all {
-			if a.Kind == "webauthn" && liveFactor(c, a, l.now().Unix()) {
+			if a.Kind == "webauthn" && a.BoundAt.Valid && !a.RevokedAt.Valid && a.CredentialGeneration == c.CredentialGeneration {
 				exclude = append(exclude, protocol.CredentialDescriptor{Type: protocol.PublicKeyCredentialType, CredentialID: a.ExternalCredentialID})
 			}
+		}
+		if !recovered && len(exclude) >= 16 {
+			return ErrDenied
 		}
 		handle, e = q.GetWebAuthnHandle(ctx, u.ID)
 		if e == sql.ErrNoRows {
@@ -103,10 +116,10 @@ func (w *WebAuthnService) BeginRegistration(ctx context.Context, session []byte,
 	}
 	now := l.now().Unix()
 	expires := now + 300
-	if expires > s.ExpiresAt {
-		expires = s.ExpiresAt
+	if expires > authority.expires {
+		expires = authority.expires
 	}
-	record := webChallenge{Data: *data, User: u.ID, Session: s.ID, Purpose: "webauthn_binding", RPID: w.verifier.Config.RPID, Origins: w.verifier.Config.RPOrigins, Generation: c.CredentialGeneration, SessionGeneration: c.SessionGeneration, Issued: now, Expires: expires}
+	record := webChallenge{Data: *data, User: u.ID, Session: authority.session, Recovery: authority.recovery, Purpose: "webauthn_binding", RPID: w.verifier.Config.RPID, Origins: w.verifier.Config.RPOrigins, Generation: c.CredentialGeneration, SessionGeneration: c.SessionGeneration, Issued: now, Expires: expires}
 	plain, e := json.Marshal(record)
 	if e != nil {
 		return RegistrationOptions{}, ErrDenied
@@ -118,8 +131,8 @@ func (w *WebAuthnService) BeginRegistration(ctx context.Context, session []byte,
 	}
 	hash := sha256.Sum256([]byte(data.Challenge))
 	e = l.repo.Control(ctx, func(q *store.Queries) error {
-		cc, uu, ss, e := freshSession(ctx, q, session, l.now().Unix())
-		if e != nil || cc.CredentialGeneration != c.CredentialGeneration || cc.SessionGeneration != c.SessionGeneration || uu.ID != u.ID || ss.ID != s.ID || l.now().Unix() >= expires {
+		current, e := w.registrationAuthority(ctx, q, session, l.now().Unix(), recovered)
+		if e != nil || current.control.CredentialGeneration != c.CredentialGeneration || current.control.SessionGeneration != c.SessionGeneration || current.user.ID != u.ID || current.session != authority.session || current.recovery != authority.recovery || l.now().Unix() >= expires {
 			return ErrDenied
 		}
 		if e = q.PruneWebAuthnChallenges(ctx, now); e != nil {
@@ -136,7 +149,7 @@ func (w *WebAuthnService) BeginRegistration(ctx context.Context, session []byte,
 		if e != nil || !bytes.Equal(h, handle) {
 			return ErrDenied
 		}
-		if e = q.CreateWebAuthnChallenge(ctx, store.CreateWebAuthnChallengeParams{ID: id, UserID: u.ID, SessionID: sql.NullString{String: s.ID, Valid: true}, Purpose: record.Purpose, ChallengeHash: hash[:], IssuedAt: now, ExpiresAt: expires, CredentialGeneration: c.CredentialGeneration}); e != nil {
+		if e = q.CreateWebAuthnChallenge(ctx, store.CreateWebAuthnChallengeParams{ID: id, UserID: u.ID, SessionID: sql.NullString{String: authority.session, Valid: authority.session != ""}, Purpose: record.Purpose, ChallengeHash: hash[:], IssuedAt: now, ExpiresAt: expires, CredentialGeneration: c.CredentialGeneration}); e != nil {
 			return e
 		}
 		return q.PutWebAuthnChallenge(ctx, store.PutWebAuthnChallengeParams{ChallengeID: id, Envelope: envelope})
@@ -191,12 +204,29 @@ func flagInt(v bool) sql.NullInt64 {
 }
 
 func (w *WebAuthnService) FinishRegistration(ctx context.Context, session []byte, id string, response []byte) error {
-	if ctx.Err() != nil || len(response) > 32768 {
+	return w.finishRegistration(ctx, session, id, response, false)
+}
+
+func (w *WebAuthnService) finishRegistration(ctx context.Context, session []byte, id string, response []byte, recovered bool) error {
+	if ctx.Err() != nil || len(response) > 32768 || !admitWebAuthn() {
 		return ErrDenied
 	}
+	defer func() { <-webAuthnWork }()
 	l := w.lifecycle
 	observed, record, e := w.loadChallenge(ctx, id)
-	if e != nil || record.Purpose != "webauthn_binding" {
+	if e != nil || record.Purpose != "webauthn_binding" || (record.Recovery != "") != recovered || observed.ConsumedAt.Valid || l.now().Unix() < record.Issued || l.now().Unix() >= record.Expires {
+		return ErrDenied
+	}
+	// Reject terminal/unowned ceremonies before parsing attacker-controlled
+	// attestation/certificates; the serialized commit rechecks all live state.
+	e = l.repo.Read(ctx, func(q *store.Queries) error {
+		a, e := w.registrationAuthority(ctx, q, session, l.now().Unix(), recovered)
+		if e != nil || a.user.ID != record.User || a.session != record.Session || a.recovery != record.Recovery || a.control.CredentialGeneration != record.Generation || a.control.SessionGeneration != record.SessionGeneration {
+			return ErrDenied
+		}
+		return nil
+	})
+	if e != nil {
 		return ErrDenied
 	}
 	parsed, e := protocol.ParseCredentialCreationResponseBytes(response)
@@ -222,9 +252,25 @@ func (w *WebAuthnService) FinishRegistration(ctx context.Context, session []byte
 	}
 	e = l.repo.Control(ctx, func(q *store.Queries) error {
 		now := l.now().Unix()
-		c, u, s, e := freshSession(ctx, q, session, now)
-		if e != nil || u.ID != record.User || s.ID != record.Session || c.CredentialGeneration != record.Generation || c.SessionGeneration != record.SessionGeneration {
+		authority, e := w.registrationAuthority(ctx, q, session, now, recovered)
+		c, u := authority.control, authority.user
+		if e != nil || u.ID != record.User || authority.session != record.Session || authority.recovery != record.Recovery || c.CredentialGeneration != record.Generation || c.SessionGeneration != record.SessionGeneration {
 			return ErrDenied
+		}
+		if !recovered {
+			all, e := q.ListUserAuthenticators(ctx, u.ID)
+			if e != nil {
+				return e
+			}
+			count := 0
+			for _, a := range all {
+				if a.Kind == "webauthn" && a.BoundAt.Valid && !a.RevokedAt.Valid && a.CredentialGeneration == c.CredentialGeneration {
+					count++
+				}
+			}
+			if count >= 16 {
+				return ErrDenied
+			}
 		}
 		row, e := q.GetWebAuthnChallenge(ctx, id)
 		if e != nil || row.ConsumedAt.Valid || now < row.IssuedAt || now >= row.ExpiresAt || !bytes.Equal(row.Envelope, observed.Envelope) {
@@ -237,8 +283,11 @@ func (w *WebAuthnService) FinishRegistration(ctx context.Context, session []byte
 		if e = q.CreateWebAuthnAuthenticator(ctx, store.CreateWebAuthnAuthenticatorParams{ID: id, UserID: u.ID, CredentialGeneration: c.CredentialGeneration, CreatedAt: now, BoundAt: nullable(now), ChangedAt: nullable(now), PublicKey: credential.PublicKey, ExternalCredentialID: credential.ID, SignCount: nullable(int64(credential.Authenticator.SignCount)), BackupEligible: flagInt(credential.Flags.BackupEligible), BackupState: flagInt(credential.Flags.BackupState)}); e != nil {
 			return e
 		}
-		if e = q.PutWebAuthnCredential(ctx, store.PutWebAuthnCredentialParams{AuthenticatorID: id, Label: "Security key", Envelope: envelope}); e != nil {
+		if e = q.PutWebAuthnKeyRecord(ctx, store.PutWebAuthnKeyRecordParams{AuthenticatorID: id, Label: "Security key", Envelope: envelope}); e != nil {
 			return e
+		}
+		if recovered {
+			return w.completeRecoveredBinding(ctx, q, c, u.ID, authority.recovery, id, now)
 		}
 		return l.enqueue(ctx, q, c, u.ID, "authenticator_bound", now)
 	}, nil)

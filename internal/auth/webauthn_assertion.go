@@ -71,7 +71,7 @@ func (w *WebAuthnService) webUser(ctx context.Context, session []byte) (webUser,
 			if a.Kind != "webauthn" || !liveFactor(c, a, l.now().Unix()) {
 				continue
 			}
-			r, e := q.GetWebAuthnCredential(ctx, a.ID)
+			r, e := q.GetWebAuthnKeyRecord(ctx, a.ID)
 			if e != nil {
 				return e
 			}
@@ -102,6 +102,10 @@ func (w *WebAuthnService) webUser(ctx context.Context, session []byte) (webUser,
 }
 
 func (w *WebAuthnService) BeginAssertion(ctx context.Context, session []byte) (AssertionOptions, error) {
+	if ctx.Err() != nil || !admitWebAuthn() {
+		return AssertionOptions{}, ErrDenied
+	}
+	defer func() { <-webAuthnWork }()
 	l := w.lifecycle
 	user, _, _, e := w.webUser(ctx, session)
 	if e != nil {
@@ -174,9 +178,10 @@ func (w *WebAuthnService) BeginAssertion(ctx context.Context, session []byte) (A
 // signals, not device-internal erasure/biometric/sync-provider conformance.
 func (w *WebAuthnService) FinishAssertion(ctx context.Context, session []byte, id string, response []byte, ip string) (FactorProof, error) {
 	l := w.lifecycle
-	if ctx.Err() != nil || len(response) > 32768 || !l.gate.allow(ip, l.now()) {
+	if ctx.Err() != nil || len(response) > 32768 || !l.gate.allow(ip, l.now()) || !admitWebAuthn() {
 		return FactorProof{}, ErrDenied
 	}
+	defer func() { <-webAuthnWork }()
 	observed, record, e := w.loadChallenge(ctx, id)
 	if e != nil || record.Purpose != "webauthn_assertion" || observed.ConsumedAt.Valid || l.now().Unix() < record.Issued || l.now().Unix() >= record.Expires {
 		return FactorProof{}, ErrDenied
@@ -235,7 +240,7 @@ func (w *WebAuthnService) FinishAssertion(ctx context.Context, session []byte, i
 		if e != nil || !liveFactor(c, a, now) || a.UserID != u.ID || a.Kind != "webauthn" || a.FailedAttempts != selected.FailedAttempts || a.NextAttemptAt != selected.NextAttemptAt || (a.NextAttemptAt.Valid && now < a.NextAttemptAt.Int64) || !bytes.Equal(a.PublicKey, selected.PublicKey) || !bytes.Equal(a.ExternalCredentialID, selected.ExternalCredentialID) || a.SignCount != selected.SignCount || a.BackupEligible != selected.BackupEligible || a.BackupState != selected.BackupState {
 			return ErrDenied
 		}
-		r, e := q.GetWebAuthnCredential(ctx, a.ID)
+		r, e := q.GetWebAuthnKeyRecord(ctx, a.ID)
 		if e != nil || !bytes.Equal(r.Envelope, records[a.ID].Envelope) {
 			return ErrDenied
 		}
@@ -257,7 +262,7 @@ func (w *WebAuthnService) FinishAssertion(ctx context.Context, session []byte, i
 		if l.repo.FailedClosed() {
 			return ErrDenied
 		}
-		n, e = q.UpdateWebAuthnCredential(ctx, store.UpdateWebAuthnCredentialParams{AuthenticatorID: a.ID, Envelope: envelope})
+		n, e = q.UpdateWebAuthnKeyRecord(ctx, store.UpdateWebAuthnKeyRecordParams{AuthenticatorID: a.ID, Envelope: envelope})
 		if e != nil || n != 1 {
 			return ErrDenied
 		}
