@@ -188,7 +188,7 @@ func (q *Queries) GetAgent(ctx context.Context, id string) (Agent, error) {
 }
 
 const getAuthenticator = `-- name: GetAuthenticator :one
-SELECT id, user_id, kind, state, credential_generation, created_at, bound_at, changed_at, revoked_at, expires_at, verifier_hash, encrypted_secret, public_key, external_credential_id, password_codepoints, password_format, max_assurance, phishing_resistant, retry_ceiling, failed_attempts, next_attempt_at, last_accepted_totp_step, sign_count, backup_eligible, backup_state, user_verified FROM authenticators WHERE id = ?
+SELECT id, user_id, kind, state, credential_generation, created_at, bound_at, changed_at, revoked_at, expires_at, verifier_hash, encrypted_secret, public_key, external_credential_id, password_codepoints, password_format, max_assurance, phishing_resistant, retry_ceiling, failed_attempts, next_attempt_at, last_accepted_totp_step, sign_count, backup_eligible, backup_state, user_verified, totp_algorithm, recovery_batch_id FROM authenticators WHERE id = ?
 `
 
 func (q *Queries) GetAuthenticator(ctx context.Context, id string) (Authenticator, error) {
@@ -221,6 +221,8 @@ func (q *Queries) GetAuthenticator(ctx context.Context, id string) (Authenticato
 		&i.BackupEligible,
 		&i.BackupState,
 		&i.UserVerified,
+		&i.TotpAlgorithm,
+		&i.RecoveryBatchID,
 	)
 	return i, err
 }
@@ -244,7 +246,7 @@ func (q *Queries) GetInstallationControl(ctx context.Context) (InstallationContr
 }
 
 const getLocalBinding = `-- name: GetLocalBinding :one
-SELECT id, user_id, kind, state, credential_generation, created_at, bound_at, changed_at, revoked_at, expires_at, verifier_hash, encrypted_secret, public_key, external_credential_id, password_codepoints, password_format, max_assurance, phishing_resistant, retry_ceiling, failed_attempts, next_attempt_at, last_accepted_totp_step, sign_count, backup_eligible, backup_state, user_verified FROM authenticators WHERE user_id = ? AND kind = 'password' AND state = 'active'
+SELECT id, user_id, kind, state, credential_generation, created_at, bound_at, changed_at, revoked_at, expires_at, verifier_hash, encrypted_secret, public_key, external_credential_id, password_codepoints, password_format, max_assurance, phishing_resistant, retry_ceiling, failed_attempts, next_attempt_at, last_accepted_totp_step, sign_count, backup_eligible, backup_state, user_verified, totp_algorithm, recovery_batch_id FROM authenticators WHERE user_id = ? AND kind = 'password' AND state = 'active'
 `
 
 func (q *Queries) GetLocalBinding(ctx context.Context, userID string) (Authenticator, error) {
@@ -277,6 +279,8 @@ func (q *Queries) GetLocalBinding(ctx context.Context, userID string) (Authentic
 		&i.BackupEligible,
 		&i.BackupState,
 		&i.UserVerified,
+		&i.TotpAlgorithm,
+		&i.RecoveryBatchID,
 	)
 	return i, err
 }
@@ -528,7 +532,7 @@ func (q *Queries) ListHourlyUsage(ctx context.Context, endpointID domain.Endpoin
 }
 
 const listNoticeIntents = `-- name: ListNoticeIntents :many
-SELECT id, event_id, user_id, address_id, address_version, recipient_snapshot, delivery_state, dispatch_state, authority_generation, attempts, next_attempt_at, last_attempt_at, failure_code, retain_until FROM security_notice_outbox WHERE event_id = ? ORDER BY id
+SELECT id, event_id, user_id, address_id, address_version, recipient_snapshot, delivery_state, dispatch_state, authority_generation, attempts, next_attempt_at, last_attempt_at, failure_code, retain_until, lease_until, worker_token, total_attempts, repair_count, retry_started_at FROM security_notice_outbox WHERE event_id = ? ORDER BY id
 `
 
 func (q *Queries) ListNoticeIntents(ctx context.Context, eventID string) ([]SecurityNoticeOutbox, error) {
@@ -555,6 +559,11 @@ func (q *Queries) ListNoticeIntents(ctx context.Context, eventID string) ([]Secu
 			&i.LastAttemptAt,
 			&i.FailureCode,
 			&i.RetainUntil,
+			&i.LeaseUntil,
+			&i.WorkerToken,
+			&i.TotalAttempts,
+			&i.RepairCount,
+			&i.RetryStartedAt,
 		); err != nil {
 			return nil, err
 		}

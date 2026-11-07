@@ -18,6 +18,8 @@ import (
 	sqlite "modernc.org/sqlite"
 )
 
+const currentSchemaVersion = 8
+
 var ErrStorage = errors.New("storage unavailable or unsafe")
 
 //go:embed migrations/*.sql
@@ -124,7 +126,7 @@ func Open(ctx context.Context, options Options) (_ *Repository, result error) {
 		}
 	}
 	if options.ExistingOnly {
-		if current != 3 {
+		if current != currentSchemaVersion {
 			return nil, ErrStorage
 		}
 	} else {
@@ -178,7 +180,7 @@ func existingSchemaVersion(ctx context.Context, db *sql.DB) (int64, error) {
 		return 0, ErrStorage
 	}
 	versions, err := metadata.ListMigrations(ctx, db)
-	if err != nil || len(versions) < 2 || len(versions) > 4 {
+	if err != nil || len(versions) < 2 || len(versions) > currentSchemaVersion+1 {
 		return 0, ErrStorage
 	}
 	for i, version := range versions {

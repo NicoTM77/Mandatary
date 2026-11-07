@@ -89,6 +89,8 @@ type Authenticator struct {
 	BackupEligible       sql.NullInt64
 	BackupState          sql.NullInt64
 	UserVerified         sql.NullInt64
+	TotpAlgorithm        sql.NullString
+	RecoveryBatchID      sql.NullString
 }
 
 type ContainerSelector struct {
@@ -168,6 +170,39 @@ type Policy struct {
 	StopTimeoutMax      sql.NullInt64
 }
 
+type ProtectiveNoticeIntent struct {
+	ID                  string
+	UserID              string
+	EventType           string
+	OccurredAt          int64
+	AuthorityGeneration int64
+	Recipients          string
+	State               string
+}
+
+type RecoveryBatch struct {
+	ID                   string
+	UserID               string
+	CredentialGeneration int64
+	State                string
+	Failures             int64
+	NextAttemptAt        int64
+	CreatedAt            int64
+}
+
+type RecoveryCapability struct {
+	ID                         string
+	UserID                     string
+	SecretHash                 []byte
+	CredentialGeneration       int64
+	SessionGeneration          int64
+	PasswordRevision           int64
+	CreatedAt                  int64
+	ExpiresAt                  int64
+	State                      string
+	ReplacementAuthenticatorID sql.NullString
+}
+
 type RepositoryMetadatum struct {
 	Singleton      int64
 	InstallationID []byte
@@ -198,6 +233,11 @@ type SecurityNoticeOutbox struct {
 	LastAttemptAt       sql.NullInt64
 	FailureCode         sql.NullString
 	RetainUntil         int64
+	LeaseUntil          int64
+	WorkerToken         sql.NullString
+	TotalAttempts       int64
+	RepairCount         int64
+	RetryStartedAt      sql.NullInt64
 }
 
 type Session struct {
@@ -229,6 +269,19 @@ type SessionAuthenticator struct {
 type SmtpSecret struct {
 	ID         string
 	Ciphertext []byte
+}
+
+type TotpAcceptance struct {
+	AuthenticatorID string
+	Step            int64
+	VerifierPeriod  int64
+	OutputHash      []byte
+}
+
+type TotpPending struct {
+	AuthenticatorID string
+	SessionID       string
+	ExpiresAt       int64
 }
 
 type UsageRecentEvent struct {
