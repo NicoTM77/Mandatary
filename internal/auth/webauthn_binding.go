@@ -241,6 +241,14 @@ func (w *WebAuthnService) finishRegistration(ctx context.Context, session []byte
 	if len(credential.ID) == 0 || len(credential.ID) > 1024 || !credential.Flags.UserVerified || !credential.Flags.UserPresent {
 		return ErrDenied
 	}
+	// A 'none' attestation validates the advertised algorithm but carries no
+	// signature that would otherwise force key parsing. Validate the actual
+	// COSE key shape/curve/point as well; an alg label alone is not ES256.
+	publicKey, e := webauthncose.ParsePublicKey(credential.PublicKey)
+	ec, ok := publicKey.(webauthncose.EC2PublicKeyData)
+	if e != nil || !ok || ec.Algorithm != int64(webauthncose.AlgES256) || ec.Curve != int64(webauthncose.P256) {
+		return ErrDenied
+	}
 	plain, e := json.Marshal(webCredential{User: record.User, RPID: record.RPID, Credential: *credential})
 	if e != nil {
 		return ErrDenied

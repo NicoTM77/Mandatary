@@ -1,7 +1,7 @@
-# P1.07 WebAuthn component — work in progress
+# P1.07 WebAuthn component
 
-This internal service is not yet a complete P1.07 handoff. No auth route is
-mounted by the application. Normal session issuance/transport and step-up remain
+This internal service mounts no auth route in the application. Component checks
+are not a product/conformance claim. Normal session issuance/transport and step-up remain
 P1.08, host bootstrap P1.09, full account-security UI and branded-browser/device
 qualification P1.16, restore import P1.18, packaged qualification P1.19/20.
 
@@ -9,7 +9,9 @@ qualification P1.16, restore import P1.18, packaged qualification P1.19/20.
 
 * `go-webauthn/webauthn v0.18.2` is pinned with checksums; ES256 (ECDSA P-256 /
   SHA-256) alone is requested and admitted at registration. Unsupported algorithms
-  cannot be selected by changing client options. No legacy U2F/AppID, wallet,
+  cannot be selected by changing client options. Actual COSE key type, algorithm,
+  curve and point are validated even for `none` attestation; an algorithm label
+  alone is insufficient. No legacy U2F/AppID, wallet,
   native opaque-origin or cross-origin ceremony is selected.
 * RP ID and HTTPS origins are explicit trusted deployment input, not request
   Host, Origin or forwarded headers. RP ID cannot be a public suffix; each

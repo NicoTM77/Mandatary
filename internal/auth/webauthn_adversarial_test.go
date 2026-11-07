@@ -122,7 +122,7 @@ func TestWebAuthnAssertionAdversarialMatrix(t *testing.T) {
 	}
 }
 func TestWebAuthnRegistrationAdversarialMatrix(t *testing.T) {
-	for _, name := range []string{"origin", "missing-up", "missing-uv", "backup-invalid", "expired", "wrong-session", "quarantine", "outbox-failure", "malformed-attestation", "unsupported-algorithm"} {
+	for _, name := range []string{"origin", "missing-up", "missing-uv", "backup-invalid", "expired", "wrong-session", "quarantine", "outbox-failure", "malformed-attestation", "unsupported-algorithm", "algorithm-curve-mismatch", "off-curve"} {
 		t.Run(name, func(t *testing.T) {
 			l, db, session := lifecycleFixture(t)
 			w, e := NewWebAuthn(l, WebAuthnSettings{RPID: "example.invalid", Origins: []string{"https://example.invalid"}})
@@ -163,7 +163,7 @@ func TestWebAuthnRegistrationAdversarialMatrix(t *testing.T) {
 			if name == "malformed-attestation" {
 				response = alterResponse(t, response, func(m map[string]any) { m["response"].(map[string]any)["attestationObject"] = b64([]byte{0}) })
 			}
-			if name == "unsupported-algorithm" {
+			if name == "unsupported-algorithm" || name == "algorithm-curve-mismatch" || name == "off-curve" {
 				response = alterResponse(t, response, func(m map[string]any) {
 					r := m["response"].(map[string]any)
 					b, _ := base64.RawURLEncoding.DecodeString(r["attestationObject"].(string))
@@ -177,7 +177,15 @@ func TestWebAuthnRegistrationAdversarialMatrix(t *testing.T) {
 					if cbor.Unmarshal(data[offset:], &pub) != nil {
 						t.Fatal("bad fixture key")
 					}
-					pub[3] = -8
+					switch name {
+					case "unsupported-algorithm":
+						pub[3] = -8
+					case "algorithm-curve-mismatch":
+						pub[-1] = 2
+					case "off-curve":
+						pub[-2] = make([]byte, 32)
+						pub[-3] = make([]byte, 32)
+					}
 					encoded, e := cbor.Marshal(pub)
 					if e != nil {
 						t.Fatal(e)
