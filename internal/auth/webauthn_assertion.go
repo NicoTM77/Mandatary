@@ -150,6 +150,9 @@ func (w *WebAuthnService) BeginAssertion(ctx context.Context, session []byte) (A
 		if e != nil || cc.CredentialGeneration != c.CredentialGeneration || cc.SessionGeneration != c.SessionGeneration || u.ID != record.User || ss.ID != s.ID || l.now().Unix() >= expires {
 			return ErrDenied
 		}
+		if e = q.PruneWebAuthnChallenges(ctx, now); e != nil {
+			return e
+		}
 		n, e := q.CountWebAuthnChallenges(ctx, store.CountWebAuthnChallengesParams{UserID: u.ID, Now: now})
 		if e != nil || n >= 16 {
 			return ErrDenied

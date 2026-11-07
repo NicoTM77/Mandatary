@@ -189,6 +189,17 @@ func (q *Queries) GetWebAuthnHandle(ctx context.Context, userID string) ([]byte,
 	return handle, err
 }
 
+const pruneWebAuthnChallenges = `-- name: PruneWebAuthnChallenges :exec
+DELETE FROM auth_challenges WHERE purpose IN ('webauthn_binding','webauthn_assertion')
+AND (expires_at<=?1 OR consumed_at IS NOT NULL)
+AND EXISTS (SELECT 1 FROM webauthn_challenges w WHERE w.challenge_id=auth_challenges.id)
+`
+
+func (q *Queries) PruneWebAuthnChallenges(ctx context.Context, now int64) error {
+	_, err := q.db.ExecContext(ctx, pruneWebAuthnChallenges, now)
+	return err
+}
+
 const putWebAuthnChallenge = `-- name: PutWebAuthnChallenge :exec
 INSERT INTO webauthn_challenges(challenge_id,envelope) VALUES(?,?)
 `

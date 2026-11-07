@@ -24,7 +24,7 @@ build: versions
 test: versions sqlc
 	node --test scripts/*.test.mjs
 	npm --prefix web test
-	go test -race -count=1 ./...
+	go test -race -timeout=20m -count=1 ./...
 
 check: build sqlc
 	$(MAKE) generate-check

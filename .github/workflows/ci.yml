@@ -13,7 +13,7 @@ jobs:
   baseline:
     name: Baseline (Go ${{ matrix.go }})
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       max-parallel: 1
@@ -51,7 +51,7 @@ jobs:
   storage-arm64:
     name: Storage (linux/arm64)
     runs-on: ubuntu-24.04-arm
-    timeout-minutes: 20
+    timeout-minutes: 30
     env:
       GOTOOLCHAIN: local
       GOMAXPROCS: '2'
@@ -76,7 +76,7 @@ jobs:
           test_root=$(mktemp -d "$HOME/mandatary-tests.XXXXXXXX")
           printf 'TMPDIR=%s\n' "$test_root" >> "$GITHUB_ENV"
           stat -c '%a %u:%g %n' / /home "$HOME" "$test_root"
-      - run: uname -m && make install build && go test -race -count=1 -v ./...
+      - run: uname -m && make install build && go test -race -timeout=20m -count=1 -v ./...
   security:
     name: Security
     needs: baseline

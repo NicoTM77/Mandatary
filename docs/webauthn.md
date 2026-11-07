@@ -32,8 +32,9 @@ qualification P1.16, restore import P1.18, packaged qualification P1.19/20.
   and record-bound AEAD envelopes, with 300-second absolute expiry (also capped
   by the originating session), account/session/purpose/config/generation binding
   and atomic one-use consumption. There are at most16 unconsumed/unexpired
-  ceremonies per account. The current implementation still needs its final
-  retention, resource-bound and abuse review before acceptance.
+  ceremonies per account. Consumed/expired WebAuthn challenge rows and their
+  envelopes are pruned on the next admitted ceremony. Key-count, parser/work
+  concurrency and broader abuse coverage still need final acceptance review.
 * Credential AEAD envelopes bind account/RP/key association; verification checks
   public key, external credential ID, counter and BE/BS metadata against the
   protected record. The RP never stores an authenticator private key, PIN,
@@ -56,6 +57,12 @@ qualification P1.16, restore import P1.18, packaged qualification P1.19/20.
   count TOTP as its remaining required key. Removal revokes normal sessions and
   uses the existing protective notification/repair path; ordinary binding commits
   two-address-capable independent outbox intent atomically or rolls back.
+* Narrow compromise reporting accepts a still-bound password to revoke an owned
+  key and its sessions, including the last required key, with protective notice
+  intent. It grants no replacement authority and never relaxes WebAuthn-only
+  policy. The WebAuthn restricted-recovery replacement continuation is still
+  incomplete; the existing TOTP continuation deliberately cannot satisfy that
+  policy. No recovery-only normal session or fallback is introduced.
 
 ## Device/provider evidence and limits
 
@@ -114,10 +121,20 @@ Playwright1.64.1 locks its Chromium revision. The browser test uses a **test-onl
 loopback TLS adapter and virtual CTAP2 authenticator with resident/nonresident,
 valid signed UV, replay and signed UV downgrade cases. It is not the product
 login/session/CSRF/UI or branded-browser/device suite. There is no skip fallback.
-Native browser launch and source scanners currently fail under the restricted
-worker's ordinary2GiB virtual envelope; these failures are NOT passes. Hosted
-exact-head baseline/browser/security execution is still required. Primary
-Go1.27.3 full race regression, module verification, sqlc diff, vet and frontend
-lint/type/unit checks have executed successfully during implementation; these
-are intermediate results, not final-head independent approval. Exact commands,
-logs, SHAs and remaining implementation gaps belong to the original Kanban card.
+Native browser launch fails with SIGTRAP under the restricted worker's ordinary
+2GiB virtual envelope. Hosted run42329099897 independently reaches Chromium's
+`No usable sandbox` failure on Ubuntu24.04 for both Go baselines. These are
+**failed executions**, not application protocol results. Do not disable Chromium
+sandboxing, weaken runner/host security policy or skip the suite to obtain green
+CI. An approved sandbox-capable isolated browser fixture is needed before
+acceptance. The same run's arm64 ordinary suite hit Go's default10-minute limit;
+the expanded race suites now have an explicit20-minute per-package timeout and
+30-minute finite baseline/arm64 job budgets, with no test removed.
+
+Resumed component fixtures exercise concurrent one-use/restart/counter retention,
+credential-specific retry ceiling/non-sliding backoff/independent backup key,
+and actual SQLite WAL xSync failure at challenge creation, binding, good/bad
+assertion, report and removal. Report and retention changes have recorded
+RED→GREEN runs. They do not close the remaining recovery/resource/evidence
+acceptance gaps. Exact commands, logs, SHAs and final regression outcomes belong
+to the original Kanban card; this remains a WIP draft, not review approval.

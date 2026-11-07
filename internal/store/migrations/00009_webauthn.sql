@@ -6,7 +6,7 @@ CREATE TABLE webauthn_users (
  handle BLOB NOT NULL UNIQUE CHECK(length(handle)=32)
 ) STRICT;
 CREATE TABLE webauthn_challenges (
- challenge_id TEXT PRIMARY KEY REFERENCES auth_challenges(id) ON DELETE RESTRICT,
+ challenge_id TEXT PRIMARY KEY REFERENCES auth_challenges(id) ON DELETE CASCADE,
  envelope BLOB NOT NULL
 ) STRICT;
 CREATE TABLE webauthn_credentials (

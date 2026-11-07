@@ -3,6 +3,10 @@
 SELECT handle FROM webauthn_users WHERE user_id=?;
 -- name: PutWebAuthnHandle :exec
 INSERT INTO webauthn_users(user_id,handle) VALUES(?,?) ON CONFLICT(user_id) DO NOTHING;
+-- name: PruneWebAuthnChallenges :exec
+DELETE FROM auth_challenges WHERE purpose IN ('webauthn_binding','webauthn_assertion')
+AND (expires_at<=sqlc.arg(now) OR consumed_at IS NOT NULL)
+AND EXISTS (SELECT 1 FROM webauthn_challenges w WHERE w.challenge_id=auth_challenges.id);
 -- name: CountWebAuthnChallenges :one
 SELECT count(*) FROM auth_challenges WHERE user_id=? AND expires_at>sqlc.arg(now) AND consumed_at IS NULL;
 -- name: CreateWebAuthnChallenge :exec
