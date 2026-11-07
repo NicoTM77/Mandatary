@@ -48,7 +48,10 @@ func assertionSession(ctx context.Context, q *store.Queries, secret []byte, now 
 	return c, u, s, nil
 }
 
-func (w *WebAuthnService) webUser(ctx context.Context, session []byte) (webUser, map[string]store.Authenticator, map[string]store.WebauthnCredential, error) {
+// includeInactive supplies ownership inventory for pending ceremonies, not
+// permission to use those keys. Begin offers only live keys; Finish separately
+// rechecks the selected key under Control before performing any proof work.
+func (w *WebAuthnService) webUser(ctx context.Context, session []byte, includeInactive bool) (webUser, map[string]store.Authenticator, map[string]store.WebauthnCredential, error) {
 	l := w.lifecycle
 	user := webUser{}
 	factors := map[string]store.Authenticator{}
@@ -68,7 +71,7 @@ func (w *WebAuthnService) webUser(ctx context.Context, session []byte) (webUser,
 			return e
 		}
 		for _, a := range all {
-			if a.Kind != "webauthn" || !liveFactor(c, a, l.now().Unix()) {
+			if a.Kind != "webauthn" || a.CredentialGeneration != c.CredentialGeneration || (!includeInactive && !liveFactor(c, a, l.now().Unix())) {
 				continue
 			}
 			r, e := q.GetWebAuthnKeyRecord(ctx, a.ID)
@@ -107,7 +110,7 @@ func (w *WebAuthnService) BeginAssertion(ctx context.Context, session []byte) (A
 	}
 	defer func() { <-webAuthnWork }()
 	l := w.lifecycle
-	user, _, _, e := w.webUser(ctx, session)
+	user, _, _, e := w.webUser(ctx, session, false)
 	if e != nil {
 		return AssertionOptions{}, ErrDenied
 	}
@@ -190,7 +193,7 @@ func (w *WebAuthnService) FinishAssertion(ctx context.Context, session []byte, i
 	if e != nil {
 		return FactorProof{}, ErrDenied
 	}
-	user, factors, records, e := w.webUser(ctx, session)
+	user, factors, records, e := w.webUser(ctx, session, true)
 	if e != nil || user.user.ID != record.User {
 		return FactorProof{}, ErrDenied
 	}
@@ -239,7 +242,16 @@ func (w *WebAuthnService) FinishAssertion(ctx context.Context, session []byte, i
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
 	defer cancel()
 	result := FactorProof{}
-	e = l.repo.Control(ctx, func(q *store.Queries) error {
+	e = l.repo.Control(ctx, func(q *store.Queries) (err error) {
+		evaluated := false
+		defer func() {
+			// Any rollback after real proof work loses the admitted attempt's
+			// consumption/accounting. Stop acceptance BEFORE releasing Control,
+			// including statement failures preceding the failure-charge update.
+			if evaluated && err != nil {
+				l.repo.FailClosed()
+			}
+		}()
 		now := l.now().Unix()
 		c, u, s, e := assertionSession(ctx, q, session, now)
 		if e != nil || u.ID != record.User || s.ID != record.Session || c.CredentialGeneration != record.Generation || c.SessionGeneration != record.SessionGeneration || caller.Err() != nil {
@@ -260,6 +272,7 @@ func (w *WebAuthnService) FinishAssertion(ctx context.Context, session []byte, i
 		// All evaluated proofs share the same cross-process admission/ceiling
 		// transaction. Concurrent or exhausted stale snapshots deny BEFORE crypto,
 		// not after speculative signature work that could exceed/undercharge100.
+		evaluated = true
 		credential, verifyErr := w.verifyLogin(user, record.Data, parsed)
 		valid := verifyErr == nil && parsed.Response.AuthenticatorData.Flags.HasUserVerified() && parsed.Response.AuthenticatorData.Flags.HasUserPresent()
 		if valid && credential.Authenticator.CloneWarning && !credential.Flags.BackupEligible {

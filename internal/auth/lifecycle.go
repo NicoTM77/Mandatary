@@ -9,6 +9,7 @@ import (
 	"database/sql"
 	"encoding/base32"
 	"encoding/hex"
+	"errors"
 	"io"
 	"net"
 	"net/mail"
@@ -114,16 +115,22 @@ func freshSession(ctx context.Context, q *store.Queries, secret []byte, now int6
 	}
 	var e error
 	c, e = q.GetInstallationControl(ctx)
-	if e != nil || !activeControl(c) {
+	if e != nil {
+		return c, u, s, e
+	}
+	if !activeControl(c) {
 		return deny()
 	}
 	hash := sha256.Sum256(secret)
 	s, e = q.GetSessionByHash(ctx, hash[:])
 	if e != nil {
-		return deny()
+		return c, u, s, authorityReadError(e)
 	}
 	u, e = q.GetUser(ctx, s.UserID)
-	if e != nil || u.State != "active" || u.Compromised != 0 || u.CredentialGeneration != c.CredentialGeneration || u.AuthorityGeneration != c.AuthorityGeneration {
+	if e != nil {
+		return c, u, s, authorityReadError(e)
+	}
+	if u.State != "active" || u.Compromised != 0 || u.CredentialGeneration != c.CredentialGeneration || u.AuthorityGeneration != c.AuthorityGeneration {
 		return deny()
 	}
 	at := s.AuthenticatedAt
@@ -135,7 +142,7 @@ func freshSession(ctx context.Context, q *store.Queries, secret []byte, now int6
 	}
 	all, e := q.ListUserAuthenticators(ctx, u.ID)
 	if e != nil {
-		return deny()
+		return c, u, s, e
 	}
 	required := int64(1)
 	for _, a := range all {
@@ -148,7 +155,7 @@ func freshSession(ctx context.Context, q *store.Queries, secret []byte, now int6
 	}
 	used, e := q.ListSessionAuthenticators(ctx, s.ID)
 	if e != nil {
-		return deny()
+		return c, u, s, e
 	}
 	password, totp, key, uv := false, false, false, false
 	for _, a := range used {
@@ -173,6 +180,16 @@ func freshSession(ctx context.Context, q *store.Queries, secret []byte, now int6
 	}
 	return c, u, s, nil
 }
+
+// Absence is a normal authority denial; an actual query failure is uncertainty.
+// Internal callbacks preserve this distinction; public services still redact it.
+func authorityReadError(err error) error {
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrDenied
+	}
+	return err
+}
+
 func liveFactor(c store.InstallationControl, a store.Authenticator, now int64) bool {
 	return a.State == "active" && a.CredentialGeneration == c.CredentialGeneration && a.BoundAt.Valid && !a.RevokedAt.Valid && (!a.ExpiresAt.Valid || now < a.ExpiresAt.Int64) && a.FailedAttempts < a.RetryCeiling
 }
@@ -372,7 +389,10 @@ func (l *Lifecycle) RevokeTOTP(ctx context.Context, session []byte, id string) e
 			return c, u, e
 		}
 		a, e := q.GetAuthenticator(ctx, id)
-		if e != nil || a.UserID != u.ID || a.Kind != "totp" || a.CredentialGeneration != c.CredentialGeneration || a.RevokedAt.Valid || now < a.CreatedAt {
+		if e != nil {
+			return c, u, authorityReadError(e)
+		}
+		if a.UserID != u.ID || a.Kind != "totp" || a.CredentialGeneration != c.CredentialGeneration || a.RevokedAt.Valid || now < a.CreatedAt {
 			return c, u, ErrDenied
 		}
 		factors, e := q.ListUserAuthenticators(ctx, u.ID)
@@ -404,9 +424,11 @@ func (l *Lifecycle) RevokeTOTP(ctx context.Context, session []byte, id string) e
 		}
 		return ErrDenied
 	}
+	logicalDenial := false
 	e = l.repo.Control(ctx, func(q *store.Queries) error {
 		c, u, e := authorize(q)
 		if e != nil {
+			logicalDenial = e == ErrDenied
 			return e
 		}
 		now := l.now().Unix()
@@ -420,7 +442,7 @@ func (l *Lifecycle) RevokeTOTP(ctx context.Context, session []byte, id string) e
 		return l.protectiveIntent(ctx, q, c, u.ID, "authenticator_removed", now)
 	}, nil)
 	if e != nil {
-		if authorized {
+		if authorized && !logicalDenial {
 			l.repo.FailClosed()
 		}
 		return ErrDenied

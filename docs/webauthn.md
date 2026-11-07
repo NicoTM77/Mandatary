@@ -69,12 +69,24 @@ qualification P1.16, restore import P1.18, packaged qualification P1.19/20.
   evaluated failures disable the specific credential; non-sliding password-style
   backoff and bounded IP admission are reused. Possession observation alone never
   resets failures; completed suitable-strength reset belongs P1.08. Storage sync
-  failure is not a successful proof/transition.
+  failure is not a successful proof/transition. Any callback error after real
+  proof evaluation terminally denies the handle **before releasing Control**:
+  a statement-time rollback cannot discard consumption/accounting and admit
+  another evaluation. Genuine pre-verification denials remain uncharged.
+  Pending ceremonies use complete current-generation ownership inventory, while
+  new allowlists offer only live keys and the selected key is rechecked under
+  Control. Another key's disablement/expiry/revocation cannot charge a valid
+  independent backup's pending assertion; the original allowlist is not widened.
 * Additional enrollment/removal requires fresh server-persisted maximum-account
   evidence; required last-factor removal denies. WebAuthn-only removal cannot
   count TOTP as its remaining required key. Removal revokes normal sessions and
   uses the existing protective notification/repair path; ordinary binding commits
   two-address-capable independent outbox intent atomically or rolls back.
+  Serialized reauthorization can normally deny after freshness expiry or
+  concurrent invalidation without poisoning healthy storage. This is distinct
+  from actual admission/read/write/commit/sync uncertainty after narrow protective
+  authority is established, which still stops affected/in-flight acceptance.
+  The same distinction applies to the shared TOTP removal/report paths.
 * Narrow compromise reporting accepts a still-bound password to revoke an owned
   key and its sessions, including the last required key, with protective notice
   intent. It grants no replacement authority and never relaxes WebAuthn-only

@@ -23,7 +23,10 @@ func (w *WebAuthnService) Revoke(ctx context.Context, session []byte, id string)
 			return c, u, e
 		}
 		a, e := q.GetAuthenticator(ctx, id)
-		if e != nil || a.UserID != u.ID || a.Kind != "webauthn" || a.CredentialGeneration != c.CredentialGeneration || a.RevokedAt.Valid || now < a.CreatedAt {
+		if e != nil {
+			return c, u, authorityReadError(e)
+		}
+		if a.UserID != u.ID || a.Kind != "webauthn" || a.CredentialGeneration != c.CredentialGeneration || a.RevokedAt.Valid || now < a.CreatedAt {
 			return c, u, ErrDenied
 		}
 		all, e := q.ListUserAuthenticators(ctx, u.ID)
@@ -52,9 +55,13 @@ func (w *WebAuthnService) Revoke(ctx context.Context, session []byte, id string)
 		}
 		return ErrDenied
 	}
+	logicalDenial := false
 	e = l.repo.Control(ctx, func(q *store.Queries) error {
 		c, u, e := authorize(q)
 		if e != nil {
+			// No transition has started. Normal expiry/concurrent invalidation
+			// denies authority without declaring healthy storage uncertain.
+			logicalDenial = e == ErrDenied
 			return e
 		}
 		now := l.now().Unix()
@@ -68,7 +75,7 @@ func (w *WebAuthnService) Revoke(ctx context.Context, session []byte, id string)
 		return l.protectiveIntent(ctx, q, c, u.ID, "authenticator_removed", now)
 	}, nil)
 	if e != nil {
-		if authorized {
+		if authorized && !logicalDenial {
 			l.repo.FailClosed()
 		}
 		return ErrDenied

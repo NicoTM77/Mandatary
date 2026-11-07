@@ -30,6 +30,32 @@ All Go names below are in `internal/auth` unless stated otherwise.
 | D1 / SUP-01/02, locked stack | Go1.27.3/1.26.10 and Node24.22.1/npm11.19.1; locked WebAuthn0.18.2/Playwright1.64.1. Existing generation/module/frontend/race/security gates retained. Native arm64 full suite is separate from cross-compilation; required final-head execution evidence is retained on the card. |
 | Browser acceptance | `TestWebAuthnBrowserVirtualAuthenticator` executes a real locked Chromium CTAP2 virtual authenticator for resident and nonresident storage, valid signed UV, rejected replay and signed UV downgrade. `scripts/webauthn-browser-boundary.test.mjs` exercises exact origin/method/route admission and external-origin denial. Trusted local synthetic TLS/HTML only, service workers blocked, Playwright documented launch defaults. Browser-process sandbox hardening is distinct from RP acceptance and is not asserted as an approved mandatory baseline. |
 
+### Review-boundary regressions
+
+* **G02 / N2 / evaluated accounting:**
+  `TestWebAuthnEvaluatedProofStatementFailureStopsAcceptance` injects real SQLite
+  statement failures at bad/good challenge consumption, failed-proof accounting,
+  good-proof envelope update and counter advancement. At prior count99, one
+  actual verifier call occurs; rollback retains count99/unconsumed challenge but
+  terminal denial prevents another evaluation. Existing shared-Control/concurrent
+  remaining-one, durable failed-charge and actual WAL xSync controls still apply.
+* **G02 / E03 / independent backup:**
+  `TestWebAuthnPendingBackupSurvivesOtherKeyInvalidation` begins ceremonies while
+  both keys are live, then disables (real wrong-key signature at99→100), expires
+  or revokes the primary. Correct pending backup assertions succeed without
+  changing counts0/99; primary proof and replay deny, fresh allowlists omit the
+  primary, and fresh backup proofs work with advancing signed counters.
+* **E12–E13 / ordinary denial versus storage uncertainty:**
+  `TestProtectiveRemovalFreshnessExpiryPreservesHealthyRepository` checks both
+  WebAuthn and TOTP read-at899s/write-at901s denial with independent password
+  acceptance at902s. `TestProtectiveConcurrentRemovalPreservesHealthyRepository`
+  races eight actual removals, observes one winner, and preserves independent
+  password acceptance. `TestProtectiveReportPasswordExpiryPreservesIndependentKey`
+  denies a report whose still-bound password expires during continuation without
+  disabling the independent signed-UV key. Existing actual admission-timeout,
+  statement/marker, sync and in-flight protective-failure regressions must pass;
+  no storage uncertainty is reclassified as ordinary denial.
+
 ## Integrated and external obligations — not silently passed
 
 * **P1.08/C2** must bind `FactorProof` observations to the same fresh server

@@ -80,22 +80,42 @@ func (l *Lifecycle) reportCompromise(ctx context.Context, name string, password 
 		}
 		return ErrDenied
 	}
+	logicalDenial := false
 	e = l.repo.Control(ctx, func(q *store.Queries) error {
 		c, e := q.GetInstallationControl(ctx)
-		if e != nil || c != observedControl {
+		if e != nil {
+			return e
+		}
+		if c != observedControl {
+			logicalDenial = true
 			return ErrDenied
 		}
 		u, e := q.GetUser(ctx, proof.UserID)
-		if e != nil || u != observedUser {
+		if e != nil {
+			logicalDenial = authorityReadError(e) == ErrDenied
+			return e
+		}
+		if u != observedUser {
+			logicalDenial = true
 			return ErrDenied
 		}
 		binding, e := q.GetAuthenticator(ctx, proof.AuthenticatorID)
 		now := l.now().Unix()
-		if e != nil || !samePassword(binding, observedPassword) || !activeBinding(c, u, binding, now) || (binding.NextAttemptAt.Valid && now < binding.NextAttemptAt.Int64) {
+		if e != nil {
+			logicalDenial = authorityReadError(e) == ErrDenied
+			return e
+		}
+		if !samePassword(binding, observedPassword) || !activeBinding(c, u, binding, now) || (binding.NextAttemptAt.Valid && now < binding.NextAttemptAt.Int64) {
+			logicalDenial = true
 			return ErrDenied
 		}
 		target, e := q.GetAuthenticator(ctx, id)
-		if e != nil || target.UserID != u.ID || target.Kind != kind || target.CredentialGeneration != c.CredentialGeneration || target.RevokedAt.Valid || now < target.CreatedAt {
+		if e != nil {
+			logicalDenial = authorityReadError(e) == ErrDenied
+			return e
+		}
+		if target.UserID != u.ID || target.Kind != kind || target.CredentialGeneration != c.CredentialGeneration || target.RevokedAt.Valid || now < target.CreatedAt {
+			logicalDenial = true
 			return ErrDenied
 		}
 		var n int64
@@ -113,7 +133,7 @@ func (l *Lifecycle) reportCompromise(ctx context.Context, name string, password 
 		return l.protectiveIntent(ctx, q, c, u.ID, "authenticator_suspended", now)
 	}, nil)
 	if e != nil {
-		if authorized {
+		if authorized && !logicalDenial {
 			l.repo.FailClosed()
 		}
 		return ErrDenied
