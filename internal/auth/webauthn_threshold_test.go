@@ -67,7 +67,8 @@ func TestWebAuthnThresholdNoticeFailureAndRepair(t *testing.T) {
 				probe.mu.Unlock()
 			}
 			n, dispatchErr := l.DispatchNotices(t.Context(), 8)
-			if fault == "sync-expand" {
+			switch fault {
+			case "sync-expand":
 				probe.mu.Lock()
 				failed := probe.failed
 				probe.fail = false
@@ -75,11 +76,11 @@ func TestWebAuthnThresholdNoticeFailureAndRepair(t *testing.T) {
 				if dispatchErr != ErrDenied || failed == 0 || !l.repo.FailedClosed() {
 					t.Fatal("expansion sync fault not fail closed")
 				}
-			} else if fault == "outbox" {
+			case "outbox":
 				if dispatchErr != ErrDenied {
 					t.Fatal("outbox fault not exercised")
 				}
-			} else if fault == "none" {
+			case "none":
 				if dispatchErr != nil || n != 2 {
 					t.Fatal("suspension fanout", n, dispatchErr)
 				}
