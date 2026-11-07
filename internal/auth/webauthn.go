@@ -16,8 +16,9 @@ type WebAuthnSettings struct {
 	Origins []string
 }
 type WebAuthnService struct {
-	lifecycle *Lifecycle
-	verifier  *wa.WebAuthn
+	lifecycle   *Lifecycle
+	verifier    *wa.WebAuthn
+	verifyLogin func(wa.User, wa.SessionData, *protocol.ParsedCredentialAssertionData) (*wa.Credential, error)
 }
 
 // Process-wide, non-waiting admission across service handles bounds challenge,
@@ -52,5 +53,5 @@ func NewWebAuthn(l *Lifecycle, c WebAuthnSettings) (*WebAuthnService, error) {
 	if e != nil {
 		return nil, ErrDenied
 	}
-	return &WebAuthnService{lifecycle: l, verifier: v}, nil
+	return &WebAuthnService{lifecycle: l, verifier: v, verifyLogin: v.ValidateLogin}, nil
 }

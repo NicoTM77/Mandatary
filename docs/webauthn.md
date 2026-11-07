@@ -58,7 +58,14 @@ qualification P1.16, restore import P1.18, packaged qualification P1.19/20.
   challenge single-use still applies. Neither flags nor counters prove hardware
   nonexportability or absence of sharing/cloning.
 * Shared `Repository.Control`/FULL writer serializes challenge consumption,
-  counters, authenticator-scoped failures and lifecycle notice intent. At most100
+  actual signature/protocol verification, counters, authenticator-scoped failures
+  and lifecycle notice intent, across handles/processes. Stale/disabled snapshots
+  deny before real proof work, preventing speculative overrun of the remaining
+  retry budget. To avoid recursive repository locking, only an untrusted candidate
+  envelope is precomputed with the pinned library's counter/flag update helpers;
+  it is committed only after the real serialized verifier's complete result is
+  byte-identical. Drift denies, never promotes candidate data. Successful proof
+  observations recheck expiry/clock/session/key/caller state after crypto. At most100
   evaluated failures disable the specific credential; non-sliding password-style
   backoff and bounded IP admission are reused. Possession observation alone never
   resets failures; completed suitable-strength reset belongs P1.08. Storage sync

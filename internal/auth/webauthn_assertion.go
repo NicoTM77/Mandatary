@@ -205,22 +205,35 @@ func (w *WebAuthnService) FinishAssertion(ctx context.Context, session []byte, i
 	if selected.ID == "" || (selected.NextAttemptAt.Valid && now < selected.NextAttemptAt.Int64) {
 		return FactorProof{}, ErrDenied
 	}
-	credential, verifyErr := w.verifier.ValidateLogin(user, record.Data, parsed)
-	valid := verifyErr == nil && parsed.Response.AuthenticatorData.Flags.HasUserVerified() && parsed.Response.AuthenticatorData.Flags.HasUserPresent()
-	if valid && credential.Authenticator.CloneWarning && !credential.Flags.BackupEligible {
-		valid = false
+	// Prepare only an UNTRUSTED candidate envelope outside Control, avoiding
+	// recursive Repository lifecycle locking. Use the pinned library's own state
+	// update helpers, not a second counter policy. Nothing is persisted until the
+	// real verifier runs under the shared control lock and its entire output is
+	// byte-identical to this candidate. Library drift therefore fails closed.
+	var candidate []byte
+	for _, c := range user.credentials {
+		if !bytes.Equal(c.ID, parsed.RawID) {
+			continue
+		}
+		c.Authenticator.UpdateCounter(parsed.Response.AuthenticatorData.Counter)
+		if record.Data.AuthorizeUVInitialization {
+			c.Flags = c.Flags.UpdateWithUVInitialization(parsed.Response.AuthenticatorData.Flags)
+		} else {
+			c.Flags = c.Flags.Update(parsed.Response.AuthenticatorData.Flags)
+		}
+		candidate, e = json.Marshal(webCredential{User: user.user.ID, RPID: record.RPID, Credential: c})
+		if e != nil {
+			return FactorProof{}, ErrDenied
+		}
+		break
 	}
-	var envelope []byte
-	if valid {
-		plain, e := json.Marshal(webCredential{User: user.user.ID, RPID: record.RPID, Credential: *credential})
-		if e != nil {
-			return FactorProof{}, ErrDenied
-		}
-		envelope, e = l.repo.EncryptSecret("webauthn-credential", selected.ID, plain)
-		clear(plain)
-		if e != nil {
-			return FactorProof{}, ErrDenied
-		}
+	if len(candidate) == 0 {
+		return FactorProof{}, ErrDenied
+	}
+	defer clear(candidate)
+	envelope, e := l.repo.EncryptSecret("webauthn-credential", selected.ID, candidate)
+	if e != nil {
+		return FactorProof{}, ErrDenied
 	}
 	caller := ctx
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
@@ -244,6 +257,14 @@ func (w *WebAuthnService) FinishAssertion(ctx context.Context, session []byte, i
 		if e != nil || !bytes.Equal(r.Envelope, records[a.ID].Envelope) {
 			return ErrDenied
 		}
+		// All evaluated proofs share the same cross-process admission/ceiling
+		// transaction. Concurrent or exhausted stale snapshots deny BEFORE crypto,
+		// not after speculative signature work that could exceed/undercharge100.
+		credential, verifyErr := w.verifyLogin(user, record.Data, parsed)
+		valid := verifyErr == nil && parsed.Response.AuthenticatorData.Flags.HasUserVerified() && parsed.Response.AuthenticatorData.Flags.HasUserPresent()
+		if valid && credential.Authenticator.CloneWarning && !credential.Flags.BackupEligible {
+			valid = false
+		}
 		n, e := q.ConsumeWebAuthnChallenge(ctx, store.ConsumeWebAuthnChallengeParams{ID: id, Now: nullable(now)})
 		if e != nil || n != 1 {
 			return ErrDenied
@@ -259,7 +280,23 @@ func (w *WebAuthnService) FinishAssertion(ctx context.Context, session []byte, i
 			}
 			return nil
 		}
+		afterProof := l.now().Unix()
+		// Consumption is tied to the admitted attempt's pre-proof instant, but
+		// no successful observation may outlive its challenge/session/key or
+		// caller. Already evaluated invalid proofs above still charge durably.
+		if afterProof < now || afterProof >= record.Expires || afterProof >= s.ExpiresAt || afterProof-s.LastActivityAt >= s.IdleTimeoutSeconds || !liveFactor(c, a, afterProof) || caller.Err() != nil {
+			return nil
+		}
 		if l.repo.FailedClosed() {
+			return ErrDenied
+		}
+		verified, e := json.Marshal(webCredential{User: u.ID, RPID: record.RPID, Credential: *credential})
+		if e != nil {
+			return ErrDenied
+		}
+		matches := bytes.Equal(verified, candidate)
+		clear(verified)
+		if !matches {
 			return ErrDenied
 		}
 		n, e = q.UpdateWebAuthnKeyRecord(ctx, store.UpdateWebAuthnKeyRecordParams{AuthenticatorID: a.ID, Envelope: envelope})
