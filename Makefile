@@ -77,6 +77,12 @@ security: tool-security
 	bin/tools/golangci-lint run ./...
 	npm --prefix web audit --audit-level=high
 
+browser-install: versions
+	web/node_modules/.bin/playwright install chromium
+
+browser-test: versions
+	go test -tags=webauthnbrowser -count=1 -v ./internal/auth -run '^TestWebAuthnBrowserVirtualAuthenticator$$'
+
 negative-control:
 	bash scripts/negative-control.sh
 

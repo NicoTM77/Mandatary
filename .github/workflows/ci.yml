@@ -45,6 +45,9 @@ jobs:
           printf 'TMPDIR=%s\n' "$test_root" >> "$GITHUB_ENV"
           stat -c '%a %u:%g %n' / /home "$HOME" "$test_root"
       - run: make install check negative-control
+      - name: Install pinned Chromium and system dependencies
+        run: web/node_modules/.bin/playwright install --with-deps chromium
+      - run: make browser-test
   storage-arm64:
     name: Storage (linux/arm64)
     runs-on: ubuntu-24.04-arm

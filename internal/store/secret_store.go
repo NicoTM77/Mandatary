@@ -52,7 +52,7 @@ func (r *Repository) bindKey(ctx context.Context, key *MasterKey, initialize boo
 func (r *Repository) EncryptSecret(purpose, id string, plain []byte) ([]byte, error) {
 	r.lifecycle.RLock()
 	defer r.lifecycle.RUnlock()
-	if r.closed || r.poisoned.Load() || (purpose != "totp" && purpose != "smtp") {
+	if r.closed || r.poisoned.Load() || (purpose != "totp" && purpose != "smtp" && purpose != "webauthn-challenge" && purpose != "webauthn-credential") {
 		return nil, ErrSecret
 	}
 	return r.cipher.Seal(purpose, id, plain)
@@ -60,7 +60,7 @@ func (r *Repository) EncryptSecret(purpose, id string, plain []byte) ([]byte, er
 func (r *Repository) DecryptSecret(purpose, id string, envelope []byte) ([]byte, error) {
 	r.lifecycle.RLock()
 	defer r.lifecycle.RUnlock()
-	if r.closed || r.poisoned.Load() || (purpose != "totp" && purpose != "smtp") {
+	if r.closed || r.poisoned.Load() || (purpose != "totp" && purpose != "smtp" && purpose != "webauthn-challenge" && purpose != "webauthn-credential") {
 		return nil, ErrSecret
 	}
 	return r.cipher.Open(purpose, id, envelope)

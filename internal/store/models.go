@@ -339,3 +339,19 @@ type UserGroupMembership struct {
 	State               string
 	AuthorityGeneration int64
 }
+
+type WebauthnChallenge struct {
+	ChallengeID string
+	Envelope    []byte
+}
+
+type WebauthnCredential struct {
+	AuthenticatorID string
+	Label           string
+	Envelope        []byte
+}
+
+type WebauthnUser struct {
+	UserID string
+	Handle []byte
+}
