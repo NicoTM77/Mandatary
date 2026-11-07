@@ -73,8 +73,9 @@ qualification P1.16, restore import P1.18, packaged qualification P1.19/20.
   proof evaluation terminally denies the handle **before releasing Control**:
   a statement-time rollback cannot discard consumption/accounting and admit
   another evaluation. Genuine pre-verification denials remain uncharged.
-  Pending ceremonies use complete current-generation ownership inventory, while
-  new allowlists offer only live keys and the selected key is rechecked under
+  Pending ceremonies use their exact current-generation ownership inventory,
+  including inactive keys but excluding unrelated retired keys; new allowlists
+  offer only live keys and the selected key is rechecked under
   Control. Another key's disablement/expiry/revocation cannot charge a valid
   independent backup's pending assertion; the original allowlist is not widened.
 * Additional enrollment/removal requires fresh server-persisted maximum-account

@@ -45,6 +45,8 @@ All Go names below are in `internal/auth` unless stated otherwise.
   or revokes the primary. Correct pending backup assertions succeed without
   changing counts0/99; primary proof and replay deny, fresh allowlists omit the
   primary, and fresh backup proofs work with advancing signed counters.
+  `TestWebAuthnNewKeyCannotEnterPendingAllowlist` denies a newly bound key outside
+  the original ceremony allowlist before evaluation, without charging its count99.
 * **E12–E13 / ordinary denial versus storage uncertainty:**
   `TestProtectiveRemovalFreshnessExpiryPreservesHealthyRepository` checks both
   WebAuthn and TOTP read-at899s/write-at901s denial with independent password

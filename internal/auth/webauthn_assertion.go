@@ -48,10 +48,11 @@ func assertionSession(ctx context.Context, q *store.Queries, secret []byte, now 
 	return c, u, s, nil
 }
 
-// includeInactive supplies ownership inventory for pending ceremonies, not
-// permission to use those keys. Begin offers only live keys; Finish separately
-// rechecks the selected key under Control before performing any proof work.
-func (w *WebAuthnService) webUser(ctx context.Context, session []byte, includeInactive bool) (webUser, map[string]store.Authenticator, map[string]store.WebauthnCredential, error) {
+// A nil allowlist offers only live keys for Begin. A pending ceremony loads its
+// exact ownership inventory, including inactive keys, without widening its
+// allowlist or decrypting unrelated retired keys. Ownership is not eligibility:
+// Finish rechecks the selected key under Control before any proof work.
+func (w *WebAuthnService) webUser(ctx context.Context, session []byte, allowed [][]byte) (webUser, map[string]store.Authenticator, map[string]store.WebauthnCredential, error) {
 	l := w.lifecycle
 	user := webUser{}
 	factors := map[string]store.Authenticator{}
@@ -71,8 +72,21 @@ func (w *WebAuthnService) webUser(ctx context.Context, session []byte, includeIn
 			return e
 		}
 		for _, a := range all {
-			if a.Kind != "webauthn" || a.CredentialGeneration != c.CredentialGeneration || (!includeInactive && !liveFactor(c, a, l.now().Unix())) {
+			if a.Kind != "webauthn" || a.CredentialGeneration != c.CredentialGeneration {
 				continue
+			}
+			if allowed == nil {
+				if !liveFactor(c, a, l.now().Unix()) {
+					continue
+				}
+			} else {
+				listed := false
+				for _, id := range allowed {
+					listed = listed || bytes.Equal(id, a.ExternalCredentialID)
+				}
+				if !listed {
+					continue
+				}
 			}
 			r, e := q.GetWebAuthnKeyRecord(ctx, a.ID)
 			if e != nil {
@@ -110,7 +124,7 @@ func (w *WebAuthnService) BeginAssertion(ctx context.Context, session []byte) (A
 	}
 	defer func() { <-webAuthnWork }()
 	l := w.lifecycle
-	user, _, _, e := w.webUser(ctx, session, false)
+	user, _, _, e := w.webUser(ctx, session, nil)
 	if e != nil {
 		return AssertionOptions{}, ErrDenied
 	}
@@ -193,7 +207,10 @@ func (w *WebAuthnService) FinishAssertion(ctx context.Context, session []byte, i
 	if e != nil {
 		return FactorProof{}, ErrDenied
 	}
-	user, factors, records, e := w.webUser(ctx, session, true)
+	if len(record.Data.AllowedCredentialIDs) == 0 {
+		return FactorProof{}, ErrDenied
+	}
+	user, factors, records, e := w.webUser(ctx, session, record.Data.AllowedCredentialIDs)
 	if e != nil || user.user.ID != record.User {
 		return FactorProof{}, ErrDenied
 	}

@@ -6,6 +6,33 @@ import (
 	"time"
 )
 
+func TestWebAuthnNewKeyCannotEnterPendingAllowlist(t *testing.T) {
+	w, db, session, _, id := webFixture(t)
+	webSession(t, db, id)
+	pending, e := w.BeginAssertion(t.Context(), session)
+	if e != nil {
+		t.Fatal(e)
+	}
+	reg, e := w.BeginRegistration(t.Context(), session, false)
+	if e != nil {
+		t.Fatal(e)
+	}
+	key := newVirtualKey(t)
+	if e = w.FinishRegistration(t.Context(), session, reg.ID, key.create(t, reg.Options.Response.Challenge.String(), "https://example.invalid", 5)); e != nil {
+		t.Fatal(e)
+	}
+	execFixture(t, db, `UPDATE authenticators SET failed_attempts=99 WHERE id=?`, reg.ID)
+	proof, e := w.FinishAssertion(t.Context(), session, pending.ID, key.assert(t, pending.Options.Response.Challenge.String(), "https://example.invalid", 5, 1), "192.0.2.236")
+	var state string
+	var failed int
+	if err := db.QueryRow(`SELECT state,failed_attempts FROM authenticators WHERE id=?`, reg.ID).Scan(&state, &failed); err != nil {
+		t.Fatal(err)
+	}
+	if e != ErrDenied || proof.UserID != "" || state != "active" || failed != 99 || w.lifecycle.repo.FailedClosed() {
+		t.Fatalf("out-of-allowlist proof charged or admitted: err=%v state=%s failures=%d", e, state, failed)
+	}
+}
+
 func TestWebAuthnPendingBackupSurvivesOtherKeyInvalidation(t *testing.T) {
 	for _, change := range []string{"disabled", "expired", "revoked"} {
 		for _, before := range []int{0, 99} {
