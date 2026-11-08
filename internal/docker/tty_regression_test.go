@@ -35,7 +35,7 @@ func TestTTYChunkBoundsPreserveBytes(t *testing.T) {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	s := newSDKLogStream(ctx, io.NopCloser(bytes.NewReader(bytes.Repeat([]byte{'x'}, int(MaxLogResponseBytes)+1))), cancel, true, false)
-	defer s.Close()
+	defer func() { _ = s.Close() }()
 	got, err := io.ReadAll(s)
 	if !errors.Is(err, ErrLogLimitExceeded) || int64(len(got)) > MaxLogResponseBytes {
 		t.Error("raw response cap not enforced")

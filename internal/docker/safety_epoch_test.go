@@ -23,7 +23,7 @@ func TestVerificationCannotOutliveSafetyChanges(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer m.Close()
+			defer func() { _ = m.Close() }()
 			done := make(chan error, 1)
 			go func() { done <- m.VerifySelf(context.Background()) }()
 			<-entered
@@ -72,7 +72,7 @@ func TestSDKVerificationEpochStartsBeforeInventory(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer b.Close()
+	defer func() { _ = b.Close() }()
 	done := make(chan error, 1)
 	go func() { done <- b.VerifySelf(context.Background()) }()
 	<-tr.entered

@@ -26,7 +26,7 @@ func guardLogStream(ctx context.Context, inner LogStream, check func(context.Con
 	go func() {
 		ticker := time.NewTicker(time.Second)
 		defer ticker.Stop()
-		defer s.Close()
+		defer func() { _ = s.Close() }()
 		for {
 			select {
 			case <-ctx.Done():

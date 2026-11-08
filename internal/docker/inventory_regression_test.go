@@ -31,7 +31,7 @@ func TestIdleEnteredLogReadCanceledByInventoryWatcher(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer a.Close()
+	defer func() { _ = a.Close() }()
 	if err = a.VerifySelf(context.Background()); err != nil {
 		t.Fatal(err)
 	}
@@ -39,7 +39,7 @@ func TestIdleEnteredLogReadCanceledByInventoryWatcher(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer stream.Close()
+	defer func() { _ = stream.Close() }()
 	done := make(chan error, 1)
 	go func() { _, err := stream.Next(context.Background()); done <- err }()
 	<-body.entered
@@ -53,7 +53,9 @@ func TestIdleEnteredLogReadCanceledByInventoryWatcher(t *testing.T) {
 		}
 	case <-time.After(4 * time.Second):
 		_ = body.Close()
-		<-done
+		if err := <-done; err == nil {
+			t.Error("terminated read returned success")
+		}
 		t.Fatal("entered idle read survived inventory loss")
 	}
 	if a.Ready() {

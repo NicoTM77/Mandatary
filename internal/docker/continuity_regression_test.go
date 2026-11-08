@@ -38,7 +38,7 @@ func TestActiveStreamsRecheckDeploymentOverlap(t *testing.T) {
 				}
 				remove = func() { m.RemoveContainer(testPeerID) }
 			}
-			defer b.Close()
+			defer func() { _ = b.Close() }()
 			if err := b.VerifySelf(ctx); err != nil {
 				t.Fatal(err)
 			}
@@ -46,7 +46,7 @@ func TestActiveStreamsRecheckDeploymentOverlap(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer stream.Close()
+			defer func() { _ = stream.Close() }()
 			if n, err := stream.Read(make([]byte, 1)); n != 1 || err != nil {
 				t.Fatal("first log byte failed")
 			}
@@ -81,7 +81,7 @@ func TestIdleSDKStreamDetectsInventoryLoss(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer stream.Close()
+	defer func() { _ = stream.Close() }()
 	tr.mu.Lock()
 	tr.failList = errors.New("synthetic inventory loss")
 	tr.mu.Unlock()
@@ -96,7 +96,9 @@ func TestIdleSDKStreamDetectsInventoryLoss(t *testing.T) {
 		}
 	case <-time.After(3 * time.Second):
 		_ = stream.Close()
-		<-done
+		if err := <-done; err == nil {
+			t.Error("terminated read returned success")
+		}
 		t.Fatal("idle stream was not canceled")
 	}
 	if a.Ready() {

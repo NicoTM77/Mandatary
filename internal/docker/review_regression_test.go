@@ -49,7 +49,7 @@ func TestReviewerBareExplicitIDCannotProveNativeIdentity(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer m.Close()
+	defer func() { _ = m.Close() }()
 	if err = m.VerifySelf(context.Background()); err == nil || m.Ready() {
 		t.Error("mock has the same bare-ID bypass")
 	}
@@ -189,13 +189,18 @@ func TestReviewerNextContextInterruptsPendingSDKRead(t *testing.T) {
 	cancel()
 	blocked := false
 	select {
-	case <-done:
+	case err := <-done:
+		if err == nil {
+			t.Error("canceled pending read returned success")
+		}
 	case <-time.After(200 * time.Millisecond):
 		blocked = true
 	}
 	_ = b.Close()
 	if blocked {
-		<-done
+		if err := <-done; err == nil {
+			t.Error("terminated read returned success")
+		}
 	}
 	_ = s.Close()
 	if blocked {
@@ -228,7 +233,7 @@ func TestReviewerReadDoesNotServeBufferedBytesAfterInvalidation(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				defer m.Close()
+				defer func() { _ = m.Close() }()
 				if err = m.VerifySelf(context.Background()); err != nil {
 					t.Fatal(err)
 				}
@@ -238,7 +243,7 @@ func TestReviewerReadDoesNotServeBufferedBytesAfterInvalidation(t *testing.T) {
 				}
 				invalidate = m.InvalidateSafety
 			}
-			defer stream.Close()
+			defer func() { _ = stream.Close() }()
 			buf := make([]byte, 1)
 			if n, err := stream.Read(buf); n != 1 || err != nil {
 				t.Fatalf("first read failed: n=%d err=%v", n, err)
@@ -257,7 +262,7 @@ func TestReviewerTTYValid40KiBAndExactBytes(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			s := newSDKLogStream(ctx, io.NopCloser(strings.NewReader(text)), cancel, true, false)
-			defer s.Close()
+			defer func() { _ = s.Close() }()
 			got, err := io.ReadAll(s)
 			if err != nil {
 				t.Errorf("valid raw output below 64KiB rejected: %v", err)
@@ -309,7 +314,7 @@ func TestReviewerTargetMetadataFailureInvalidatesProof(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer a.Close()
+	defer func() { _ = a.Close() }()
 	if err = a.VerifySelf(context.Background()); err != nil {
 		t.Fatal(err)
 	}

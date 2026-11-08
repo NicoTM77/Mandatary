@@ -31,7 +31,7 @@ func TestTargetProofCannotCrossVerificationEpoch(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer a.Close()
+	defer func() { _ = a.Close() }()
 	if err = a.VerifySelf(context.Background()); err != nil {
 		t.Fatal(err)
 	}

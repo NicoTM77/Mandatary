@@ -20,7 +20,7 @@ func TestSDKFailuresCancelStreamsAndRequireFreshProof(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer s.Close()
+			defer func() { _ = s.Close() }()
 			if n, err := s.Read(make([]byte, 1)); n != 1 || err != nil {
 				t.Fatal("first byte failed")
 			}
