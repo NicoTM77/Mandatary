@@ -72,6 +72,12 @@ not a logical missing-target/invalid-argument denial. Explicit fresh proof is
 required for new operations; revoked old streams never recover. Raw TTY reads
 still avoid an extra buffering layer near the response cap. Ordinary bytes with
 healthy EOF and consumer `Close` do not invalidate a healthy daemon proof.
+Stream metadata checks classify errors before invalidation: an error matching a
+known consumer cancellation/Close is local and terminates only that stream,
+including pre/post-delivery checks and the idle watcher. Independent transport
+errors, malformed/uncertain metadata, explicit invalidation and the internal
+two-second watchdog still revoke global proof and cancel peers. A consumer
+cancellation cannot mask an independently returned transport fault.
 
 ## Sanitizer and parameter bounds (TD §§1.1–1.2, 10.2)
 
@@ -157,6 +163,13 @@ sticky, fixed fault classification independently of request-error exceptions.
 `stream_close_fault_test.go` holds body `Close` between read interruption and
 unregistration to prove per-`Next` cancellation does not masquerade as daemon
 loss in either framing mode; independent healthy peers/proof remain usable.
+F8's entered `/info`, self-inspect and inventory cancellation cases are retained
+in `stream_metadata_cancellation_test.go` (derived from run380).
+`stream_metadata_boundaries_test.go` adds post-delivery `Next`/`Read`, idle
+watcher Close, actual consumer/idle watchdog expiry, independent transport fault
+coincident with consumer cancellation, and explicit-invalidation controls; it
+checks discarded output, preserved healthy peer/admission, and mandatory
+revocation with zero dispatch on genuine uncertainty.
 All SDK tests inject an in-memory HTTP transport; no daemon or socket is used.
 These are package-level fixtures, not completed REST/MCP, deployment, NIST/FIPS
 or OS×CPU qualification.

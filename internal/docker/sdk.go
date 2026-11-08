@@ -279,25 +279,57 @@ func (a *SDKAdapter) VerifySelf(ctx context.Context) error {
 }
 
 func (a *SDKAdapter) safetyListContainers(ctx context.Context) ([]container.Summary, error) {
-	a.safetyListCalls.Add(1)
-	res, err := a.cli.ContainerList(ctx, client.ContainerListOptions{All: true})
+	items, err := a.readSafetyInventory(ctx)
 	if err != nil {
 		a.safety.Invalidate()
 		return nil, SanitizeError(err)
 	}
-	return res.Items, nil
+	return items, nil
+}
+
+// Raw metadata readers leave error classification to their admission boundary.
+// In particular, stream-local aborts must be identified before any invalidation.
+func (a *SDKAdapter) readSafetyInventory(ctx context.Context) ([]container.Summary, error) {
+	a.safetyListCalls.Add(1)
+	res, err := a.cli.ContainerList(ctx, client.ContainerListOptions{All: true})
+	return res.Items, err
 }
 
 func (a *SDKAdapter) safetyInspectContainer(ctx context.Context, cid ContainerID) (container.InspectResponse, error) {
-	a.safetyInspectCalls.Add(1)
-	res, err := a.cli.ContainerInspect(ctx, string(cid), client.ContainerInspectOptions{})
+	raw, err := a.readSafetyInspect(ctx, cid)
 	if err != nil {
 		return container.InspectResponse{}, a.operationError(err)
 	}
-	return res.Container, nil
+	return raw, nil
+}
+
+func (a *SDKAdapter) readSafetyInspect(ctx context.Context, cid ContainerID) (container.InspectResponse, error) {
+	a.safetyInspectCalls.Add(1)
+	res, err := a.cli.ContainerInspect(ctx, string(cid), client.ContainerInspectOptions{})
+	return res.Container, err
 }
 
 func (a *SDKAdapter) verifySelfContinuity(ctx context.Context) error {
+	return a.checkSelfContinuity(ctx, func(error) error {
+		a.safety.Invalidate()
+		return ErrUnverified
+	})
+}
+
+func (a *SDKAdapter) verifyStreamContinuity(ctx context.Context) error {
+	return a.checkSelfContinuity(ctx, func(err error) error {
+		// Only an error matching a known canceled consumer request is local.
+		// Independent transport faults and our internal watchdog still revoke,
+		// even if the consumer has also canceled by the time I/O returns.
+		if ctx.Err() != nil && errors.Is(err, ctx.Err()) && !errors.Is(context.Cause(ctx), errStreamCheckDeadline) {
+			return SanitizeError(err)
+		}
+		a.safety.Invalidate()
+		return ErrUnverified
+	})
+}
+
+func (a *SDKAdapter) checkSelfContinuity(ctx context.Context, onError func(error) error) error {
 	epoch := a.safety.currentEpoch()
 	selfID, ok := a.safety.SelfContainerID()
 	if !ok {
@@ -305,13 +337,11 @@ func (a *SDKAdapter) verifySelfContinuity(ctx context.Context) error {
 	}
 	infoRes, err := a.cli.Info(ctx, client.InfoOptions{})
 	if err != nil {
-		a.safety.Invalidate()
-		return ErrUnverified
+		return onError(err)
 	}
-	rawSelf, err := a.safetyInspectContainer(ctx, selfID)
+	rawSelf, err := a.readSafetyInspect(ctx, selfID)
 	if err != nil {
-		a.safety.Invalidate()
-		return ErrUnverified
+		return onError(err)
 	}
 	var startedAt string
 	if rawSelf.State != nil {
@@ -334,9 +364,9 @@ func (a *SDKAdapter) verifySelfContinuity(ctx context.Context) error {
 	}); err != nil {
 		return err
 	}
-	items, err := a.safetyListContainers(ctx)
+	items, err := a.readSafetyInventory(ctx)
 	if err != nil {
-		return err
+		return onError(err)
 	}
 	candidates := make([]SafetyCandidate, 0, len(items))
 	for _, item := range items {
@@ -344,6 +374,9 @@ func (a *SDKAdapter) verifySelfContinuity(ctx context.Context) error {
 	}
 	if err := a.safety.VerifyInventory(candidates); err != nil {
 		return err
+	}
+	if err := ctx.Err(); err != nil {
+		return onError(err)
 	}
 	return a.safety.requireEpoch(epoch)
 }
@@ -529,7 +562,7 @@ func (a *SDKAdapter) Logs(ctx context.Context, target TargetIdentity, opts LogOp
 	}
 
 	stream := newSDKLogStream(streamCtx, rc, unregister, isTTY, normOpts.Follow, a.operationError)
-	return guardLogStream(streamCtx, stream, a.verifySelfContinuity, a.operationError), nil
+	return guardLogStream(streamCtx, stream, a.verifyStreamContinuity, a.operationError), nil
 }
 
 func (a *SDKAdapter) Start(ctx context.Context, target TargetIdentity) error {

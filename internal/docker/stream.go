@@ -8,22 +8,27 @@ import (
 	"time"
 )
 
+// This cause distinguishes our fail-closed watchdog from consumer deadlines.
+var errStreamCheckDeadline = errors.New("stream continuity check deadline")
+
 // safetyLogStream keeps inventory continuity an admission condition for both
 // framed and buffered reads. The bounded watcher also cancels idle follow I/O;
 // explicit event/reconnect invalidation still cancels immediately via ctx.
 type safetyLogStream struct {
-	inner   LogStream
-	ctx     context.Context
-	cancel  context.CancelFunc
-	check   func(context.Context) error
-	onError func(error) error
-	once    sync.Once
+	inner     LogStream
+	ctx       context.Context
+	cancel    context.CancelFunc
+	check     func(context.Context) error
+	onError   func(error) error
+	once      sync.Once
+	watchDone chan struct{}
 }
 
 func guardLogStream(ctx context.Context, inner LogStream, check func(context.Context) error, onError func(error) error) *safetyLogStream {
 	ctx, cancel := context.WithCancel(ctx)
-	s := &safetyLogStream{inner: inner, ctx: ctx, cancel: cancel, check: check, onError: onError}
+	s := &safetyLogStream{inner: inner, ctx: ctx, cancel: cancel, check: check, onError: onError, watchDone: make(chan struct{})}
 	go func() {
+		defer close(s.watchDone)
 		ticker := time.NewTicker(time.Second)
 		defer ticker.Stop()
 		defer func() { _ = s.Close() }()
@@ -48,7 +53,7 @@ func (s *safetyLogStream) verify(ctx context.Context) error {
 	if ctx.Err() != nil {
 		return SanitizeError(ctx.Err())
 	}
-	checkCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	checkCtx, cancel := context.WithTimeoutCause(ctx, 2*time.Second, errStreamCheckDeadline)
 	stop := context.AfterFunc(s.ctx, cancel)
 	defer stop()
 	defer cancel()
@@ -58,6 +63,9 @@ func (s *safetyLogStream) verify(ctx context.Context) error {
 	}
 	if s.ctx.Err() != nil {
 		return ErrUnverified
+	}
+	if ctx.Err() != nil {
+		return SanitizeError(ctx.Err())
 	}
 	return nil
 }
