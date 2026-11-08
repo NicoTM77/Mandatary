@@ -62,6 +62,11 @@ reconnect and endpoint changes through that method; this package does not expose
 an event subscription or claim real-Docker integration evidence. `Close` and a
 per-`Next` canceled context interrupt blocked body reads independently of the
 parser lock. Callers must close streams; cancellation discards undelivered bytes.
+TTY body reads reporting bytes **and** a non-EOF error discard those bytes and
+invalidate safety through the stream guard before returning to the caller. This
+also applies near the response cap: raw TTY reads do not introduce a `bufio`
+layer that could defer an already observed error. Ordinary bytes with healthy
+EOF and consumer `Close` do not invalidate a healthy daemon proof.
 
 ## Sanitizer and parameter bounds (TD §§1.1–1.2, 10.2)
 
@@ -134,6 +139,9 @@ and explicit recovery (`transport_regression_test.go`), startup malformed invent
 and an entered idle read (`inventory_regression_test.go`), SDK/mock post-startup
 UUID overlap and resynchronization (`continuity_regression_test.go`), shared
 entrypoint/command/env projection (`sanitizer_regression_test.go`), and exact raw
-TTY frame/response bounds (`tty_regression_test.go`). All SDK tests inject an
+TTY frame/response bounds (`tty_regression_test.go`). F3-R first-delivery body
+faults, parsed-HTTP fixture timing, `Next`/`Read` denial, peer cancellation,
+explicit proof recovery and healthy EOF/local-Close controls are covered by
+`stream_fault_regression_test.go` and `tty_fault_test.go`. All SDK tests inject an
 in-memory HTTP transport; no daemon or socket is used. These are package-level
 fixtures, not completed REST/MCP, deployment, NIST/FIPS or OS×CPU qualification.

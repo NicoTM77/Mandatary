@@ -661,16 +661,20 @@ func (s *sdkLogStream) nextTTYFrameLocked() (LogFrame, error) {
 		size = int(min(int64(size), MaxLogResponseBytes-s.totalBytes+1))
 	}
 	payload := make([]byte, size)
-	n, err := s.reader.Read(payload)
+	// Do not add a buffering layer here: bufio can defer an observed body
+	// error when the remaining response allowance makes this a small read.
+	n, err := s.rc.Read(payload)
+	if err != nil && !errors.Is(err, io.EOF) {
+		// A read may report both data and connection loss. Do not acknowledge
+		// that data (or mask the fault with a limit error) before invalidation.
+		return LogFrame{}, SanitizeError(err)
+	}
 	if !s.follow && s.totalBytes+int64(n) > MaxLogResponseBytes {
 		_ = s.Close()
 		return LogFrame{}, ErrLogLimitExceeded
 	}
-	if n == 0 && err != nil {
-		if errors.Is(err, io.EOF) {
-			return LogFrame{}, io.EOF
-		}
-		return LogFrame{}, SanitizeError(err)
+	if n == 0 && errors.Is(err, io.EOF) {
+		return LogFrame{}, io.EOF
 	}
 	s.totalBytes += int64(n)
 	return LogFrame{Stream: LogStreamStdout, Payload: payload[:n]}, nil
