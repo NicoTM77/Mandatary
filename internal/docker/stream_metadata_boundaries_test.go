@@ -13,7 +13,7 @@ import (
 // just the pre-read requests covered by the original independent reproducer.
 func TestStreamMetadataCancellationBoundaries(t *testing.T) {
 	for _, stage := range []string{"/info", "/containers/" + string(testSelfID) + "/json", "/containers/json"} {
-		for _, mode := range []string{"post-close-next", "post-close-read", "post-cancel-next", "idle-close", "idle-watchdog", "watchdog", "independent-fault-with-cancel", "explicit-invalidation"} {
+		for _, mode := range []string{"post-close-next", "post-close-read", "post-cancel-next", "idle-close", "idle-watchdog", "watchdog", "independent-fault-with-cancel", "joined-fault-with-cancel", "explicit-invalidation"} {
 			t.Run(stage+"/"+mode, func(t *testing.T) {
 				ctx := context.Background()
 				base := newFakeDaemonTransport()
@@ -22,6 +22,9 @@ func TestStreamMetadataCancellationBoundaries(t *testing.T) {
 				barrier := &review380MetadataBarrier{base: base, path: stage, entered: make(chan struct{})}
 				if mode == "independent-fault-with-cancel" {
 					barrier.fault = io.ErrUnexpectedEOF
+				}
+				if mode == "joined-fault-with-cancel" {
+					barrier.fault = errors.Join(io.ErrUnexpectedEOF, context.Canceled)
 				}
 				a, err := NewSDKAdapter(SDKOptions{EndpointID: mustEndpointID(t), Identity: reviewerProof(), Transport: barrier})
 				if err != nil {
@@ -81,7 +84,7 @@ func TestStreamMetadataCancellationBoundaries(t *testing.T) {
 					t.Fatal("metadata request not entered")
 				}
 				switch mode {
-				case "post-cancel-next", "independent-fault-with-cancel":
+				case "post-cancel-next", "independent-fault-with-cancel", "joined-fault-with-cancel":
 					cancel()
 				case "watchdog", "idle-watchdog": // no local abort: wait for the actual two-second deadline
 				case "explicit-invalidation":
@@ -112,7 +115,7 @@ func TestStreamMetadataCancellationBoundaries(t *testing.T) {
 						t.Fatal("metadata request did not terminate")
 					}
 				}
-				mustRevoke := mode == "watchdog" || mode == "idle-watchdog" || mode == "independent-fault-with-cancel" || mode == "explicit-invalidation"
+				mustRevoke := mode == "watchdog" || mode == "idle-watchdog" || mode == "independent-fault-with-cancel" || mode == "joined-fault-with-cancel" || mode == "explicit-invalidation"
 				if mustRevoke {
 					if a.Ready() || peer.Err() == nil {
 						t.Error("genuine uncertainty did not revoke proof and peer")

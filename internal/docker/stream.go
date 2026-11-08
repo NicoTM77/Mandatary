@@ -11,6 +11,22 @@ import (
 // This cause distinguishes our fail-closed watchdog from consumer deadlines.
 var errStreamCheckDeadline = errors.New("stream continuity check deadline")
 
+func isStreamConsumerAbort(ctx context.Context, err error) bool {
+	if ctx.Err() == nil || context.Cause(ctx) == errStreamCheckDeadline {
+		return false
+	}
+	// SDK/url wrappers around the canceled request are local. A multi-error
+	// (e.g. cancellation joined with an observed connection fault) is uncertain,
+	// not a pure cancellation; errors.Is alone would mask its other branches.
+	for err != nil {
+		if err == ctx.Err() {
+			return true
+		}
+		err = errors.Unwrap(err)
+	}
+	return false
+}
+
 // safetyLogStream keeps inventory continuity an admission condition for both
 // framed and buffered reads. The bounded watcher also cancels idle follow I/O;
 // explicit event/reconnect invalidation still cancels immediately via ctx.

@@ -321,7 +321,7 @@ func (a *SDKAdapter) verifyStreamContinuity(ctx context.Context) error {
 		// Only an error matching a known canceled consumer request is local.
 		// Independent transport faults and our internal watchdog still revoke,
 		// even if the consumer has also canceled by the time I/O returns.
-		if ctx.Err() != nil && errors.Is(err, ctx.Err()) && !errors.Is(context.Cause(ctx), errStreamCheckDeadline) {
+		if isStreamConsumerAbort(ctx, err) {
 			return SanitizeError(err)
 		}
 		a.safety.Invalidate()
