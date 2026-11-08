@@ -75,6 +75,13 @@ func (s *safetyLogStream) Next(ctx context.Context) (LogFrame, error) {
 	}
 	frame, err := s.inner.Next(ctx)
 	if err != nil {
+		// A canceled consumer read is not proof of daemon loss. The body
+		// observer already revoked synchronously if it saw a live I/O fault.
+		// In particular, local body Close may still be unwinding before the
+		// stream unregisters from safety and cancels our parent context.
+		if ctx.Err() != nil {
+			return LogFrame{}, SanitizeError(ctx.Err())
+		}
 		return LogFrame{}, s.result(err)
 	}
 	if err = s.verify(ctx); err != nil {

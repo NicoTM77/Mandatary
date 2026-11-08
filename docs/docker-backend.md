@@ -154,6 +154,9 @@ cancellation, explicit recovery and revoked-old-stream controls are retained in
 fills, prefetched frames, error-before-limit ordering and healthy co-returned
 EOF are covered by `multiplex_fault_test.go`; `log_body_test.go` checks the
 sticky, fixed fault classification independently of request-error exceptions.
+`stream_close_fault_test.go` holds body `Close` between read interruption and
+unregistration to prove per-`Next` cancellation does not masquerade as daemon
+loss in either framing mode; independent healthy peers/proof remain usable.
 All SDK tests inject an in-memory HTTP transport; no daemon or socket is used.
 These are package-level fixtures, not completed REST/MCP, deployment, NIST/FIPS
 or OS×CPU qualification.
