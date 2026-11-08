@@ -39,6 +39,7 @@ type fakeDaemonContainer struct {
 	Labels     map[string]string
 	Env        []string
 	Cmd        []string
+	Entrypoint []string
 	Tty        bool
 	Logs       []byte
 	FollowCh   chan []byte
@@ -236,11 +237,12 @@ func (f *fakeDaemonTransport) RoundTrip(req *http.Request) (*http.Response, erro
 						FinishedAt: c.FinishedAt,
 					},
 					Config: &container.Config{
-						Image:  c.Image,
-						Labels: c.Labels,
-						Env:    c.Env,
-						Cmd:    c.Cmd,
-						Tty:    c.Tty,
+						Image:      c.Image,
+						Labels:     c.Labels,
+						Env:        c.Env,
+						Cmd:        c.Cmd,
+						Entrypoint: c.Entrypoint,
+						Tty:        c.Tty,
 					},
 					HostConfig:      &container.HostConfig{NetworkMode: "bridge"},
 					NetworkSettings: &container.NetworkSettings{},

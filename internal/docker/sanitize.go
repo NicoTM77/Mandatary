@@ -70,7 +70,7 @@ func hasURLUserInfo(val string) bool {
 }
 
 func isPurePOSIXPathList(val string) bool {
-	if val == "" || (!strings.HasPrefix(val, "/") && !strings.Contains(val, ":/")) {
+	if val == "" || !strings.HasPrefix(val, "/") {
 		return false
 	}
 	if strings.ContainsAny(val, "=?@ \t\r\n") {
@@ -93,7 +93,17 @@ func isPurePOSIXPathList(val string) bool {
 			return false
 		}
 	}
+	for _, segment := range strings.FieldsFunc(val, func(r rune) bool { return r == '/' || r == ':' }) {
+		if isOpaqueSecret(segment) {
+			return false
+		}
+	}
 	return true
+}
+
+func isOpaqueSecret(token string) bool {
+	return (len(token) >= 32 && isHexString(token) && shannonEntropy(token) >= 3.5) ||
+		(len(token) >= 20 && shannonEntropy(token) >= 3.75)
 }
 
 func isHexString(s string) bool {
@@ -160,11 +170,16 @@ func isSecretOrHighEntropyValue(val string) bool {
 		if isPurePOSIXPathList(token) {
 			continue
 		}
-		if len(token) >= 32 && isHexString(token) && shannonEntropy(token) >= 3.5 {
+		if isOpaqueSecret(token) {
 			return true
 		}
-		if len(token) >= 20 && shannonEntropy(token) >= 3.75 {
-			return true
+		// A slash or URL prefix must not make opaque credential segments safe.
+		for _, segment := range strings.FieldsFunc(token, func(r rune) bool {
+			return r == '/' || r == ':' || r == '?' || r == '#' || r == '&'
+		}) {
+			if isOpaqueSecret(segment) {
+				return true
+			}
 		}
 	}
 	return false
@@ -247,10 +262,24 @@ func sanitizeStringSlice(in []string) []string {
 		return nil
 	}
 	out := make([]string, len(in))
+	redactNext := false
 	for i, v := range in {
-		out[i] = SanitizeArgument(v)
+		if redactNext {
+			out[i] = redactedValue
+		} else {
+			out[i] = SanitizeArgument(v)
+		}
+		flag := strings.TrimSpace(v)
+		redactNext = strings.HasPrefix(flag, "-") && !strings.Contains(flag, "=") && isSecretKeyName(strings.TrimLeft(flag, "-"))
 	}
 	return out
+}
+
+// Docker joins entrypoint and cmd, so secret flag/value pairs can cross that boundary.
+func sanitizeCommand(entrypoint, cmd []string) ([]string, []string) {
+	args := append(slices.Clone(entrypoint), cmd...)
+	safe := sanitizeStringSlice(args)
+	return safe[:len(entrypoint)], safe[len(entrypoint):]
 }
 
 func normalizeContainerName(name string) string {
@@ -394,8 +423,7 @@ func SanitizeInspectConfig(endpointID domain.EndpointID, raw container.InspectRe
 	if raw.Config != nil {
 		cfg.User = strings.TrimSpace(raw.Config.User)
 		cfg.WorkingDir = strings.TrimSpace(raw.Config.WorkingDir)
-		cfg.Entrypoint = sanitizeStringSlice(raw.Config.Entrypoint)
-		cfg.Cmd = sanitizeStringSlice(raw.Config.Cmd)
+		cfg.Entrypoint, cfg.Cmd = sanitizeCommand(raw.Config.Entrypoint, raw.Config.Cmd)
 		cfg.Env = SanitizeEnvSlice(raw.Config.Env)
 	}
 

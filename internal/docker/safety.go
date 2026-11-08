@@ -3,6 +3,7 @@ package docker
 import (
 	"cmp"
 	"context"
+	"errors"
 	"os"
 	"slices"
 	"strings"
@@ -139,6 +140,8 @@ func DefaultProcessEvidenceReader(_ context.Context) (ProcessEvidence, error) {
 // protected container set, and active stream cancellation.
 type SafetyMonitor struct {
 	mu            sync.RWMutex
+	epoch         uint64
+	closed        bool
 	cfg           SelfIdentityConfig
 	state         VerificationState
 	selfID        ContainerID
@@ -178,6 +181,21 @@ func (m *SafetyMonitor) SetConfig(cfg SelfIdentityConfig) {
 	m.cfg = cfg
 	m.invalidateLocked()
 	m.mu.Unlock()
+}
+
+func (m *SafetyMonitor) currentEpoch() uint64 {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.epoch
+}
+
+func (m *SafetyMonitor) requireEpoch(epoch uint64) error {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	if m.closed || m.epoch != epoch || m.state != StateVerified {
+		return ErrUnverified
+	}
+	return nil
 }
 
 func (m *SafetyMonitor) State() VerificationState {
@@ -241,7 +259,18 @@ func (m *SafetyMonitor) Invalidate() {
 	m.mu.Unlock()
 }
 
+// Only known logical target/input denials preserve proof. Unknown errors,
+// including canceled I/O, cannot establish current daemon continuity.
+func (m *SafetyMonitor) operationError(err error) error {
+	safe := SanitizeError(err)
+	if safe != nil && !errors.Is(safe, ErrTargetNotFound) && !errors.Is(safe, ErrInvalidParameter) {
+		m.Invalidate()
+	}
+	return safe
+}
+
 func (m *SafetyMonitor) invalidateLocked() {
+	m.epoch++
 	m.state = StateUnverified
 	m.selfID = ""
 	m.daemonID = ""
@@ -260,9 +289,34 @@ func (m *SafetyMonitor) Verify(
 	allContainers []SafetyCandidate,
 	inspectFn func(ContainerID) (SafetyCandidate, error),
 ) error {
+	epoch := m.beginVerification()
+	return m.verifyAt(ctx, epoch, daemonID, allContainers, inspectFn)
+}
+
+// Reserve proof publication before any fallible inventory or identity I/O.
+// Invalidation, config changes, closure and every newer attempt revoke this epoch.
+func (m *SafetyMonitor) beginVerification() uint64 {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.invalidateLocked()
+	return m.epoch
+}
+
+func (m *SafetyMonitor) Close() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.closed = true
+	m.invalidateLocked()
+}
+
+func (m *SafetyMonitor) verifyAt(ctx context.Context, epoch uint64, daemonID string, allContainers []SafetyCandidate, inspectFn func(ContainerID) (SafetyCandidate, error)) error {
 	m.mu.RLock()
 	cfg := m.cfg
+	stale := m.closed || m.epoch != epoch
 	m.mu.RUnlock()
+	if stale || ctx.Err() != nil {
+		return ErrUnverified
+	}
 
 	if strings.TrimSpace(daemonID) == "" {
 		m.Invalidate()
@@ -312,8 +366,14 @@ func (m *SafetyMonitor) Verify(
 
 	protected := make(map[ContainerID]struct{})
 	var uuidMatches []ContainerID
+	seen := make(map[ContainerID]bool, len(allContainers))
 
 	for _, c := range allContainers {
+		if _, err := ParseContainerID(string(c.ID)); err != nil || seen[c.ID] {
+			m.Invalidate()
+			return ErrUnverified
+		}
+		seen[c.ID] = true
 		if HasProtectedNamespaceLabel(c.Labels) {
 			protected[c.ID] = struct{}{}
 		}
@@ -349,10 +409,12 @@ func (m *SafetyMonitor) Verify(
 			m.Invalidate()
 			return ErrUnverified
 		}
-		if explicitID != "" {
-			candidateID = explicitID
-		} else if instanceUUID != "" && len(uuidMatches) == 1 {
+		if instanceUUID != "" && len(uuidMatches) == 1 {
 			candidateID = uuidMatches[0]
+		}
+		if explicitID != "" && explicitID != candidateID {
+			m.Invalidate()
+			return ErrUnverified
 		}
 	}
 
@@ -382,6 +444,10 @@ func (m *SafetyMonitor) Verify(
 	protected[candidateID] = struct{}{}
 
 	m.mu.Lock()
+	if m.closed || m.epoch != epoch || ctx.Err() != nil {
+		m.mu.Unlock()
+		return ErrUnverified
+	}
 	m.state = StateVerified
 	m.selfID = candidateID
 	m.daemonID = daemonID
@@ -416,6 +482,37 @@ func (m *SafetyMonitor) VerifyContinuity(currentDaemonID string, currentSelf Saf
 		currentSelf.Created != created ||
 		currentSelf.StartedAt != startedAt {
 		m.Invalidate()
+		return ErrUnverified
+	}
+	return nil
+}
+
+// VerifyInventory rechecks the complete all-state inventory, including deployment
+// binding uniqueness. An overlap invalidates proof until explicit re-verification;
+// merely removing the overlapping member cannot resurrect cached authority.
+func (m *SafetyMonitor) VerifyInventory(all []SafetyCandidate) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.state != StateVerified {
+		return ErrUnverified
+	}
+	seen := make(map[ContainerID]bool, len(all))
+	var matches []ContainerID
+	for _, c := range all {
+		if _, err := ParseContainerID(string(c.ID)); err != nil || seen[c.ID] {
+			m.invalidateLocked()
+			return ErrUnverified
+		}
+		seen[c.ID] = true
+		if HasProtectedNamespaceLabel(c.Labels) {
+			m.protected[c.ID] = struct{}{}
+		}
+		if m.cfg.InstanceUUID != "" && strings.TrimSpace(c.Labels[SelfInstanceUUIDLabelKey]) == m.cfg.InstanceUUID {
+			matches = append(matches, c.ID)
+		}
+	}
+	if !seen[m.selfID] || (m.cfg.InstanceUUID != "" && (len(matches) != 1 || matches[0] != m.selfID)) {
+		m.invalidateLocked()
 		return ErrUnverified
 	}
 	return nil

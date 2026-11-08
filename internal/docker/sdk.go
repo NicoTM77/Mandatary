@@ -147,7 +147,7 @@ func (a *SDKAdapter) NegotiatedAPIVersion() string {
 }
 
 func (a *SDKAdapter) Close() error {
-	a.safety.Invalidate()
+	a.safety.Close()
 	if a.cli != nil {
 		_ = a.cli.Close()
 	}
@@ -187,6 +187,7 @@ func parseMajorMinor(v string) (int, int, error) {
 }
 
 func (a *SDKAdapter) VerifySelf(ctx context.Context) error {
+	epoch := a.safety.beginVerification()
 	pingRes, err := a.cli.Ping(ctx, client.PingOptions{
 		NegotiateAPIVersion: true,
 		ForceNegotiate:      true,
@@ -233,7 +234,8 @@ func (a *SDKAdapter) VerifySelf(ctx context.Context) error {
 	for _, item := range listItems {
 		cid, cErr := ParseContainerID(item.ID)
 		if cErr != nil {
-			continue
+			a.safety.Invalidate()
+			return ErrUnverified
 		}
 		candidates = append(candidates, SafetyCandidate{
 			ID:     cid,
@@ -241,7 +243,7 @@ func (a *SDKAdapter) VerifySelf(ctx context.Context) error {
 		})
 	}
 
-	err = a.safety.Verify(ctx, daemonID, candidates, func(cid ContainerID) (SafetyCandidate, error) {
+	err = a.safety.verifyAt(ctx, epoch, daemonID, candidates, func(cid ContainerID) (SafetyCandidate, error) {
 		raw, iErr := a.safetyInspectContainer(ctx, cid)
 		if iErr != nil {
 			return SafetyCandidate{}, iErr
@@ -280,6 +282,7 @@ func (a *SDKAdapter) safetyListContainers(ctx context.Context) ([]container.Summ
 	a.safetyListCalls.Add(1)
 	res, err := a.cli.ContainerList(ctx, client.ContainerListOptions{All: true})
 	if err != nil {
+		a.safety.Invalidate()
 		return nil, SanitizeError(err)
 	}
 	return res.Items, nil
@@ -289,12 +292,13 @@ func (a *SDKAdapter) safetyInspectContainer(ctx context.Context, cid ContainerID
 	a.safetyInspectCalls.Add(1)
 	res, err := a.cli.ContainerInspect(ctx, string(cid), client.ContainerInspectOptions{})
 	if err != nil {
-		return container.InspectResponse{}, SanitizeError(err)
+		return container.InspectResponse{}, a.operationError(err)
 	}
 	return res.Container, nil
 }
 
 func (a *SDKAdapter) verifySelfContinuity(ctx context.Context) error {
+	epoch := a.safety.currentEpoch()
 	selfID, ok := a.safety.SelfContainerID()
 	if !ok {
 		return ErrUnverified
@@ -322,15 +326,30 @@ func (a *SDKAdapter) verifySelfContinuity(ctx context.Context) error {
 		a.safety.Invalidate()
 		return ErrUnverified
 	}
-	return a.safety.VerifyContinuity(strings.TrimSpace(infoRes.Info.ID), SafetyCandidate{
+	if err := a.safety.VerifyContinuity(strings.TrimSpace(infoRes.Info.ID), SafetyCandidate{
 		ID:        parsedID,
 		Created:   rawSelf.Created,
 		StartedAt: startedAt,
 		Labels:    labels,
-	})
+	}); err != nil {
+		return err
+	}
+	items, err := a.safetyListContainers(ctx)
+	if err != nil {
+		return err
+	}
+	candidates := make([]SafetyCandidate, 0, len(items))
+	for _, item := range items {
+		candidates = append(candidates, SafetyCandidate{ID: ContainerID(item.ID), Labels: item.Labels})
+	}
+	if err := a.safety.VerifyInventory(candidates); err != nil {
+		return err
+	}
+	return a.safety.requireEpoch(epoch)
 }
 
 func (a *SDKAdapter) verifyTargetForOperation(ctx context.Context, target TargetIdentity) (container.InspectResponse, error) {
+	epoch := a.safety.currentEpoch()
 	if !a.safety.Ready() {
 		return container.InspectResponse{}, ErrUnverified
 	}
@@ -360,6 +379,9 @@ func (a *SDKAdapter) verifyTargetForOperation(ctx context.Context, target Target
 	if HasProtectedNamespaceLabel(targetLabels) || a.safety.IsProtected(cid) {
 		a.safety.MarkProtected(cid)
 		return container.InspectResponse{}, ErrProtectedTarget
+	}
+	if err := a.safety.requireEpoch(epoch); err != nil {
+		return container.InspectResponse{}, err
 	}
 	return rawTarget, nil
 }
@@ -498,7 +520,7 @@ func (a *SDKAdapter) Logs(ctx context.Context, target TargetIdentity, opts LogOp
 	rc, err := a.cli.ContainerLogs(streamCtx, string(target.ContainerID), sdkOpts)
 	if err != nil {
 		unregister()
-		return nil, SanitizeError(err)
+		return nil, a.operationError(err)
 	}
 
 	var isTTY bool
@@ -506,7 +528,8 @@ func (a *SDKAdapter) Logs(ctx context.Context, target TargetIdentity, opts LogOp
 		isTTY = raw.Config.Tty
 	}
 
-	return newSDKLogStream(streamCtx, rc, unregister, isTTY, normOpts.Follow), nil
+	stream := newSDKLogStream(streamCtx, rc, unregister, isTTY, normOpts.Follow)
+	return guardLogStream(streamCtx, stream, a.verifySelfContinuity, a.operationError), nil
 }
 
 func (a *SDKAdapter) Start(ctx context.Context, target TargetIdentity) error {
@@ -515,7 +538,12 @@ func (a *SDKAdapter) Start(ctx context.Context, target TargetIdentity) error {
 	}
 	a.operationalStarts.Add(1)
 	_, err := a.cli.ContainerStart(ctx, string(target.ContainerID), client.ContainerStartOptions{})
-	return SanitizeError(err)
+	return a.operationError(err)
+}
+
+// operationError never lets uncertain I/O preserve a cached safety proof.
+func (a *SDKAdapter) operationError(err error) error {
+	return a.safety.operationError(err)
 }
 
 func (a *SDKAdapter) Stop(ctx context.Context, target TargetIdentity, opts StopOptions) error {
@@ -530,7 +558,7 @@ func (a *SDKAdapter) Stop(ctx context.Context, target TargetIdentity, opts StopO
 	_, err = a.cli.ContainerStop(ctx, string(target.ContainerID), client.ContainerStopOptions{
 		Timeout: &timeoutSec,
 	})
-	return SanitizeError(err)
+	return a.operationError(err)
 }
 
 func (a *SDKAdapter) Restart(ctx context.Context, target TargetIdentity, opts RestartOptions) error {
@@ -545,7 +573,7 @@ func (a *SDKAdapter) Restart(ctx context.Context, target TargetIdentity, opts Re
 	_, err = a.cli.ContainerRestart(ctx, string(target.ContainerID), client.ContainerRestartOptions{
 		Timeout: &timeoutSec,
 	})
-	return SanitizeError(err)
+	return a.operationError(err)
 }
 
 type sdkLogStream struct {
@@ -556,14 +584,19 @@ type sdkLogStream struct {
 	tty        bool
 	follow     bool
 	mu         sync.Mutex
+	readMu     sync.Mutex
+	closeOnce  sync.Once
+	cancel     context.CancelFunc
 	totalBytes int64
 	readBuf    []byte
-	closed     bool
+	closed     atomic.Bool
 }
 
 func newSDKLogStream(ctx context.Context, rc io.ReadCloser, unregister func(), tty, follow bool) *sdkLogStream {
+	ctx, cancel := context.WithCancel(ctx)
 	s := &sdkLogStream{
 		ctx:        ctx,
+		cancel:     cancel,
 		rc:         rc,
 		reader:     bufio.NewReaderSize(rc, 32*1024),
 		unregister: unregister,
@@ -578,6 +611,9 @@ func newSDKLogStream(ctx context.Context, rc io.ReadCloser, unregister func(), t
 }
 
 func (s *sdkLogStream) Next(ctx context.Context) (LogFrame, error) {
+	// Closing the body must interrupt I/O independently of the parser lock.
+	stop := context.AfterFunc(ctx, func() { _ = s.Close() })
+	defer stop()
 	select {
 	case <-ctx.Done():
 		_ = s.Close()
@@ -590,50 +626,54 @@ func (s *sdkLogStream) Next(ctx context.Context) (LogFrame, error) {
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.closed {
+	if s.closed.Load() {
 		if s.ctx.Err() != nil {
 			return LogFrame{}, ErrUnverified
 		}
 		return LogFrame{}, io.EOF
 	}
 
+	var frame LogFrame
+	var err error
 	if s.tty {
-		return s.nextTTYFrameLocked()
+		frame, err = s.nextTTYFrameLocked()
+	} else {
+		frame, err = s.nextMultiplexedFrameLocked()
 	}
-	return s.nextMultiplexedFrameLocked()
+	if errors.Is(err, ErrLogLimitExceeded) || errors.Is(err, ErrBackendFailed) {
+		return LogFrame{}, err
+	}
+	if ctx.Err() != nil {
+		_ = s.Close()
+		return LogFrame{}, SanitizeError(ctx.Err())
+	}
+	if s.ctx.Err() != nil || s.closed.Load() {
+		return LogFrame{}, ErrUnverified
+	}
+	return frame, err
 }
 
 func (s *sdkLogStream) nextTTYFrameLocked() (LogFrame, error) {
-	line, isPrefix, err := s.reader.ReadLine()
-	if isPrefix || len(line) > MaxLogFrameBytes {
-		_ = s.closeLocked()
+	// TTY output has no Docker framing or guaranteed newline. Read bounded raw
+	// chunks, never ReadLine (which strips CRLF and invents final newlines).
+	size := MaxLogFrameBytes
+	if !s.follow {
+		size = int(min(int64(size), MaxLogResponseBytes-s.totalBytes+1))
+	}
+	payload := make([]byte, size)
+	n, err := s.reader.Read(payload)
+	if !s.follow && s.totalBytes+int64(n) > MaxLogResponseBytes {
+		_ = s.Close()
 		return LogFrame{}, ErrLogLimitExceeded
 	}
-	if err != nil {
-		if errors.Is(err, io.EOF) && len(line) == 0 {
-			if s.ctx.Err() != nil {
-				return LogFrame{}, ErrUnverified
-			}
+	if n == 0 && err != nil {
+		if errors.Is(err, io.EOF) {
 			return LogFrame{}, io.EOF
 		}
-		if !errors.Is(err, io.EOF) {
-			if s.ctx.Err() != nil {
-				return LogFrame{}, ErrUnverified
-			}
-			return LogFrame{}, SanitizeError(err)
-		}
+		return LogFrame{}, SanitizeError(err)
 	}
-
-	payload := append(append([]byte(nil), line...), '\n')
-	if !s.follow && s.totalBytes+int64(len(payload)) > MaxLogResponseBytes {
-		_ = s.closeLocked()
-		return LogFrame{}, ErrLogLimitExceeded
-	}
-	s.totalBytes += int64(len(payload))
-	return LogFrame{
-		Stream:  LogStreamStdout,
-		Payload: payload,
-	}, nil
+	s.totalBytes += int64(n)
+	return LogFrame{Stream: LogStreamStdout, Payload: payload[:n]}, nil
 }
 
 func (s *sdkLogStream) nextMultiplexedFrameLocked() (LogFrame, error) {
@@ -659,17 +699,17 @@ func (s *sdkLogStream) nextMultiplexedFrameLocked() (LogFrame, error) {
 	case 2:
 		streamType = LogStreamStderr
 	default:
-		_ = s.closeLocked()
+		_ = s.Close()
 		return LogFrame{}, ErrBackendFailed
 	}
 
 	frameSize := binary.BigEndian.Uint32(hdr[4:8])
 	if frameSize > MaxLogFrameBytes {
-		_ = s.closeLocked()
+		_ = s.Close()
 		return LogFrame{}, ErrLogLimitExceeded
 	}
 	if !s.follow && s.totalBytes+int64(frameSize) > MaxLogResponseBytes {
-		_ = s.closeLocked()
+		_ = s.Close()
 		return LogFrame{}, ErrLogLimitExceeded
 	}
 
@@ -689,6 +729,12 @@ func (s *sdkLogStream) nextMultiplexedFrameLocked() (LogFrame, error) {
 }
 
 func (s *sdkLogStream) Read(p []byte) (int, error) {
+	s.readMu.Lock()
+	defer s.readMu.Unlock()
+	if s.ctx.Err() != nil || s.closed.Load() {
+		s.readBuf = nil
+		return 0, ErrUnverified
+	}
 	if len(p) == 0 {
 		return 0, nil
 	}
@@ -699,27 +745,25 @@ func (s *sdkLogStream) Read(p []byte) (int, error) {
 		}
 		s.readBuf = frame.Payload
 	}
+	if s.ctx.Err() != nil || s.closed.Load() {
+		s.readBuf = nil
+		return 0, ErrUnverified
+	}
 	n := copy(p, s.readBuf)
 	s.readBuf = s.readBuf[n:]
 	return n, nil
 }
 
 func (s *sdkLogStream) Close() error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.closeLocked()
-}
-
-func (s *sdkLogStream) closeLocked() error {
-	if s.closed {
-		return nil
-	}
-	s.closed = true
-	if s.unregister != nil {
-		s.unregister()
-	}
-	if s.rc != nil {
-		_ = s.rc.Close()
-	}
+	s.closeOnce.Do(func() {
+		s.closed.Store(true)
+		s.cancel()
+		if s.rc != nil {
+			_ = s.rc.Close()
+		}
+		if s.unregister != nil {
+			s.unregister()
+		}
+	})
 	return nil
 }

@@ -32,15 +32,36 @@ by **P1.19**.
 
 | Artifact | Value / Format | Role |
 | --- | --- | --- |
-| Container label `io.mandatary.self` | Exact string `"true"` | Required on the Mandatary container for positive own-instance verification; never sufficient alone without process or explicit identity proof (`SELF-03`). |
+| Container label `io.mandatary.self` | Exact string `"true"` | Required on the Mandatary container for positive own-instance verification; never sufficient without reliable current-process evidence or a trusted unique deployment binding (`SELF-03`). |
 | Reserved label namespace `io.mandatary.*` | Any label key with prefix `io.mandatary.` | Conservatively marks any container in any state (`created`, `running`, `paused`, `restarting`, `removing`, `exited`, `dead`) as a protected peer (`SELF-08`, `SELF-12`). |
-| Env `MANDATARY_SELF_CONTAINER_ID` | 64-character lowercase hex container ID | Explicit operator-supplied container ID; must match runtime cgroup evidence when both are present (`SELF-02`). |
+| Env `MANDATARY_SELF_CONTAINER_ID` | 64-character lowercase hex container ID | Operator assertion, not proof by itself: must match reliable current-process evidence or the unique trusted deployment binding. Bare/stale explicit IDs cannot enable native access (`SELF-01`, `SELF-02`, `SELF-13`). |
 | Env `MANDATARY_SELF_INSTANCE_UUID` + label `io.mandatary.self.instance-uuid` | Canonical lowercase non-nil UUID (`domain.ParseEndpointID`) | Deployment instance-UUID binding used to prove unique own-instance identity when private cgroup namespaces (`cgroupns=private`) hide the container ID in `/proc/self/cgroup` (`SELF-11`). Duplicate or missing UUIDs fail closed. |
 
 Every backend instance starts in `UNVERIFIED` (`SELF-09`). Any missing,
 conflicting, ambiguous, stale, or daemon-mismatched proof keeps or returns the
 backend to `UNVERIFIED`, cancels active log streams immediately (`SELF-07`), and
 denies all operational calls with zero operational SDK dispatches.
+
+Verification reserves a new generation **before** inventory I/O. Invalidation,
+configuration changes, closure and newer verification attempts supersede older
+work; stale work cannot publish proof or carry target metadata across generations.
+Closing a backend is terminal. A fresh backend is required after closure.
+
+Every ordinary admission rechecks daemon/self continuity and a complete all-state
+inventory, including uniqueness of any instance-UUID binding. Unknown/malformed
+inventory and connection/I/O failures invalidate proof and cancel all streams.
+Known logical missing-target/invalid-argument denials do not by themselves imply
+a disconnected daemon. Removing an overlap or reconnecting does not restore
+readiness: explicit fresh `VerifySelf` is required.
+
+Active streams recheck continuity before and after each delivery (including
+buffered `Read` bytes); idle streams also have a one-second safety watcher with a
+two-second check deadline. Explicit `InvalidateSafety` cancels immediately, without
+waiting for the watcher. Integration owners must signal event continuity loss,
+reconnect and endpoint changes through that method; this package does not expose
+an event subscription or claim real-Docker integration evidence. `Close` and a
+per-`Next` canceled context interrupt blocked body reads independently of the
+parser lock. Callers must close streams; cancellation discards undelivered bytes.
 
 ## Sanitizer and parameter bounds (TD §§1.1–1.2, 10.2)
 
@@ -61,8 +82,12 @@ denies all operational calls with zero operational SDK dispatches.
   - Values containing `mdt_`, `-----BEGIN`, `Bearer `, `Basic `, URL userinfo
     (`scheme://user:pass@host`), inline secret assignments, or high-entropy
     tokens (`>= 20` chars with Shannon entropy `>= 3.75` bits/char, or hex
-    `>= 32` chars with `>= 3.5` bits/char, excluding pure POSIX path lists) are
+    `>= 32` chars with `>= 3.5` bits/char) are
     redacted to `"[REDACTED]"`.
+  - Ordinary POSIX path lists remain readable only when no path segment matches
+    the entropy rules; a slash or URL prefix cannot exempt an opaque credential.
+    Secret flag/value pairs are redacted in both entrypoint and command arrays,
+    including pairs that cross the entrypoint/command boundary.
 - **Operation parameter bounds**:
   - `Stop` / `Restart` timeout: `1–300` seconds (default `10` seconds); `0` and
     negative values are rejected (`ErrInvalidParameter`).
@@ -70,6 +95,9 @@ denies all operational calls with zero operational SDK dispatches.
     one of `Stdout`/`Stderr` required, `Until >= Since`, 64 KiB max frame size
     (`MaxLogFrameBytes`), and 4 MiB max non-follow response size
     (`MaxLogResponseBytes`).
+    Raw TTY output is chunked to at most 64 KiB without interpreting newlines or
+    changing CRLF/final fragments; the same 4 MiB non-follow cap applies. This is
+    reading existing container logs, not Phase 4 interactive TTY/exec support.
 - **Error redaction**: `SanitizeError` maps all SDK, HTTP, and transport errors
   to fixed secret-free `docker.Error` sentinels without wrapping raw socket paths
   or daemon messages.
@@ -94,3 +122,18 @@ denies all operational calls with zero operational SDK dispatches.
 | `SUP-03` Engine API `>= 1.44` negotiation | `TestEngineAPINegotiationAndMinimum144` | P1.19 (live Engine matrix) |
 | TD §§1.1–1.2 Inspect allowlists, secret/entropy redaction, error redaction | `TestInspectStatusAllowlistAndUnknownFields`, `TestInspectConfigEnvCommandMountAndResourceSanitization`, `TestTransportAndSDKErrorsRedacted` | P1.13, P1.14, P1.16 |
 | TD §§1.2, 5, 10.4 Operation catalog, parameter bounds, SDK & mock parity | `TestOperationParameterBounds`, `TestSDKAdapterAllowedOperationsAndBounds`, `TestMockBackendFullLifecycleAndFaultInjection` | P1.13, P1.14 |
+
+### Review regressions (F1–F7)
+
+`review_regression_test.go` retains the independent run374 reproducers, including
+healthy process-proof, self-denial, PATH and inline-secret controls. Additional
+permanent cases cover config/close/newer-failed verification barriers and the
+SDK inventory boundary (`safety_epoch_test.go`), target-proof generation changes
+(`dispatch_epoch_test.go`), seven disconnect paths with active buffered streams
+and explicit recovery (`transport_regression_test.go`), startup malformed inventory
+and an entered idle read (`inventory_regression_test.go`), SDK/mock post-startup
+UUID overlap and resynchronization (`continuity_regression_test.go`), shared
+entrypoint/command/env projection (`sanitizer_regression_test.go`), and exact raw
+TTY frame/response bounds (`tty_regression_test.go`). All SDK tests inject an
+in-memory HTTP transport; no daemon or socket is used. These are package-level
+fixtures, not completed REST/MCP, deployment, NIST/FIPS or OS×CPU qualification.

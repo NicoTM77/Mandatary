@@ -326,7 +326,7 @@ func (m *MockBackend) Counters() OperationalCounters {
 }
 
 func (m *MockBackend) Close() error {
-	m.safety.Invalidate()
+	m.safety.Close()
 	return nil
 }
 
@@ -386,6 +386,7 @@ func (m *MockBackend) SimulateEventDiscontinuity() {
 }
 
 func (m *MockBackend) VerifySelf(ctx context.Context) error {
+	epoch := m.safety.beginVerification()
 	m.safetyListCalls.Add(1)
 	m.mu.RLock()
 	daemonID := m.daemonID
@@ -400,7 +401,7 @@ func (m *MockBackend) VerifySelf(ctx context.Context) error {
 	}
 	m.mu.RUnlock()
 
-	return m.safety.Verify(ctx, daemonID, candidates, func(cid ContainerID) (SafetyCandidate, error) {
+	return m.safety.verifyAt(ctx, epoch, daemonID, candidates, func(cid ContainerID) (SafetyCandidate, error) {
 		m.safetyInspectCalls.Add(1)
 		m.mu.RLock()
 		defer m.mu.RUnlock()
@@ -418,6 +419,7 @@ func (m *MockBackend) VerifySelf(ctx context.Context) error {
 }
 
 func (m *MockBackend) verifySelfContinuity() error {
+	epoch := m.safety.currentEpoch()
 	selfID, ok := m.safety.SelfContainerID()
 	if !ok {
 		return ErrUnverified
@@ -435,15 +437,26 @@ func (m *MockBackend) verifySelfContinuity() error {
 			Labels:    maps.Clone(c.Labels),
 		}
 	}
+	all := make([]SafetyCandidate, 0, len(m.containers))
+	for _, c := range m.containers {
+		all = append(all, SafetyCandidate{ID: c.ID, Labels: maps.Clone(c.Labels)})
+	}
 	m.mu.RUnlock()
 	if !exists {
 		m.safety.Invalidate()
 		return ErrUnverified
 	}
-	return m.safety.VerifyContinuity(daemonID, cand)
+	if err := m.safety.VerifyContinuity(daemonID, cand); err != nil {
+		return err
+	}
+	if err := m.safety.VerifyInventory(all); err != nil {
+		return err
+	}
+	return m.safety.requireEpoch(epoch)
 }
 
 func (m *MockBackend) verifyTargetForOperation(op Operation, target TargetIdentity) (*MockContainerFixture, error) {
+	epoch := m.safety.currentEpoch()
 	if err := ValidateOperation(op); err != nil {
 		return nil, err
 	}
@@ -482,7 +495,10 @@ func (m *MockBackend) verifyTargetForOperation(op Operation, target TargetIdenti
 		return nil, ErrProtectedTarget
 	}
 	if failErr != nil {
-		return nil, SanitizeError(failErr)
+		return nil, m.safety.operationError(failErr)
+	}
+	if err := m.safety.requireEpoch(epoch); err != nil {
+		return nil, err
 	}
 	return cloned, nil
 }
@@ -629,6 +645,7 @@ func (m *MockBackend) InspectConfig(ctx context.Context, target TargetIdentity) 
 		mounts = append(mounts, mtCopy)
 	}
 
+	entrypoint, cmd := sanitizeCommand(c.Entrypoint, c.Cmd)
 	return InspectConfig{
 		EndpointID:  m.endpointID,
 		ContainerID: c.ID,
@@ -637,8 +654,8 @@ func (m *MockBackend) InspectConfig(ctx context.Context, target TargetIdentity) 
 		ImageDigest: c.ImageDigest,
 		User:        c.User,
 		WorkingDir:  c.WorkingDir,
-		Entrypoint:  sanitizeStringSlice(c.Entrypoint),
-		Cmd:         sanitizeStringSlice(c.Cmd),
+		Entrypoint:  entrypoint,
+		Cmd:         cmd,
 		Env:         SanitizeEnvSlice(c.Env),
 		Mounts:      mounts,
 		Network:     c.Network,
@@ -698,14 +715,17 @@ func (m *MockBackend) Logs(ctx context.Context, target TargetIdentity, opts LogO
 		}
 	}
 
-	return &mockLogStream{
+	stream := &mockLogStream{
 		ctx:        streamCtx,
 		unregister: unregister,
 		unsub:      unsub,
 		opts:       normOpts,
 		backlog:    filtered,
 		followCh:   followCh,
-	}, nil
+	}
+	return guardLogStream(streamCtx, stream, func(context.Context) error {
+		return m.verifySelfContinuity()
+	}, m.safety.operationError), nil
 }
 
 func matchesLogFilter(l MockLogLine, opts LogOptions) bool {
@@ -794,6 +814,7 @@ type mockLogStream struct {
 	followCh   chan MockLogLine
 	totalBytes int64
 	readBuf    []byte
+	readMu     sync.Mutex
 	closed     bool
 }
 
@@ -885,6 +906,12 @@ func (s *mockLogStream) Next(ctx context.Context) (LogFrame, error) {
 }
 
 func (s *mockLogStream) Read(p []byte) (int, error) {
+	s.readMu.Lock()
+	defer s.readMu.Unlock()
+	if s.ctx.Err() != nil {
+		s.readBuf = nil
+		return 0, ErrUnverified
+	}
 	if len(p) == 0 {
 		return 0, nil
 	}
@@ -894,6 +921,10 @@ func (s *mockLogStream) Read(p []byte) (int, error) {
 			return 0, err
 		}
 		s.readBuf = frame.Payload
+	}
+	if s.ctx.Err() != nil {
+		s.readBuf = nil
+		return 0, ErrUnverified
 	}
 	n := copy(p, s.readBuf)
 	s.readBuf = s.readBuf[n:]
