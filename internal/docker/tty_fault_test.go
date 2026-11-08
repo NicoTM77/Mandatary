@@ -114,7 +114,7 @@ func TestTTYFaultDeniesDeliveryCancelsPeersAndRequiresFreshProof(t *testing.T) {
 func TestTTYSmallRemainingReadCannotHideFault(t *testing.T) {
 	for _, remaining := range []int64{0, 8, 100} {
 		ctx := context.Background()
-		s := newSDKLogStream(ctx, &review376Body{payload: []byte("ordinary log"), fault: errors.New("synthetic read connection loss")}, nil, true, false)
+		s := newSDKLogStream(ctx, &review376Body{payload: []byte("ordinary log"), fault: errors.New("synthetic read connection loss")}, nil, true, false, nil)
 		s.totalBytes = MaxLogResponseBytes - remaining
 		f, err := s.Next(ctx)
 		_ = s.Close()

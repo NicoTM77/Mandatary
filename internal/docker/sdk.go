@@ -528,7 +528,7 @@ func (a *SDKAdapter) Logs(ctx context.Context, target TargetIdentity, opts LogOp
 		isTTY = raw.Config.Tty
 	}
 
-	stream := newSDKLogStream(streamCtx, rc, unregister, isTTY, normOpts.Follow)
+	stream := newSDKLogStream(streamCtx, rc, unregister, isTTY, normOpts.Follow, a.operationError)
 	return guardLogStream(streamCtx, stream, a.verifySelfContinuity, a.operationError), nil
 }
 
@@ -576,9 +576,40 @@ func (a *SDKAdapter) Restart(ctx context.Context, target TargetIdentity, opts Re
 	return a.operationError(err)
 }
 
+// sdkLogBody observes faults below bufio and io.ReadFull, both of which may
+// otherwise defer/drop an error co-returned with a complete frame. Reads are
+// serialized by sdkLogStream.mu; Close must remain independent of that lock.
+type sdkLogBody struct {
+	ctx     context.Context
+	reader  io.Reader
+	onError func(error) error
+	fault   error
+}
+
+func (b *sdkLogBody) Read(p []byte) (int, error) {
+	if b.fault != nil {
+		return 0, b.fault
+	}
+	n, err := b.reader.Read(p)
+	if err != nil && !errors.Is(err, io.EOF) {
+		// Body I/O cannot establish a logical missing-target/argument denial;
+		// use the fixed continuity-failure class regardless of transport type.
+		b.fault = ErrBackendFailed
+		// Revoke synchronously before framing, limits or another admission can
+		// acknowledge this read. A local Close/canceled stream is not evidence
+		// of daemon loss and must not invalidate an otherwise healthy proof.
+		if b.ctx.Err() == nil && b.onError != nil {
+			b.fault = b.onError(b.fault)
+		}
+		return 0, b.fault
+	}
+	return n, err
+}
+
 type sdkLogStream struct {
 	ctx        context.Context
 	rc         io.ReadCloser
+	body       *sdkLogBody
 	reader     *bufio.Reader
 	unregister func()
 	tty        bool
@@ -592,13 +623,15 @@ type sdkLogStream struct {
 	closed     atomic.Bool
 }
 
-func newSDKLogStream(ctx context.Context, rc io.ReadCloser, unregister func(), tty, follow bool) *sdkLogStream {
+func newSDKLogStream(ctx context.Context, rc io.ReadCloser, unregister func(), tty, follow bool, onReadError func(error) error) *sdkLogStream {
 	ctx, cancel := context.WithCancel(ctx)
+	body := &sdkLogBody{ctx: ctx, reader: rc, onError: onReadError}
 	s := &sdkLogStream{
 		ctx:        ctx,
 		cancel:     cancel,
 		rc:         rc,
-		reader:     bufio.NewReaderSize(rc, 32*1024),
+		body:       body,
+		reader:     bufio.NewReaderSize(body, 32*1024),
 		unregister: unregister,
 		tty:        tty,
 		follow:     follow,
@@ -640,6 +673,11 @@ func (s *sdkLogStream) Next(ctx context.Context) (LogFrame, error) {
 	} else {
 		frame, err = s.nextMultiplexedFrameLocked()
 	}
+	if s.body.fault != nil {
+		// Synchronous revocation cancels s.ctx; preserve the observed fault
+		// rather than masking it as cancellation or an ordinary output limit.
+		return LogFrame{}, s.body.fault
+	}
 	if errors.Is(err, ErrLogLimitExceeded) || errors.Is(err, ErrBackendFailed) {
 		return LogFrame{}, err
 	}
@@ -663,7 +701,7 @@ func (s *sdkLogStream) nextTTYFrameLocked() (LogFrame, error) {
 	payload := make([]byte, size)
 	// Do not add a buffering layer here: bufio can defer an observed body
 	// error when the remaining response allowance makes this a small read.
-	n, err := s.rc.Read(payload)
+	n, err := s.body.Read(payload)
 	if err != nil && !errors.Is(err, io.EOF) {
 		// A read may report both data and connection loss. Do not acknowledge
 		// that data (or mask the fault with a limit error) before invalidation.

@@ -156,7 +156,7 @@ func TestReviewerCloseInterruptsPendingSDKRead(t *testing.T) {
 	b := &reviewerBlockingBody{entered: make(chan struct{}), release: make(chan struct{})}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	s := newSDKLogStream(ctx, b, cancel, false, true)
+	s := newSDKLogStream(ctx, b, cancel, false, true, nil)
 	readDone := make(chan struct{})
 	go func() { _, _ = s.Next(context.Background()); close(readDone) }()
 	<-b.entered
@@ -181,7 +181,7 @@ func TestReviewerNextContextInterruptsPendingSDKRead(t *testing.T) {
 	b := &reviewerBlockingBody{entered: make(chan struct{}), release: make(chan struct{})}
 	parent, stop := context.WithCancel(context.Background())
 	defer stop()
-	s := newSDKLogStream(parent, b, stop, false, true)
+	s := newSDKLogStream(parent, b, stop, false, true, nil)
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 1)
 	go func() { _, err := s.Next(ctx); done <- err }()
@@ -224,7 +224,7 @@ func TestReviewerReadDoesNotServeBufferedBytesAfterInvalidation(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				stream = newSDKLogStream(ctx, io.NopCloser(bytes.NewReader(encodeMultiplexedFrame(1, []byte("synthetic log payload\n")))), unregister, false, true)
+				stream = newSDKLogStream(ctx, io.NopCloser(bytes.NewReader(encodeMultiplexedFrame(1, []byte("synthetic log payload\n")))), unregister, false, true, nil)
 				invalidate = m.Invalidate
 			} else {
 				ep := mustEndpointID(t)
@@ -261,7 +261,7 @@ func TestReviewerTTYValid40KiBAndExactBytes(t *testing.T) {
 		t.Run("raw", func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			s := newSDKLogStream(ctx, io.NopCloser(strings.NewReader(text)), cancel, true, false)
+			s := newSDKLogStream(ctx, io.NopCloser(strings.NewReader(text)), cancel, true, false, nil)
 			defer func() { _ = s.Close() }()
 			got, err := io.ReadAll(s)
 			if err != nil {

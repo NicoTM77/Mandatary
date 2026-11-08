@@ -62,11 +62,16 @@ reconnect and endpoint changes through that method; this package does not expose
 an event subscription or claim real-Docker integration evidence. `Close` and a
 per-`Next` canceled context interrupt blocked body reads independently of the
 parser lock. Callers must close streams; cancellation discards undelivered bytes.
-TTY body reads reporting bytes **and** a non-EOF error discard those bytes and
-invalidate safety through the stream guard before returning to the caller. This
-also applies near the response cap: raw TTY reads do not introduce a `bufio`
-layer that could defer an already observed error. Ordinary bytes with healthy
-EOF and consumer `Close` do not invalidate a healthy daemon proof.
+Both TTY and multiplexed log bodies observe and latch non-EOF errors **below**
+buffering/framing. A body read reporting bytes **and** a fault discards those
+bytes and synchronously invalidates proof/cancels peers before returning to the
+parser. Neither `bufio` prefetch nor an exactly filled `io.ReadFull` request may
+defer or discard that fault, even when it accompanies complete frames or a
+header exceeding an output limit. Body errors always mean continuity failure,
+not a logical missing-target/invalid-argument denial. Explicit fresh proof is
+required for new operations; revoked old streams never recover. Raw TTY reads
+still avoid an extra buffering layer near the response cap. Ordinary bytes with
+healthy EOF and consumer `Close` do not invalidate a healthy daemon proof.
 
 ## Sanitizer and parameter bounds (TD §§1.1–1.2, 10.2)
 
@@ -142,6 +147,13 @@ entrypoint/command/env projection (`sanitizer_regression_test.go`), and exact ra
 TTY frame/response bounds (`tty_regression_test.go`). F3-R first-delivery body
 faults, parsed-HTTP fixture timing, `Next`/`Read` denial, peer cancellation,
 explicit proof recovery and healthy EOF/local-Close controls are covered by
-`stream_fault_regression_test.go` and `tty_fault_test.go`. All SDK tests inject an
-in-memory HTTP transport; no daemon or socket is used. These are package-level
-fixtures, not completed REST/MCP, deployment, NIST/FIPS or OS×CPU qualification.
+`stream_fault_regression_test.go` and `tty_fault_test.go`. F3-M complete-frame
+synthetic/parsed-HTTP faults via both APIs, caller-buffer preservation, peer
+cancellation, explicit recovery and revoked-old-stream controls are retained in
+`multiplex_fault_regression_test.go` (derived from run378). Exact header/payload
+fills, prefetched frames, error-before-limit ordering and healthy co-returned
+EOF are covered by `multiplex_fault_test.go`; `log_body_test.go` checks the
+sticky, fixed fault classification independently of request-error exceptions.
+All SDK tests inject an in-memory HTTP transport; no daemon or socket is used.
+These are package-level fixtures, not completed REST/MCP, deployment, NIST/FIPS
+or OS×CPU qualification.

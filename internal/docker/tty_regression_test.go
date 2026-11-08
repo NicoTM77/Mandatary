@@ -12,7 +12,7 @@ func TestTTYChunkBoundsPreserveBytes(t *testing.T) {
 	for _, size := range []int{0, 1, 32 * 1024, 40 * 1024, MaxLogFrameBytes, MaxLogFrameBytes + 1, int(MaxLogResponseBytes)} {
 		text := bytes.Repeat([]byte{'x'}, size)
 		ctx, cancel := context.WithCancel(context.Background())
-		s := newSDKLogStream(ctx, io.NopCloser(bytes.NewReader(text)), cancel, true, false)
+		s := newSDKLogStream(ctx, io.NopCloser(bytes.NewReader(text)), cancel, true, false, nil)
 		var got []byte
 		for {
 			f, err := s.Next(ctx)
@@ -34,7 +34,7 @@ func TestTTYChunkBoundsPreserveBytes(t *testing.T) {
 		}
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-	s := newSDKLogStream(ctx, io.NopCloser(bytes.NewReader(bytes.Repeat([]byte{'x'}, int(MaxLogResponseBytes)+1))), cancel, true, false)
+	s := newSDKLogStream(ctx, io.NopCloser(bytes.NewReader(bytes.Repeat([]byte{'x'}, int(MaxLogResponseBytes)+1))), cancel, true, false, nil)
 	defer func() { _ = s.Close() }()
 	got, err := io.ReadAll(s)
 	if !errors.Is(err, ErrLogLimitExceeded) || int64(len(got)) > MaxLogResponseBytes {
