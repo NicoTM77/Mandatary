@@ -168,6 +168,10 @@ P1.05 adds internal password services only; the static server still has no login
 MFA, session, reset or HIBP-configured route. See the [password contract](docs/password-authentication.md)
 for strict original decoding, supported Unicode repertoire, immutable profiles,
 list provenance/updates, privacy, retry limits, migration and the NIST test map.
+P1.12 adds the `internal/docker` intermediary package (`DockerBackend`, official
+`moby/client` adapter, container-free `MockBackend`, `SELF-01`–`SELF-13`
+self-protection state machine, and inspect/log/error sanitizers) without exposing
+HTTP/MCP routes; see the [Docker backend reference](docs/docker-backend.md).
 Copied normalization source needs explicit upstream-advisory review; scanners do
 not automatically identify its parent module. No production footprint budget or
 NIST/FIPS claim changes. In this task's restricted worker, necessary Go race
