@@ -34,7 +34,7 @@ func newRecordCipher(key *MasterKey, installation []byte) (*recordCipher, error)
 	return &recordCipher{key: key, installation: append([]byte(nil), installation...), random: rand.Reader}, nil
 }
 func (c *recordCipher) aad(purpose, id string) ([]byte, error) {
-	if (purpose != "smtp" && purpose != "totp" && purpose != "key-check") || len(id) == 0 || len(id) > 256 {
+	if (purpose != "smtp" && purpose != "totp" && purpose != "key-check" && purpose != "webauthn-challenge" && purpose != "webauthn-credential") || len(id) == 0 || len(id) > 256 {
 		return nil, ErrSecret
 	}
 	data := append([]byte("mandatary/secret/v1"), c.installation...)

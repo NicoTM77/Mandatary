@@ -13,6 +13,12 @@ import (
 // intent, but issues NO replacement, recovery capability, ordinary session or
 // assurance. Removal/binding administration still requires maximum fresh AAL.
 func (l *Lifecycle) ReportTOTPCompromise(ctx context.Context, name string, password []byte, id, ip string) error {
+	return l.reportCompromise(ctx, name, password, id, ip, "totp")
+}
+
+// Both callers select a fixed, internal kind. Report authority is deliberately
+// narrower than removal/replacement and may revoke the last required factor.
+func (l *Lifecycle) reportCompromise(ctx context.Context, name string, password []byte, id, ip, kind string) error {
 	if ctx.Err() != nil || !l.gate.allow(ip, l.now()) {
 		return ErrDenied
 	}
@@ -61,7 +67,7 @@ func (l *Lifecycle) ReportTOTPCompromise(ctx context.Context, name string, passw
 			return ErrDenied
 		}
 		target, e := q.GetAuthenticator(ctx, id)
-		if e != nil || target.UserID != u.ID || target.Kind != "totp" || target.CredentialGeneration != c.CredentialGeneration || target.RevokedAt.Valid || now < target.CreatedAt {
+		if e != nil || target.UserID != u.ID || target.Kind != kind || target.CredentialGeneration != c.CredentialGeneration || target.RevokedAt.Valid || now < target.CreatedAt {
 			return ErrDenied
 		}
 		observedControl, observedUser, observedPassword = c, u, passwordBinding
@@ -74,25 +80,50 @@ func (l *Lifecycle) ReportTOTPCompromise(ctx context.Context, name string, passw
 		}
 		return ErrDenied
 	}
+	logicalDenial := false
 	e = l.repo.Control(ctx, func(q *store.Queries) error {
 		c, e := q.GetInstallationControl(ctx)
-		if e != nil || c != observedControl {
+		if e != nil {
+			return e
+		}
+		if c != observedControl {
+			logicalDenial = true
 			return ErrDenied
 		}
 		u, e := q.GetUser(ctx, proof.UserID)
-		if e != nil || u != observedUser {
+		if e != nil {
+			logicalDenial = authorityReadError(e) == ErrDenied
+			return e
+		}
+		if u != observedUser {
+			logicalDenial = true
 			return ErrDenied
 		}
 		binding, e := q.GetAuthenticator(ctx, proof.AuthenticatorID)
 		now := l.now().Unix()
-		if e != nil || !samePassword(binding, observedPassword) || !activeBinding(c, u, binding, now) || (binding.NextAttemptAt.Valid && now < binding.NextAttemptAt.Int64) {
+		if e != nil {
+			logicalDenial = authorityReadError(e) == ErrDenied
+			return e
+		}
+		if !samePassword(binding, observedPassword) || !activeBinding(c, u, binding, now) || (binding.NextAttemptAt.Valid && now < binding.NextAttemptAt.Int64) {
+			logicalDenial = true
 			return ErrDenied
 		}
 		target, e := q.GetAuthenticator(ctx, id)
-		if e != nil || target.UserID != u.ID || target.Kind != "totp" || target.CredentialGeneration != c.CredentialGeneration || target.RevokedAt.Valid || now < target.CreatedAt {
+		if e != nil {
+			logicalDenial = authorityReadError(e) == ErrDenied
+			return e
+		}
+		if target.UserID != u.ID || target.Kind != kind || target.CredentialGeneration != c.CredentialGeneration || target.RevokedAt.Valid || now < target.CreatedAt {
+			logicalDenial = true
 			return ErrDenied
 		}
-		n, e := q.RevokeTOTP(ctx, store.RevokeTOTPParams{ID: id, Now: nullable(now)})
+		var n int64
+		if kind == "webauthn" {
+			n, e = q.RevokeWebAuthn(ctx, store.RevokeWebAuthnParams{ID: id, Now: nullable(now)})
+		} else {
+			n, e = q.RevokeTOTP(ctx, store.RevokeTOTPParams{ID: id, Now: nullable(now)})
+		}
 		if e != nil || n != 1 {
 			return ErrDenied
 		}
@@ -102,7 +133,7 @@ func (l *Lifecycle) ReportTOTPCompromise(ctx context.Context, name string, passw
 		return l.protectiveIntent(ctx, q, c, u.ID, "authenticator_suspended", now)
 	}, nil)
 	if e != nil {
-		if authorized {
+		if authorized && !logicalDenial {
 			l.repo.FailClosed()
 		}
 		return ErrDenied

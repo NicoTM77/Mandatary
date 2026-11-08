@@ -17,6 +17,10 @@ import (
 // The approved WebAuthn-only policy is deliberately NOT satisfiable by this
 // TOTP continuation; its replacement ceremony belongs to P1.07/08 integration.
 func recoveryAuthority(ctx context.Context, q *store.Queries, secret []byte, now int64) (store.InstallationControl, store.User, store.RecoveryCapability, error) {
+	return recoveryAuthorityFor(ctx, q, secret, now, "totp")
+}
+
+func recoveryAuthorityFor(ctx context.Context, q *store.Queries, secret []byte, now int64, method string) (store.InstallationControl, store.User, store.RecoveryCapability, error) {
 	var c store.InstallationControl
 	var u store.User
 	var cap store.RecoveryCapability
@@ -40,7 +44,7 @@ func recoveryAuthority(ctx context.Context, q *store.Queries, secret []byte, now
 	if e != nil {
 		return deny()
 	}
-	if cap.State != "restricted" || cap.CredentialGeneration != c.CredentialGeneration || cap.SessionGeneration != c.SessionGeneration || now < cap.CreatedAt || now >= cap.ExpiresAt || u.State != "active" || u.Compromised != 0 || u.CredentialGeneration != c.CredentialGeneration || u.AuthorityGeneration != c.AuthorityGeneration || u.PasswordRevision != cap.PasswordRevision || u.MfaRequirement == "webauthn" {
+	if cap.State != "restricted" || cap.CredentialGeneration != c.CredentialGeneration || cap.SessionGeneration != c.SessionGeneration || now < cap.CreatedAt || now >= cap.ExpiresAt || u.State != "active" || u.Compromised != 0 || u.CredentialGeneration != c.CredentialGeneration || u.AuthorityGeneration != c.AuthorityGeneration || u.PasswordRevision != cap.PasswordRevision || (method != "totp" && method != "webauthn") || (u.MfaRequirement == "webauthn" && method != "webauthn") {
 		return deny()
 	}
 	return c, u, cap, nil
