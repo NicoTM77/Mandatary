@@ -110,7 +110,7 @@ func TestConcurrentDecisionBindingPublication(t *testing.T) {
 				case <-v.entered:
 				case <-ctx.Done():
 					close(v.release)
-					<-done
+					_ = <-done // Join the worker before failing the barrier assertion.
 					t.Fatal("snapshot barrier not entered")
 				}
 				if change == "rebind" {

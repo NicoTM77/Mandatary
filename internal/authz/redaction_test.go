@@ -40,7 +40,13 @@ func TestSuccessfulAuthorizationSecretRedaction(t *testing.T) {
 				t.Fatal(err)
 			}
 			defer lease.Release()
-			canaries := []string{secret, hex.EncodeToString([]byte(secret)), base64.StdEncoding.EncodeToString([]byte(secret)), fmt.Sprint([]byte(secret))}
+			canaries := []string{
+				secret,
+				hex.EncodeToString([]byte(secret)),
+				base64.StdEncoding.EncodeToString([]byte(secret)),
+				fmt.Sprintf("%d", []byte(secret)),
+				fmt.Sprintf("%#v", []byte(secret)),
+			}
 			check := func(label, output string) {
 				t.Helper()
 				for _, canary := range canaries {
