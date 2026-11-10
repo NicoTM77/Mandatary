@@ -52,6 +52,16 @@ type Decision struct {
 
 	creds       PrincipalCredentials
 	requireAAL2 bool
+	binding     decisionBinding
+}
+
+// Unlike a policy revision (which permits fresh re-evaluation), these bindings
+// are permanent issuance boundaries. Rebinding even the same backend revokes
+// earlier decisions; re-registering an old instance cannot resurrect them.
+type decisionBinding struct {
+	issuer               *Authorizer
+	backendRevision      uint64
+	invalidationRevision uint64
 }
 
 // Lease represents an active, cancellable authorization handle (e.g., for streaming logs).
@@ -126,7 +136,11 @@ type Authorizer struct {
 	backends    map[domain.EndpointID]docker.DockerBackend
 	leases      map[uint64]*Lease
 	nextLeaseID atomic.Uint64
-	policyEpoch atomic.Uint64
+	// policyEpoch is protected by mu. Never hold mu across storage/backend
+	// evaluation I/O; compare the captured revision at publication instead.
+	policyEpoch          uint64
+	backendRevisions     map[domain.EndpointID]uint64
+	invalidationRevision uint64
 }
 
 // NewAuthorizer constructs a shared default-deny Authorizer.
@@ -152,13 +166,14 @@ func NewAuthorizer(cfg Config) (*Authorizer, error) {
 	}
 
 	az := &Authorizer{
-		repo:     cfg.Repository,
-		clock:    clock,
-		verifier: verifier,
-		backends: backends,
-		leases:   make(map[uint64]*Lease),
+		repo:             cfg.Repository,
+		clock:            clock,
+		verifier:         verifier,
+		backends:         backends,
+		leases:           make(map[uint64]*Lease),
+		backendRevisions: make(map[domain.EndpointID]uint64),
 	}
-	az.policyEpoch.Store(1)
+	az.policyEpoch = 1
 	return az, nil
 }
 
@@ -172,7 +187,8 @@ func (a *Authorizer) RegisterBackend(endpointID domain.EndpointID, backend docke
 	var toCancel []*Lease
 	a.mu.Lock()
 	a.backends[endpointID] = backend
-	a.policyEpoch.Add(1)
+	a.backendRevisions[endpointID]++
+	a.policyEpoch++
 	for _, l := range a.leases {
 		if l.Decision.Target.EndpointID == endpointID {
 			toCancel = append(toCancel, l)
@@ -191,7 +207,8 @@ func (a *Authorizer) RemoveBackend(endpointID domain.EndpointID) {
 	var toCancel []*Lease
 	a.mu.Lock()
 	delete(a.backends, endpointID)
-	a.policyEpoch.Add(1)
+	a.backendRevisions[endpointID]++
+	a.policyEpoch++
 	for _, l := range a.leases {
 		if l.Decision.Target.EndpointID == endpointID {
 			toCancel = append(toCancel, l)
@@ -211,6 +228,13 @@ func (a *Authorizer) getBackend(endpointID domain.EndpointID) (docker.DockerBack
 	return b, ok
 }
 
+// validBindingLocked requires mu to be held for reading or writing.
+func (a *Authorizer) validBindingLocked(dec Decision) bool {
+	return dec.binding.issuer == a &&
+		dec.binding.backendRevision == a.backendRevisions[dec.Target.EndpointID] &&
+		dec.binding.invalidationRevision == a.invalidationRevision
+}
+
 func (a *Authorizer) removeLease(id uint64) {
 	a.mu.Lock()
 	delete(a.leases, id)
@@ -218,10 +242,22 @@ func (a *Authorizer) removeLease(id uint64) {
 }
 
 func (a *Authorizer) cancelMatchingLeases(dec Decision) {
+	a.cancelLeases(dec, true)
+}
+
+// Shared target/safety failures invalidate peers too; local validation and
+// credential failures must not revoke another principal using the same rule.
+func (a *Authorizer) cancelLeases(dec Decision, principalOnly bool) {
 	var toCancel []*Lease
 	a.mu.RLock()
 	for _, l := range a.leases {
-		if l.Decision.Target == dec.Target && l.Decision.Operation == dec.Operation && l.Decision.MatchedPolicyID == dec.MatchedPolicyID {
+		p, other := dec.Principal, l.Decision.Principal
+		samePrincipal := p.Kind == other.Kind && p.UserID == other.UserID &&
+			p.SessionID == other.SessionID && p.AgentID == other.AgentID &&
+			p.AgentCredentialID == other.AgentCredentialID
+		if l.Decision.binding == dec.binding && l.Decision.Target == dec.Target &&
+			l.Decision.Operation == dec.Operation && l.Decision.MatchedPolicyID == dec.MatchedPolicyID &&
+			(!principalOnly || samePrincipal) {
 			toCancel = append(toCancel, l)
 		}
 	}
@@ -250,7 +286,15 @@ func (a *Authorizer) Authorize(ctx context.Context, req AuthorizeRequest) (Decis
 		return Decision{}, newForbidden(ReasonSelfProtected)
 	}
 
-	backend, hasBackend := a.getBackend(req.EndpointID)
+	a.mu.RLock()
+	backend, hasBackend := a.backends[req.EndpointID]
+	epoch := a.policyEpoch
+	binding := decisionBinding{
+		issuer:               a,
+		backendRevision:      a.backendRevisions[req.EndpointID],
+		invalidationRevision: a.invalidationRevision,
+	}
+	a.mu.RUnlock()
 	if !hasBackend || backend == nil || !backend.Ready() || backend.VerificationState() != docker.StateVerified {
 		return Decision{}, newForbidden(ReasonSafetyUnverified)
 	}
@@ -286,7 +330,6 @@ func (a *Authorizer) Authorize(ctx context.Context, req AuthorizeRequest) (Decis
 	}
 
 	now := a.clock()
-	epoch := a.policyEpoch.Load()
 
 	var decision Decision
 	var decisionErr error
@@ -388,6 +431,7 @@ func (a *Authorizer) Authorize(ctx context.Context, req AuthorizeRequest) (Decis
 			DecidedAt:       now,
 			creds:           req.Principal,
 			requireAAL2:     req.RequireAAL2,
+			binding:         binding,
 		}
 		return nil
 	})
@@ -400,7 +444,12 @@ func (a *Authorizer) Authorize(ctx context.Context, req AuthorizeRequest) (Decis
 	}
 
 	// Final safety check so concurrent continuity loss during policy evaluation cannot allow.
-	currentBackend, ok := a.getBackend(req.EndpointID)
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	if ctx.Err() != nil || epoch != a.policyEpoch {
+		return Decision{}, newForbidden(ReasonDecisionStale)
+	}
+	currentBackend, ok := a.backends[req.EndpointID]
 	if !ok || currentBackend != backend || !backend.Ready() || backend.VerificationState() != docker.StateVerified {
 		return Decision{}, newForbidden(ReasonSafetyUnverified)
 	}
@@ -571,16 +620,23 @@ func (a *Authorizer) ValidateDecision(ctx context.Context, dec Decision) error {
 		return newForbidden(ReasonDecisionStale)
 	}
 
-	backend, ok := a.getBackend(dec.Target.EndpointID)
+	a.mu.RLock()
+	backend, ok := a.backends[dec.Target.EndpointID]
+	epoch := a.policyEpoch
+	bound := a.validBindingLocked(dec)
+	a.mu.RUnlock()
+	if !bound {
+		return newForbidden(ReasonDecisionStale)
+	}
 	if !ok || backend == nil || !backend.Ready() || backend.VerificationState() != docker.StateVerified {
-		a.cancelMatchingLeases(dec)
+		a.cancelLeases(dec, false)
 		return newForbidden(ReasonSafetyUnverified)
 	}
 
 	// Resolve target strictly by immutable 64-hex ContainerID.
 	currentTarget, err := backend.ResolveTarget(ctx, string(dec.Target.ContainerID))
 	if err != nil {
-		a.cancelMatchingLeases(dec)
+		a.cancelLeases(dec, ctx.Err() != nil)
 		if errors.Is(err, docker.ErrProtectedTarget) {
 			return newForbidden(ReasonSelfProtected)
 		}
@@ -590,12 +646,16 @@ func (a *Authorizer) ValidateDecision(ctx context.Context, dec Decision) error {
 		return newForbidden(ReasonDecisionStale)
 	}
 	if docker.HasProtectedNamespaceLabel(currentTarget.Labels) {
-		a.cancelMatchingLeases(dec)
+		a.cancelLeases(dec, false)
 		return newForbidden(ReasonSelfProtected)
 	}
 
 	now := a.clock()
 	var validateErr error
+	if now.Before(dec.DecidedAt) {
+		a.cancelMatchingLeases(dec)
+		return newForbidden(ReasonDecisionStale)
+	}
 
 	readErr := a.repo.Read(ctx, func(q *store.Queries) error {
 		control, err := q.GetInstallationControl(ctx)
@@ -659,8 +719,16 @@ func (a *Authorizer) ValidateDecision(ctx context.Context, dec Decision) error {
 		a.cancelMatchingLeases(dec)
 		return validateErr
 	}
-	if !backend.Ready() || backend.VerificationState() != docker.StateVerified {
+	a.mu.RLock()
+	stale := ctx.Err() != nil || epoch != a.policyEpoch || !a.validBindingLocked(dec) || a.backends[dec.Target.EndpointID] != backend
+	safe := backend.Ready() && backend.VerificationState() == docker.StateVerified
+	a.mu.RUnlock()
+	if stale {
 		a.cancelMatchingLeases(dec)
+		return newForbidden(ReasonDecisionStale)
+	}
+	if !safe {
+		a.cancelLeases(dec, false)
 		return newForbidden(ReasonSafetyUnverified)
 	}
 	return nil
@@ -684,6 +752,11 @@ func (a *Authorizer) AcquireLease(ctx context.Context, req AuthorizeRequest) (*L
 	}
 
 	a.mu.Lock()
+	if ctx.Err() != nil || dec.PolicyEpoch != a.policyEpoch || !a.validBindingLocked(dec) {
+		a.mu.Unlock()
+		cancel()
+		return nil, newForbidden(ReasonDecisionStale)
+	}
 	a.leases[id] = lease
 	a.mu.Unlock()
 
@@ -694,20 +767,26 @@ func (a *Authorizer) AcquireLease(ctx context.Context, req AuthorizeRequest) (*L
 		return nil, err
 	}
 
+	a.mu.RLock()
+	stale := leaseCtx.Err() != nil || dec.PolicyEpoch != a.policyEpoch || !a.validBindingLocked(dec)
+	a.mu.RUnlock()
+	if stale {
+		lease.Release()
+		return nil, newForbidden(ReasonDecisionStale)
+	}
 	return lease, nil
 }
 
 // NotifyPolicyChange advances the policy epoch and revalidates all active Leases,
 // immediately canceling any Lease whose authorization is no longer valid (TD §3.4).
 func (a *Authorizer) NotifyPolicyChange(ctx context.Context) error {
-	a.policyEpoch.Add(1)
-
-	a.mu.RLock()
+	a.mu.Lock()
+	a.policyEpoch++
 	snapshot := make([]*Lease, 0, len(a.leases))
 	for _, l := range a.leases {
 		snapshot = append(snapshot, l)
 	}
-	a.mu.RUnlock()
+	a.mu.Unlock()
 
 	for _, l := range snapshot {
 		_ = l.Revalidate(ctx)
@@ -717,9 +796,9 @@ func (a *Authorizer) NotifyPolicyChange(ctx context.Context) error {
 
 // InvalidateAll unconditionally cancels and removes all active Leases.
 func (a *Authorizer) InvalidateAll() {
-	a.policyEpoch.Add(1)
-
 	a.mu.Lock()
+	a.policyEpoch++
+	a.invalidationRevision++
 	snapshot := make([]*Lease, 0, len(a.leases))
 	for _, l := range a.leases {
 		snapshot = append(snapshot, l)

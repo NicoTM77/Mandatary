@@ -132,6 +132,29 @@ operational requests against the missing target deny with `ReasonTargetMissing`.
 - `NotifyPolicyChange` increments the policy epoch and revalidates all active
   leases, immediately canceling any lease whose authorization was revoked or
   tightened while preserving unrelated valid leases.
+- Policy writers must commit first, then call `NotifyPolicyChange` before
+  acknowledging the change. A mutex-protected revision fences evaluations that
+  overlap notification, backend replacement, or explicit invalidation: stale
+  SQLite snapshots cannot publish a successful decision or validation afterward.
+  Lease registration and publication check the same revision. I/O is not
+  performed under the revision writer lock. Overlapping evaluations may deny
+  conservatively; unchanged existing leases can re-evaluate against fresh policy.
+- Decisions are private issuance-bound handles: validation requires the issuing
+  authorizer, endpoint backend revision, and explicit invalidation revision.
+  Rebinding even the same backend, remove/re-register, and `InvalidateAll` cannot
+  resurrect an old decision. A policy epoch change alone permits fresh dynamic
+  re-evaluation, rather than permanently revoking unrelated valid handles.
+- Local validation cancellation and credential failure cancel only matching
+  principal/session/credential leases, not peers using the same group policy.
+  Shared backend/target failures still cancel affected peers; policy notification
+  revalidates every active lease.
+- Future session creation/authentication/activity or token issuance, negative
+  idle ages, and validation before a decision's issuance time deny. This is
+  bounded detection of observable clock uncertainty, **not** a trustworthy-time
+  source or malicious full-host rollback guarantee.
+- Successful `Decision` and `*Lease` handles redact all `fmt` verbs and implement
+  `slog.LogValuer`; private verification credentials are never log projections.
+  Handles are trusted in-process values, not serialized capability tokens.
 - `RegisterBackend`, `RemoveBackend`, `InvalidateAll`, and `Close` immediately
   cancel affected active leases.
 
@@ -151,6 +174,11 @@ operational requests against the missing target deny with `ReasonTargetMissing`.
 | Deterministic clock expiry boundaries (session absolute/idle expiry, agent token expiry & rotation overlap) | `TestDeterministicClockExpiryBoundaries` (`invalidation_test.go`) | C2 |
 | Policy change invalidation of active leases (`log_tail_max` tightening, `DENY` insertion, group disable, restore quarantine) | `TestPolicyChangeInvalidatesActiveAuthorizations` (`invalidation_test.go`) | P1.13, P1.15 (policy CRUD) |
 | Concurrent `Authorize` / `AcquireLease` / `NotifyPolicyChange` race safety | `TestConcurrentAuthorizeAndPolicyInvalidationRace` (`invalidation_test.go`) | P1.13 |
+| Revocation publication fence with held real SQLite snapshots and zero post-revocation dispatch | `TestPolicyRevocationPublicationFence` (`publication_test.go`) | P1.13 dispatch integration |
+| Permanent issuer/backend/invalidation bindings; sequential and concurrent rebind/invalidation | `TestDecisionIssuingBindings`, `TestConcurrentDecisionBindingPublication` (`binding_test.go`) | SELF-13, P1.13 |
+| Principal-local failure isolation and shared-failure cancellation | `TestSharedPolicyLeaseFailureIsolation` (`lease_isolation_test.go`) | C2, P1.13 |
+| Observable clock rollback and future evidence denial with healthy boundary controls | `TestObservableClockRollbackDenies` (`clock_rollback_test.go`), existing expiry/overlap suite | RESTORE-04 bounded domain enforcement; P1.18 owns actual restore |
+| Human/agent success-path decision/lease `fmt`, JSON and text/JSON structured-log canaries | `TestSuccessfulAuthorizationSecretRedaction` (`redaction_test.go`) | TD §9.3; P1.13/P1.14 adapters |
 | **C1** integrated substrate gate (fresh/reopened SQLite + `MasterKey` secret store + tamper checks + `Authorizer` + `MockBackend` + log redaction + 0 operational calls on rejected fixtures) | `TestC1IntegratedSubstrateCheckpoint` (`c1_substrate_test.go`) | Independent reviewer gate check; P1.13/P1.14 |
 
 ## `SELF-01`–`SELF-13` service-level coverage and remaining boundaries

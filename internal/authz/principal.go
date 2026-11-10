@@ -189,10 +189,16 @@ func verifyUserSession(
 	if sess.SessionGeneration <= 0 || sess.SessionGeneration != control.SessionGeneration {
 		return VerifiedPrincipal{}, newUnauthenticated(ReasonUnauthenticated)
 	}
+	// Observable future evidence is clock uncertainty, not a new validity window.
+	// This detects bounded rollback; it is not protection from a malicious host.
+	if sess.CreatedAt > nowUnix || sess.AuthenticatedAt.Int64 > nowUnix || sess.LastActivityAt > nowUnix {
+		return VerifiedPrincipal{}, newUnauthenticated(ReasonUnauthenticated)
+	}
 	if sess.ExpiresAt <= sess.CreatedAt || nowUnix >= sess.ExpiresAt {
 		return VerifiedPrincipal{}, newUnauthenticated(ReasonUnauthenticated)
 	}
-	if sess.IdleTimeoutSeconds <= 0 || nowUnix-sess.LastActivityAt >= sess.IdleTimeoutSeconds {
+	idleAge := nowUnix - sess.LastActivityAt
+	if sess.IdleTimeoutSeconds <= 0 || idleAge < 0 || idleAge >= sess.IdleTimeoutSeconds {
 		return VerifiedPrincipal{}, newUnauthenticated(ReasonUnauthenticated)
 	}
 
@@ -345,7 +351,7 @@ func verifyAgentToken(
 		return VerifiedPrincipal{}, newUnauthenticated(ReasonUnauthenticated)
 	}
 
-	if cred.State != "active" || cred.RevokedAt.Valid {
+	if cred.State != "active" || cred.RevokedAt.Valid || cred.IssuedAt > nowUnix {
 		return VerifiedPrincipal{}, newUnauthenticated(ReasonUnauthenticated)
 	}
 	if cred.CredentialGeneration <= 0 || cred.CredentialGeneration != control.CredentialGeneration {
