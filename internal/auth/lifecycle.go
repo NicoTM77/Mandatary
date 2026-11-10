@@ -144,12 +144,13 @@ func freshSession(ctx context.Context, q *store.Queries, secret []byte, now int6
 	if e != nil {
 		return c, u, s, e
 	}
-	required := int64(1)
-	for _, a := range all {
-		if (a.Kind == "totp" || a.Kind == "webauthn") && a.BoundAt.Valid && !a.RevokedAt.Valid && a.CredentialGeneration == c.CredentialGeneration {
-			required = 2
-		}
+	admin, e := isAdministrator(ctx, q, u.ID)
+	if e != nil {
+		return c, u, s, e
 	}
+	// The shared floor (assurance_floor.go): unavailable or protectively
+	// invalidated bound factors keep it at 2; only deliberate retirement lowers it.
+	required := assuranceFloor(c, u, admin, all)
 	if s.AchievedAssurance < required || (u.MfaRequirement == "webauthn" && (s.Methods != 8 || s.PhishingResistant != 1)) {
 		return deny()
 	}
@@ -440,7 +441,9 @@ func (l *Lifecycle) RevokeTOTP(ctx context.Context, session []byte, id string) e
 			return e
 		}
 		now := l.now().Unix()
-		n, e := q.RevokeTOTP(ctx, store.RevokeTOTPParams{ID: id, Now: nullable(now)})
+		// authorize() above passed freshSession: this removal is backed by fresh
+		// maximum-account-assurance evidence, recorded in the same statement.
+		n, e := q.RevokeTOTP(ctx, store.RevokeTOTPParams{ID: id, Now: nullable(now), Reason: retireAuthorized})
 		if e != nil || n != 1 {
 			return ErrDenied
 		}

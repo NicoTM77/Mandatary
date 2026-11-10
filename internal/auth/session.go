@@ -83,9 +83,17 @@ type SessionInfo struct {
 	Assurance         Assurance
 	Methods           []string
 	PhishingResistant bool
-	// MaxAssurance is the highest assurance this ACCOUNT can currently reach
-	// (2 if it has a live bound TOTP/WebAuthn factor), not what this session has.
-	MaxAssurance    int64
+	// RequiredAssurance is the account's required-assurance FLOOR (1 or 2): what
+	// a maximum-available sensitive write demands, derived by assuranceFloor
+	// from bound factors and their retirement provenance. It is the only value
+	// RequireSensitive gates on. An unavailable, exhausted, expired or protectively
+	// invalidated factor keeps it at 2. Zero (unset) is denied, never defaulted.
+	RequiredAssurance int64
+	// UsableAssurance is the highest assurance the account can PROVE right now
+	// with usable factors (2 only when a live second factor exists). It is
+	// capability for the step-up hint and the SPA, never permission to lower
+	// RequiredAssurance or to downgrade a gate.
+	UsableAssurance int64
 	AuthenticatedAt time.Time
 	CreatedAt       time.Time
 	ExpiresAt       time.Time

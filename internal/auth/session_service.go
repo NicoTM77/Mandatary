@@ -67,9 +67,12 @@ type accountView struct {
 	user        store.User
 	admin       bool
 	hasPassword bool
-	password    store.Authenticator
-	totp        map[string]store.Authenticator
-	keys        map[string]store.Authenticator
+	// floor is the REQUIRED assurance (assuranceFloor): what a maximum-available
+	// sensitive write needs. It is independent of which factors are usable now.
+	floor    int64
+	password store.Authenticator
+	totp     map[string]store.Authenticator
+	keys     map[string]store.Authenticator
 }
 
 func loadAccount(ctx context.Context, q *store.Queries, c store.InstallationControl, userID string, now int64) (accountView, error) {
@@ -87,17 +90,14 @@ func loadAccount(ctx context.Context, q *store.Queries, c store.InstallationCont
 		return v, ErrDenied
 	}
 	v.user = u
-	roles, e := q.ListUserAdministrativeRoles(ctx, u.ID)
-	if e != nil {
+	if v.admin, e = isAdministrator(ctx, q, u.ID); e != nil {
 		return v, e
-	}
-	for _, r := range roles {
-		v.admin = v.admin || r.State != "disabled"
 	}
 	all, e := q.ListUserAuthenticators(ctx, u.ID)
 	if e != nil {
 		return v, e
 	}
+	v.floor = assuranceFloor(c, u, v.admin, all)
 	v.totp, v.keys = map[string]store.Authenticator{}, map[string]store.Authenticator{}
 	for _, a := range all {
 		switch a.Kind {
@@ -132,15 +132,29 @@ func (a accountView) hasSecondFactor() bool {
 	return (a.allowsTOTP() && len(a.totp) > 0) || len(a.keys) > 0
 }
 
-// maxAssurance is the highest assurance THIS ACCOUNT can reach now (NIST E03).
-func (a accountView) maxAssurance() int64 {
+// usableAssurance is the highest assurance this account can PROVE right now with
+// currently usable factors. It is informational capability only (the step-up
+// hint). It must never decide a gate or permit a downgrade: that is the floor.
+func (a accountView) usableAssurance() int64 {
 	if a.hasSecondFactor() {
 		return 2
 	}
 	return 1
 }
+
+// passwordOnlyAllowed is the policy question "may this account hold a lower-
+// assurance (password-only) session at all": optional MFA, long password.
 func (a accountView) passwordOnlyAllowed() bool {
 	return a.hasPassword && !a.mfaRequired() && a.password.PasswordCodepoints.Valid && a.password.PasswordCodepoints.Int64 >= 15
+}
+
+// lowerAssuranceUsable additionally requires that the lower-assurance session
+// is not a stranded one: with a required floor of 2 and no usable second factor
+// the account could never step up, so password evidence alone gets NO session
+// (a protective report or exhausted factor must not turn into password-only
+// access, NIST E12/I08/D-04). Recovery is the approved way back.
+func (a accountView) lowerAssuranceUsable() bool {
+	return a.passwordOnlyAllowed() && (a.floor < 2 || a.hasSecondFactor())
 }
 
 // next lists only what policy permits after a correct password.
@@ -165,8 +179,10 @@ type evidence struct {
 	phishing       bool
 	authenticators []string
 	idle, lifetime time.Duration
-	// max is the highest assurance the account can currently reach (info only).
-	max int64
+	// usable (capability, informational) and required (the floor, which gates
+	// sensitive writes) are copied into the session view; neither is stored or
+	// read from the client.
+	usable, required int64
 }
 
 func methodLabels(methods int64) []string {
@@ -249,7 +265,7 @@ func (s *Sessions) issue(ctx context.Context, q *store.Queries, c store.Installa
 		}
 		remaining--
 	}
-	info := SessionInfo{ID: id, UserID: userID, Methods: methodLabels(ev.methods), PhishingResistant: ev.phishing, MaxAssurance: ev.max, CreatedAt: time.Unix(now, 0), ExpiresAt: time.Unix(expires, 0), LastActivityAt: time.Unix(now, 0)}
+	info := SessionInfo{ID: id, UserID: userID, Methods: methodLabels(ev.methods), PhishingResistant: ev.phishing, UsableAssurance: ev.usable, RequiredAssurance: ev.required, CreatedAt: time.Unix(now, 0), ExpiresAt: time.Unix(expires, 0), LastActivityAt: time.Unix(now, 0)}
 	switch {
 	case ev.purpose == "preauth":
 		info.Assurance, info.Methods = AssurancePreauth, []string{}
@@ -327,6 +343,11 @@ func (s *Sessions) verifySession(ctx context.Context, q *store.Queries, secret [
 	if acct.mfaRequired() && row.AchievedAssurance < 2 {
 		return c, row, acct, ErrDenied
 	}
+	// A lower-assurance session on an account that requires 2 is only meaningful
+	// while a usable second factor exists to step up with.
+	if row.AchievedAssurance < 2 && !acct.lowerAssuranceUsable() {
+		return c, row, acct, ErrDenied
+	}
 	if acct.user.MfaRequirement == "webauthn" && (row.AchievedAssurance != 2 || row.Methods != evidenceWebAuthnUV || row.PhishingResistant != 1) {
 		return c, row, acct, ErrDenied
 	}
@@ -337,7 +358,7 @@ func (s *Sessions) viewOf(row store.Session, acct accountView, secret []byte) Se
 	at := authTime(row)
 	info := SessionInfo{
 		ID: row.ID, UserID: row.UserID, Methods: methodLabels(row.Methods), PhishingResistant: row.PhishingResistant == 1,
-		MaxAssurance: acct.maxAssurance(), CreatedAt: time.Unix(row.CreatedAt, 0), ExpiresAt: time.Unix(row.ExpiresAt, 0), LastActivityAt: time.Unix(row.LastActivityAt, 0),
+		UsableAssurance: acct.usableAssurance(), RequiredAssurance: acct.floor, CreatedAt: time.Unix(row.CreatedAt, 0), ExpiresAt: time.Unix(row.ExpiresAt, 0), LastActivityAt: time.Unix(row.LastActivityAt, 0),
 	}
 	if at.Valid {
 		info.AuthenticatedAt = time.Unix(at.Int64, 0)
@@ -458,8 +479,8 @@ func (s *Sessions) PasswordLogin(ctx context.Context, name string, password []by
 		}
 		next := acct.next()
 		switch {
-		case !acct.mfaRequired() && !acct.hasSecondFactor() && acct.passwordOnlyAllowed() && !proof.RequiresMFA:
-			issued, e := s.issue(ctx, q, c, acct.user.ID, evidence{purpose: "normal", assurance: 1, methods: evidencePassword, authenticators: []string{acct.password.ID}, idle: s.settings.Idle, lifetime: s.settings.Absolute, max: 1}, now)
+		case !acct.hasSecondFactor() && acct.lowerAssuranceUsable() && !proof.RequiresMFA:
+			issued, e := s.issue(ctx, q, c, acct.user.ID, evidence{purpose: "normal", assurance: 1, methods: evidencePassword, authenticators: []string{acct.password.ID}, idle: s.settings.Idle, lifetime: s.settings.Absolute, usable: 1, required: acct.floor}, now)
 			if e != nil {
 				return e
 			}
@@ -492,10 +513,10 @@ func (s *Sessions) LoginWithoutMFA(ctx context.Context, preauth []byte) (IssuedS
 		if e != nil {
 			return e
 		}
-		if !acct.passwordOnlyAllowed() {
+		if !acct.lowerAssuranceUsable() {
 			return ErrDenied
 		}
-		out, e = s.issue(ctx, q, c, acct.user.ID, evidence{purpose: "normal", assurance: 1, methods: evidencePassword, authenticators: []string{acct.password.ID}, idle: s.settings.Idle, lifetime: s.settings.Absolute, max: acct.maxAssurance()}, now, row.ID)
+		out, e = s.issue(ctx, q, c, acct.user.ID, evidence{purpose: "normal", assurance: 1, methods: evidencePassword, authenticators: []string{acct.password.ID}, idle: s.settings.Idle, lifetime: s.settings.Absolute, usable: acct.usableAssurance(), required: acct.floor}, now, row.ID)
 		return e
 	})
 	if err != nil {
@@ -541,7 +562,7 @@ func (s *Sessions) LoginTOTP(ctx context.Context, preauth []byte, authenticatorI
 		if current.ID != row.ID || proof.UserID != acct.user.ID || !acct.usableTOTP(proof.AuthenticatorID) {
 			return ErrDenied
 		}
-		out, e = s.issue(ctx, q, c, acct.user.ID, evidence{purpose: "normal", assurance: 2, methods: evidencePassword | evidenceTOTP, authenticators: []string{acct.password.ID, proof.AuthenticatorID}, idle: s.settings.Idle, lifetime: s.settings.Absolute, max: 2}, now, current.ID)
+		out, e = s.issue(ctx, q, c, acct.user.ID, evidence{purpose: "normal", assurance: 2, methods: evidencePassword | evidenceTOTP, authenticators: []string{acct.password.ID, proof.AuthenticatorID}, idle: s.settings.Idle, lifetime: s.settings.Absolute, usable: 2, required: acct.floor}, now, current.ID)
 		return e
 	})
 	if err != nil {
@@ -583,7 +604,7 @@ func (s *Sessions) LoginWebAuthn(ctx context.Context, preauth []byte, challengeI
 		if current.ID != row.ID || proof.UserID != acct.user.ID || !acct.usableKey(proof.AuthenticatorID) {
 			return ErrDenied
 		}
-		out, e = s.issue(ctx, q, c, acct.user.ID, evidence{purpose: "normal", assurance: 2, methods: evidenceWebAuthnUV, phishing: true, authenticators: []string{acct.password.ID, proof.AuthenticatorID}, idle: s.settings.Idle, lifetime: s.settings.Absolute, max: 2}, now, current.ID)
+		out, e = s.issue(ctx, q, c, acct.user.ID, evidence{purpose: "normal", assurance: 2, methods: evidenceWebAuthnUV, phishing: true, authenticators: []string{acct.password.ID, proof.AuthenticatorID}, idle: s.settings.Idle, lifetime: s.settings.Absolute, usable: 2, required: acct.floor}, now, current.ID)
 		return e
 	})
 	if err != nil {
@@ -624,7 +645,7 @@ func (s *Sessions) stepUp(ctx context.Context, secret []byte, prior store.Sessio
 		if ev.assurance < current.AchievedAssurance || (current.PhishingResistant == 1 && !ev.phishing) {
 			return ErrDenied
 		}
-		ev.idle, ev.lifetime, ev.max = s.settings.Idle, s.settings.Absolute, acct.maxAssurance()
+		ev.idle, ev.lifetime, ev.usable, ev.required = s.settings.Idle, s.settings.Absolute, acct.usableAssurance(), acct.floor
 		ev.purpose = "normal"
 		out, e = s.issue(ctx, q, c, acct.user.ID, ev, now, current.ID)
 		return e
@@ -643,7 +664,7 @@ func (s *Sessions) StepUpPassword(ctx context.Context, secret, password []byte, 
 	if err != nil {
 		return IssuedSession{}, err
 	}
-	if acct.mfaRequired() || acct.hasSecondFactor() || !acct.passwordOnlyAllowed() {
+	if acct.floor >= 2 || acct.hasSecondFactor() || !acct.passwordOnlyAllowed() {
 		return IssuedSession{}, ErrDenied
 	}
 	proof, err := s.l.passwords.Prove(ctx, acct.user.Username, password, ip)
@@ -651,7 +672,7 @@ func (s *Sessions) StepUpPassword(ctx context.Context, secret, password []byte, 
 		return IssuedSession{}, ErrDenied
 	}
 	return s.stepUp(ctx, secret, prior, evidence{assurance: 1, methods: evidencePassword, authenticators: []string{proof.AuthenticatorID}}, func(a accountView) bool {
-		return !a.mfaRequired() && !a.hasSecondFactor() && a.passwordOnlyAllowed() && a.password.ID == proof.AuthenticatorID
+		return a.floor < 2 && !a.hasSecondFactor() && a.passwordOnlyAllowed() && a.password.ID == proof.AuthenticatorID
 	})
 }
 

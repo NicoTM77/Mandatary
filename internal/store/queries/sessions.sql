@@ -15,7 +15,8 @@ UPDATE sessions SET state='revoked',revoked_at=max(created_at,CAST(sqlc.arg(now)
 
 -- name: TouchSession :execrows
 UPDATE sessions SET last_activity_at=sqlc.arg(now)
-WHERE id=sqlc.arg(id) AND state='active' AND revoked_at IS NULL AND last_activity_at<=sqlc.arg(now) AND sqlc.arg(now)<expires_at;
+WHERE id=sqlc.arg(id) AND state='active' AND revoked_at IS NULL AND last_activity_at<=sqlc.arg(now) AND sqlc.arg(now)<expires_at
+AND sqlc.arg(now)-last_activity_at<idle_timeout_seconds;
 
 -- name: ListLiveUserSessions :many
 SELECT id,purpose,created_at FROM sessions

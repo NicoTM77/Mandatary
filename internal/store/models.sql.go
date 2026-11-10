@@ -188,7 +188,7 @@ func (q *Queries) GetAgent(ctx context.Context, id string) (Agent, error) {
 }
 
 const getAuthenticator = `-- name: GetAuthenticator :one
-SELECT id, user_id, kind, state, credential_generation, created_at, bound_at, changed_at, revoked_at, expires_at, verifier_hash, encrypted_secret, public_key, external_credential_id, password_codepoints, password_format, max_assurance, phishing_resistant, retry_ceiling, failed_attempts, next_attempt_at, last_accepted_totp_step, sign_count, backup_eligible, backup_state, user_verified, totp_algorithm, recovery_batch_id FROM authenticators WHERE id = ?
+SELECT id, user_id, kind, state, credential_generation, created_at, bound_at, changed_at, revoked_at, expires_at, verifier_hash, encrypted_secret, public_key, external_credential_id, password_codepoints, password_format, max_assurance, phishing_resistant, retry_ceiling, failed_attempts, next_attempt_at, last_accepted_totp_step, sign_count, backup_eligible, backup_state, user_verified, totp_algorithm, recovery_batch_id, retirement_reason FROM authenticators WHERE id = ?
 `
 
 func (q *Queries) GetAuthenticator(ctx context.Context, id string) (Authenticator, error) {
@@ -223,6 +223,7 @@ func (q *Queries) GetAuthenticator(ctx context.Context, id string) (Authenticato
 		&i.UserVerified,
 		&i.TotpAlgorithm,
 		&i.RecoveryBatchID,
+		&i.RetirementReason,
 	)
 	return i, err
 }
@@ -246,7 +247,7 @@ func (q *Queries) GetInstallationControl(ctx context.Context) (InstallationContr
 }
 
 const getLocalBinding = `-- name: GetLocalBinding :one
-SELECT id, user_id, kind, state, credential_generation, created_at, bound_at, changed_at, revoked_at, expires_at, verifier_hash, encrypted_secret, public_key, external_credential_id, password_codepoints, password_format, max_assurance, phishing_resistant, retry_ceiling, failed_attempts, next_attempt_at, last_accepted_totp_step, sign_count, backup_eligible, backup_state, user_verified, totp_algorithm, recovery_batch_id FROM authenticators WHERE user_id = ? AND kind = 'password' AND state = 'active'
+SELECT id, user_id, kind, state, credential_generation, created_at, bound_at, changed_at, revoked_at, expires_at, verifier_hash, encrypted_secret, public_key, external_credential_id, password_codepoints, password_format, max_assurance, phishing_resistant, retry_ceiling, failed_attempts, next_attempt_at, last_accepted_totp_step, sign_count, backup_eligible, backup_state, user_verified, totp_algorithm, recovery_batch_id, retirement_reason FROM authenticators WHERE user_id = ? AND kind = 'password' AND state = 'active'
 `
 
 func (q *Queries) GetLocalBinding(ctx context.Context, userID string) (Authenticator, error) {
@@ -281,6 +282,7 @@ func (q *Queries) GetLocalBinding(ctx context.Context, userID string) (Authentic
 		&i.UserVerified,
 		&i.TotpAlgorithm,
 		&i.RecoveryBatchID,
+		&i.RetirementReason,
 	)
 	return i, err
 }

@@ -85,9 +85,9 @@ const (
 )
 
 // sensitivePolicy: aal2 operations need AAL2 evidence outright; the others need
-// the ACCOUNT's maximum available assurance (NIST E03), so a genuinely AAL1-only
-// account re-verifies its password while an AAL2-capable account never can with a
-// password alone.
+// the account's required-assurance floor (NIST E03), so a genuinely AAL1-only
+// account re-verifies its password while an account that is or was AAL2-capable
+// and has not deliberately retired its factors never can with a password alone.
 type sensitivePolicy struct{ aal2 bool }
 
 var sensitivePolicies = map[SensitiveOperation]sensitivePolicy{
@@ -127,15 +127,19 @@ func (s *Sessions) RequireSensitive(info SessionInfo, op SensitiveOperation) err
 	if info.AuthenticatedAt.IsZero() || info.AuthenticatedAt.After(now) {
 		return ErrDenied // absent or future time is clock uncertainty
 	}
+	// The floor is server-derived and shared with login and the lifecycle gate.
+	// An unset/out-of-range value is denied rather than defaulted to AAL1.
+	if info.RequiredAssurance < 1 || info.RequiredAssurance > 2 {
+		return ErrDenied
+	}
 	required := int64(2)
 	if !policy.aal2 {
-		required = info.MaxAssurance
-		if required < 1 {
-			required = 1
-		}
+		required = info.RequiredAssurance
 	}
 	if have < required {
-		if info.MaxAssurance >= required {
+		// Only a usable factor makes a re-authentication worthwhile; capability
+		// never lowers `required`.
+		if info.UsableAssurance >= required {
 			return ErrStepUpRequired
 		}
 		return ErrAssuranceUnavailable
@@ -185,7 +189,10 @@ func (b *Browser) Handle(pattern string, p RoutePolicy, h http.Handler) (err err
 		return ErrDenied
 	}
 	if p.Sensitive != "" {
-		if _, known := sensitivePolicies[p.Sensitive]; !known || p.Require != RequireSession {
+		// A sensitive class names a mutation. Safe methods skip the Origin and
+		// CSRF checks by design, so a sensitive class may only sit on an unsafe
+		// method; a read of sensitive data is not expressible here.
+		if _, known := sensitivePolicies[p.Sensitive]; !known || p.Require != RequireSession || method == http.MethodGet {
 			return ErrDenied
 		}
 	}
@@ -434,7 +441,8 @@ func (b *Browser) SessionInfoHandler() http.Handler {
 			"assurance":          session.Assurance,
 			"methods":            session.Methods,
 			"phishing_resistant": session.PhishingResistant,
-			"max_assurance":      session.MaxAssurance,
+			"required_assurance": session.RequiredAssurance,
+			"usable_assurance":   session.UsableAssurance,
 			"authenticated_at":   session.AuthenticatedAt.Unix(),
 			"expires_at":         session.ExpiresAt.Unix(),
 			"csrf_token":         session.CSRFToken(),

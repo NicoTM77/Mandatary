@@ -254,6 +254,17 @@ Secure/HttpOnly/SameSite=Strict cookie, exact Origin + per-session CSRF + JSON
 content type, strict API CSP and headers, 12h/30m clocks, 15-minute inclusive
 step-up with successor-session rotation, and negative plus step-up-positive tests
 for every declared sensitive class and every session-gated lifecycle mutation.
+Rework (reviewer F1/F2, Nico-approved bounded migration): a single
+required-assurance floor, separate from the factors currently usable, now decides
+login issuance, the session gate, step-up and `freshSession`, so a password-only
+compromise report (E12/I08), an exhausted/expired factor or a pre-migration
+ambiguous revocation can never lower the gate and unlock replacement,
+recovery-code issuance or other maximum-assurance writes (E03/E09/D-04). Only a
+durably recorded deliberate retirement (migration `00010`: fresh-maximum-assurance
+removal or approved recovery replacement) lets an optional-MFA account return to
+AAL1; existing ambiguous records are not backfilled, and such accounts use the
+approved restricted recovery. Schema, transitions and migration consequence are in
+the contract's "Required-assurance floor" section.
 `N63B4-SESSION-STORAGE`'s browser-restart behaviour, `N63B4-TLS-BOUNDARY`'s
 proxy/hop topology, `N63B4-SESSION-MONITORING` data-flow review, the bounded
 session-row retention policy, branded-browser/password-manager/WebAuthn UX, own-

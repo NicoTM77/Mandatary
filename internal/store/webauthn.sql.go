@@ -264,16 +264,17 @@ func (q *Queries) RecordWebAuthnFailure(ctx context.Context, arg RecordWebAuthnF
 }
 
 const revokeWebAuthn = `-- name: RevokeWebAuthn :execrows
-UPDATE authenticators SET state='revoked',revoked_at=?1,changed_at=?1 WHERE id=?2 AND kind='webauthn' AND state IN ('active','disabled') AND revoked_at IS NULL
+UPDATE authenticators SET state='revoked',revoked_at=?1,changed_at=?1,retirement_reason=CAST(?2 AS TEXT) WHERE id=?3 AND kind='webauthn' AND state IN ('active','disabled') AND revoked_at IS NULL
 `
 
 type RevokeWebAuthnParams struct {
-	Now sql.NullInt64
-	ID  string
+	Now    sql.NullInt64
+	Reason string
+	ID     string
 }
 
 func (q *Queries) RevokeWebAuthn(ctx context.Context, arg RevokeWebAuthnParams) (int64, error) {
-	result, err := q.db.ExecContext(ctx, revokeWebAuthn, arg.Now, arg.ID)
+	result, err := q.db.ExecContext(ctx, revokeWebAuthn, arg.Now, arg.Reason, arg.ID)
 	if err != nil {
 		return 0, err
 	}

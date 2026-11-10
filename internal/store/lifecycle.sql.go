@@ -150,7 +150,7 @@ func (q *Queries) HasTOTPReplay(ctx context.Context, arg HasTOTPReplayParams) (b
 }
 
 const listSessionAuthenticators = `-- name: ListSessionAuthenticators :many
-SELECT a.id, a.user_id, a.kind, a.state, a.credential_generation, a.created_at, a.bound_at, a.changed_at, a.revoked_at, a.expires_at, a.verifier_hash, a.encrypted_secret, a.public_key, a.external_credential_id, a.password_codepoints, a.password_format, a.max_assurance, a.phishing_resistant, a.retry_ceiling, a.failed_attempts, a.next_attempt_at, a.last_accepted_totp_step, a.sign_count, a.backup_eligible, a.backup_state, a.user_verified, a.totp_algorithm, a.recovery_batch_id FROM authenticators a JOIN session_authenticators s ON a.id=s.authenticator_id WHERE s.session_id=? ORDER BY a.id
+SELECT a.id, a.user_id, a.kind, a.state, a.credential_generation, a.created_at, a.bound_at, a.changed_at, a.revoked_at, a.expires_at, a.verifier_hash, a.encrypted_secret, a.public_key, a.external_credential_id, a.password_codepoints, a.password_format, a.max_assurance, a.phishing_resistant, a.retry_ceiling, a.failed_attempts, a.next_attempt_at, a.last_accepted_totp_step, a.sign_count, a.backup_eligible, a.backup_state, a.user_verified, a.totp_algorithm, a.recovery_batch_id, a.retirement_reason FROM authenticators a JOIN session_authenticators s ON a.id=s.authenticator_id WHERE s.session_id=? ORDER BY a.id
 `
 
 func (q *Queries) ListSessionAuthenticators(ctx context.Context, sessionID string) ([]Authenticator, error) {
@@ -191,6 +191,7 @@ func (q *Queries) ListSessionAuthenticators(ctx context.Context, sessionID strin
 			&i.UserVerified,
 			&i.TotpAlgorithm,
 			&i.RecoveryBatchID,
+			&i.RetirementReason,
 		); err != nil {
 			return nil, err
 		}
@@ -206,7 +207,7 @@ func (q *Queries) ListSessionAuthenticators(ctx context.Context, sessionID strin
 }
 
 const listUserAuthenticators = `-- name: ListUserAuthenticators :many
-SELECT id, user_id, kind, state, credential_generation, created_at, bound_at, changed_at, revoked_at, expires_at, verifier_hash, encrypted_secret, public_key, external_credential_id, password_codepoints, password_format, max_assurance, phishing_resistant, retry_ceiling, failed_attempts, next_attempt_at, last_accepted_totp_step, sign_count, backup_eligible, backup_state, user_verified, totp_algorithm, recovery_batch_id FROM authenticators WHERE user_id=? ORDER BY id
+SELECT id, user_id, kind, state, credential_generation, created_at, bound_at, changed_at, revoked_at, expires_at, verifier_hash, encrypted_secret, public_key, external_credential_id, password_codepoints, password_format, max_assurance, phishing_resistant, retry_ceiling, failed_attempts, next_attempt_at, last_accepted_totp_step, sign_count, backup_eligible, backup_state, user_verified, totp_algorithm, recovery_batch_id, retirement_reason FROM authenticators WHERE user_id=? ORDER BY id
 `
 
 func (q *Queries) ListUserAuthenticators(ctx context.Context, userID string) ([]Authenticator, error) {
@@ -247,6 +248,7 @@ func (q *Queries) ListUserAuthenticators(ctx context.Context, userID string) ([]
 			&i.UserVerified,
 			&i.TotpAlgorithm,
 			&i.RecoveryBatchID,
+			&i.RetirementReason,
 		); err != nil {
 			return nil, err
 		}
@@ -346,16 +348,17 @@ func (q *Queries) RecordTOTPFailure(ctx context.Context, arg RecordTOTPFailurePa
 }
 
 const revokeTOTP = `-- name: RevokeTOTP :execrows
-UPDATE authenticators SET state='revoked',revoked_at=?1,changed_at=?1,encrypted_secret=NULL WHERE id=?2 AND kind='totp' AND state IN ('active','disabled','pending') AND revoked_at IS NULL
+UPDATE authenticators SET state='revoked',revoked_at=?1,changed_at=?1,retirement_reason=CAST(?2 AS TEXT),encrypted_secret=NULL WHERE id=?3 AND kind='totp' AND state IN ('active','disabled','pending') AND revoked_at IS NULL
 `
 
 type RevokeTOTPParams struct {
-	Now sql.NullInt64
-	ID  string
+	Now    sql.NullInt64
+	Reason string
+	ID     string
 }
 
 func (q *Queries) RevokeTOTP(ctx context.Context, arg RevokeTOTPParams) (int64, error) {
-	result, err := q.db.ExecContext(ctx, revokeTOTP, arg.Now, arg.ID)
+	result, err := q.db.ExecContext(ctx, revokeTOTP, arg.Now, arg.Reason, arg.ID)
 	if err != nil {
 		return 0, err
 	}

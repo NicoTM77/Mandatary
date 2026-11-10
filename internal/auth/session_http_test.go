@@ -70,7 +70,6 @@ func newBrowserHarness(t *testing.T) *browserHarness {
 	must("GET /t/poll", RoutePolicy{Require: RequireSession, Background: true}, count("poll", 200))
 	must("GET /t/info", RoutePolicy{Require: RequireSession}, h.b.SessionInfoHandler())
 	must("POST /t/logout", RoutePolicy{Require: RequireSession}, h.b.LogoutHandler())
-	must("GET /t/sensitive-read", RoutePolicy{Require: RequireSession, Sensitive: OpBackupExport}, count("sensitive-read", 200))
 	for _, op := range SensitiveOperations() {
 		must("POST /t/sensitive/"+string(op), RoutePolicy{Require: RequireSession, Sensitive: op}, count("op:"+string(op), 200))
 	}
@@ -741,13 +740,6 @@ func TestSensitiveRoutesStepUpOverHTTP(t *testing.T) { // every sensitive class:
 			t.Fatalf("%s handler count", op)
 		}
 	}
-	// A GET-sensitive read behaves the same way.
-	if w := h.do(httpReq{method: "GET", path: "/t/sensitive-read", cookie: set.stale.cookie}); w.Code != http.StatusForbidden {
-		t.Fatal("stale session read sensitive data", w.Code)
-	}
-	if w := h.do(httpReq{method: "GET", path: "/t/sensitive-read", cookie: set.fresh.cookie}); w.Code != 200 {
-		t.Fatal("fresh session denied sensitive read", w.Code)
-	}
 	// Freshness decays: after the window the fresh cookie must step up again.
 	h.e.clock.Advance(DefaultStepUpWindow + time.Second)
 	if w := h.do(httpReq{method: "POST", path: "/t/sensitive/" + string(OpBackupRestore), cookie: set.fresh.cookie, csrf: set.fresh.csrf, body: `{}`}); w.Code != http.StatusForbidden {
@@ -815,9 +807,10 @@ func TestLoginAndStepUpFlowOverHTTP(t *testing.T) { // REAUTH-STRENGTH, SESSION-
 		PhishingResistant bool     `json:"phishing_resistant"`
 		CSRFToken         string   `json:"csrf_token"`
 		StepUpRequired    bool     `json:"step_up_required"`
-		MaxAssurance      int      `json:"max_assurance"`
+		RequiredAssurance int      `json:"required_assurance"`
+		UsableAssurance   int      `json:"usable_assurance"`
 	}
-	if w.Code != 200 || json.Unmarshal(w.Body.Bytes(), &info) != nil || info.Assurance != "aal2" || strings.Join(info.Methods, ",") != "password,totp" || info.PhishingResistant || info.CSRFToken != done.CSRF || info.StepUpRequired || info.MaxAssurance != 2 {
+	if w.Code != 200 || json.Unmarshal(w.Body.Bytes(), &info) != nil || info.Assurance != "aal2" || strings.Join(info.Methods, ",") != "password,totp" || info.PhishingResistant || info.CSRFToken != done.CSRF || info.StepUpRequired || info.RequiredAssurance != 2 || info.UsableAssurance != 2 {
 		t.Fatalf("session info wrong: %d %s", w.Code, w.Body.String())
 	}
 	// 15m+1s later: info reports step-up, a sensitive write is refused, step-up fixes it.

@@ -51,10 +51,15 @@ func (w *WebAuthnService) completeRecoveredBinding(ctx context.Context, q *store
 	}
 	for _, a := range all {
 		if a.Kind == "webauthn" && a.ID != id && !a.RevokedAt.Valid {
-			if _, e := q.RevokeWebAuthn(ctx, store.RevokeWebAuthnParams{ID: a.ID, Now: nullable(now)}); e != nil {
+			if _, e := q.RevokeWebAuthn(ctx, store.RevokeWebAuthnParams{ID: a.ID, Now: nullable(now), Reason: retireRecovered}); e != nil {
 				return e
 			}
 		}
+	}
+	// The approved recovery bound a verified replacement: settle earlier
+	// protective/ambiguous retirements in this same transaction.
+	if e := q.ResolveRetiredFactors(ctx, store.ResolveRetiredFactorsParams{Now: nullable(now), UserID: user}); e != nil {
+		return e
 	}
 	n, e = q.FinishRecoveryCapability(ctx, store.FinishRecoveryCapabilityParams{ID: capability, AuthenticatorID: sql.NullString{String: id, Valid: true}})
 	if e != nil || n != 1 {

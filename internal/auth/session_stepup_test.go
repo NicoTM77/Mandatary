@@ -30,7 +30,7 @@ func TestSensitiveOperationPolicyMatrix(t *testing.T) { // REAUTH-STRENGTH, SB-4
 	e := newSessionEnv(t)
 	at := e.clock.Now()
 	mk := func(assurance Assurance, max int64, age time.Duration) SessionInfo {
-		return SessionInfo{ID: "s", UserID: "u", Assurance: assurance, MaxAssurance: max, AuthenticatedAt: at.Add(-age), CreatedAt: at.Add(-age), ExpiresAt: at.Add(time.Hour), LastActivityAt: at}
+		return SessionInfo{ID: "s", UserID: "u", Assurance: assurance, RequiredAssurance: max, UsableAssurance: max, AuthenticatedAt: at.Add(-age), CreatedAt: at.Add(-age), ExpiresAt: at.Add(time.Hour), LastActivityAt: at}
 	}
 	window := DefaultStepUpWindow
 	for _, op := range SensitiveOperations() {

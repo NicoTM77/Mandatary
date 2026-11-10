@@ -183,7 +183,10 @@ P1.08 adds session and browser-security **middleware, not routes**: `auth.Sessio
 and `auth.Browser` (`__Host-` Secure/HttpOnly/SameSite=Strict cookie, exact
 Origin, per-session CSRF, JSON-only bodies, Host check, strict CSP/headers and an
 explicit-policy route registry with TD §4.3 sensitive-operation classes). The
-static server still mounts no login/session/step-up/logout endpoint; see the
+static server still mounts no login/session/step-up/logout endpoint. One shared
+required-assurance floor (`assuranceFloor`, backed by the additive migration
+`00010` retirement provenance) governs login, the sensitive gate, step-up and the
+lifecycle freshness check; see the
 [session/browser contract](docs/sessions-browser-security.md) for tests, limits and
 owning later tasks (P1.09 setup/recovery sessions, P1.16 UI adapters, P1.19 TLS
 topology, Phase 3 own-session visibility).

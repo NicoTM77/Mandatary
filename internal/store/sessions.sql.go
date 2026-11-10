@@ -132,6 +132,7 @@ func (q *Queries) RevokeSession(ctx context.Context, arg RevokeSessionParams) (i
 const touchSession = `-- name: TouchSession :execrows
 UPDATE sessions SET last_activity_at=?1
 WHERE id=?2 AND state='active' AND revoked_at IS NULL AND last_activity_at<=?1 AND ?1<expires_at
+AND ?1-last_activity_at<idle_timeout_seconds
 `
 
 type TouchSessionParams struct {

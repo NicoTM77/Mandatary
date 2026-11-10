@@ -66,7 +66,7 @@ func TestPasswordOnlyIsLowerAssuranceNeverAAL2(t *testing.T) { // SCOPE-PASSWORD
 		t.Fatal(err)
 	}
 	info := r.Session.Info
-	if info.Assurance != AssurancePasswordOnly || len(r.Next) != 0 || info.MaxAssurance != 1 || info.PhishingResistant || strings.Join(info.Methods, ",") != "password" {
+	if info.Assurance != AssurancePasswordOnly || len(r.Next) != 0 || info.UsableAssurance != 1 || info.RequiredAssurance != 1 || info.PhishingResistant || strings.Join(info.Methods, ",") != "password" {
 		t.Fatalf("optional-MFA user without MFA must receive a labelled password-only session: %+v", info)
 	}
 	if row := e.row(info.ID); row.Purpose != "normal" || row.Assurance != 1 || row.Methods != 1 || row.Phishing != 0 || !row.Authenticated.Valid {
@@ -87,7 +87,7 @@ func TestPasswordOnlyIsLowerAssuranceNeverAAL2(t *testing.T) { // SCOPE-PASSWORD
 		t.Fatal("preauth capability accepted as a session")
 	}
 	skipped, err := e.s.LoginWithoutMFA(t.Context(), r.Session.Secret())
-	if err != nil || skipped.Info.Assurance != AssurancePasswordOnly || skipped.Info.MaxAssurance != 2 || e.row(skipped.Info.ID).Assurance != 1 {
+	if err != nil || skipped.Info.Assurance != AssurancePasswordOnly || skipped.Info.UsableAssurance != 2 || skipped.Info.RequiredAssurance != 2 || e.row(skipped.Info.ID).Assurance != 1 {
 		t.Fatalf("skipping MFA must stay password-only AAL1 even with MFA enrolled: %+v %v", skipped.Info, err)
 	}
 	if _, err = e.s.LoginWithoutMFA(t.Context(), r.Session.Secret()); err != ErrDenied {

@@ -136,10 +136,15 @@ func (l *Lifecycle) ConfirmRecoveredTOTP(ctx context.Context, secret []byte, id,
 		}
 		for _, f := range old {
 			if f.Kind == "totp" && f.ID != id && !f.RevokedAt.Valid {
-				if _, e = q.RevokeTOTP(ctx, store.RevokeTOTPParams{ID: f.ID, Now: nullable(now)}); e != nil {
+				if _, e = q.RevokeTOTP(ctx, store.RevokeTOTPParams{ID: f.ID, Now: nullable(now), Reason: retireRecovered}); e != nil {
 					return e
 				}
 			}
+		}
+		// The approved recovery bound a verified replacement: settle earlier
+		// protective/ambiguous retirements in this same transaction.
+		if e = q.ResolveRetiredFactors(ctx, store.ResolveRetiredFactorsParams{Now: nullable(now), UserID: u.ID}); e != nil {
+			return e
 		}
 		n, e = q.FinishRecoveryCapability(ctx, store.FinishRecoveryCapabilityParams{ID: cap.ID, AuthenticatorID: sql.NullString{String: id, Valid: true}})
 		if e != nil || n != 1 {
