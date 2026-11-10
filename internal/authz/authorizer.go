@@ -141,6 +141,10 @@ type Authorizer struct {
 	policyEpoch          uint64
 	backendRevisions     map[domain.EndpointID]uint64
 	invalidationRevision uint64
+	// notifySem serializes NotifyPolicyChange's epoch bump and lease
+	// revalidation so concurrent notifications cannot continuously invalidate
+	// each other's in-flight revalidations (capacity 1; context-aware).
+	notifySem chan struct{}
 }
 
 // NewAuthorizer constructs a shared default-deny Authorizer.
@@ -172,6 +176,7 @@ func NewAuthorizer(cfg Config) (*Authorizer, error) {
 		backends:         backends,
 		leases:           make(map[uint64]*Lease),
 		backendRevisions: make(map[domain.EndpointID]uint64),
+		notifySem:        make(chan struct{}, 1),
 	}
 	az.policyEpoch = 1
 	return az, nil
@@ -606,18 +611,45 @@ func evaluatePolicies(
 // an active streaming Lease. It resolves the target strictly by its immutable ContainerID
 // (never re-resolving mutable names) and checks current safety, control, credential,
 // group, selector, and policy parameter caps.
+//
+// A policy-epoch change observed only at publication (binding intact, context
+// live, backend unchanged and safe) is not itself a denial: the evaluation is
+// repeated on a fresh snapshot with the epoch re-captured, up to
+// maxValidationAttempts. A real denial, a shared fault or retry exhaustion deny.
 func (a *Authorizer) ValidateDecision(ctx context.Context, dec Decision) error {
+	for attempt := 0; attempt < maxValidationAttempts; attempt++ {
+		retry, err := a.validateDecisionOnce(ctx, dec)
+		if !retry {
+			return err
+		}
+	}
+	a.cancelMatchingLeases(dec)
+	return newForbidden(ReasonDecisionStale)
+}
+
+// maxValidationAttempts bounds epoch-only re-evaluation so continuous policy
+// churn fails closed instead of livelocking.
+const maxValidationAttempts = 16
+
+// backendSafe reports whether backend is ready and self/peer verified.
+func backendSafe(backend docker.DockerBackend) bool {
+	return backend != nil && backend.Ready() && backend.VerificationState() == docker.StateVerified
+}
+
+// validateDecisionOnce performs one evaluation. retry=true means only the
+// policy epoch moved during evaluation and the caller should re-evaluate.
+func (a *Authorizer) validateDecisionOnce(ctx context.Context, dec Decision) (retry bool, _ error) {
 	if ctx.Err() != nil {
 		a.cancelMatchingLeases(dec)
-		return newForbidden(ReasonDecisionStale)
+		return false, newForbidden(ReasonDecisionStale)
 	}
 	if _, err := docker.ParseTargetIdentity(dec.Target.EndpointID, string(dec.Target.ContainerID)); err != nil {
 		a.cancelMatchingLeases(dec)
-		return newForbidden(ReasonDecisionStale)
+		return false, newForbidden(ReasonDecisionStale)
 	}
 	if err := docker.ValidateOperation(dec.Operation); err != nil {
 		a.cancelMatchingLeases(dec)
-		return newForbidden(ReasonDecisionStale)
+		return false, newForbidden(ReasonDecisionStale)
 	}
 
 	a.mu.RLock()
@@ -626,35 +658,41 @@ func (a *Authorizer) ValidateDecision(ctx context.Context, dec Decision) error {
 	bound := a.validBindingLocked(dec)
 	a.mu.RUnlock()
 	if !bound {
-		return newForbidden(ReasonDecisionStale)
+		return false, newForbidden(ReasonDecisionStale)
 	}
-	if !ok || backend == nil || !backend.Ready() || backend.VerificationState() != docker.StateVerified {
+	if !ok || !backendSafe(backend) {
 		a.cancelLeases(dec, false)
-		return newForbidden(ReasonSafetyUnverified)
+		return false, newForbidden(ReasonSafetyUnverified)
 	}
 
 	// Resolve target strictly by immutable 64-hex ContainerID.
 	currentTarget, err := backend.ResolveTarget(ctx, string(dec.Target.ContainerID))
 	if err != nil {
-		a.cancelLeases(dec, ctx.Err() != nil)
-		if errors.Is(err, docker.ErrProtectedTarget) {
-			return newForbidden(ReasonSelfProtected)
+		// A co-observed shared fault (protected/unverified/missing target or a
+		// backend that is no longer safe) is never masked by this caller's own
+		// cancellation: only a pure cancellation with no shared fault is local.
+		protected := errors.Is(err, docker.ErrProtectedTarget)
+		unverified := errors.Is(err, docker.ErrUnverified) || !backendSafe(backend)
+		shared := protected || unverified || errors.Is(err, docker.ErrTargetNotFound)
+		a.cancelLeases(dec, ctx.Err() != nil && !shared)
+		if protected {
+			return false, newForbidden(ReasonSelfProtected)
 		}
-		if errors.Is(err, docker.ErrUnverified) {
-			return newForbidden(ReasonSafetyUnverified)
+		if unverified {
+			return false, newForbidden(ReasonSafetyUnverified)
 		}
-		return newForbidden(ReasonDecisionStale)
+		return false, newForbidden(ReasonDecisionStale)
 	}
 	if docker.HasProtectedNamespaceLabel(currentTarget.Labels) {
 		a.cancelLeases(dec, false)
-		return newForbidden(ReasonSelfProtected)
+		return false, newForbidden(ReasonSelfProtected)
 	}
 
 	now := a.clock()
 	var validateErr error
 	if now.Before(dec.DecidedAt) {
 		a.cancelMatchingLeases(dec)
-		return newForbidden(ReasonDecisionStale)
+		return false, newForbidden(ReasonDecisionStale)
 	}
 
 	readErr := a.repo.Read(ctx, func(q *store.Queries) error {
@@ -711,27 +749,34 @@ func (a *Authorizer) ValidateDecision(ctx context.Context, dec Decision) error {
 		return nil
 	})
 
+	// Shared state is classified before any local outcome so a shared fault
+	// observed at publication is never masked by this caller's cancellation or
+	// by an unrelated stale/read failure.
+	a.mu.RLock()
+	bound = a.validBindingLocked(dec)
+	sameBackend := a.backends[dec.Target.EndpointID] == backend
+	epochMoved := epoch != a.policyEpoch
+	a.mu.RUnlock()
+	if !backendSafe(backend) {
+		a.cancelLeases(dec, false)
+		return false, newForbidden(ReasonSafetyUnverified)
+	}
 	if readErr != nil {
 		a.cancelMatchingLeases(dec)
-		return newForbidden(ReasonDecisionStale)
+		return false, newForbidden(ReasonDecisionStale)
 	}
 	if validateErr != nil {
 		a.cancelMatchingLeases(dec)
-		return validateErr
+		return false, validateErr
 	}
-	a.mu.RLock()
-	stale := ctx.Err() != nil || epoch != a.policyEpoch || !a.validBindingLocked(dec) || a.backends[dec.Target.EndpointID] != backend
-	safe := backend.Ready() && backend.VerificationState() == docker.StateVerified
-	a.mu.RUnlock()
-	if stale {
+	if !bound || !sameBackend || ctx.Err() != nil {
 		a.cancelMatchingLeases(dec)
-		return newForbidden(ReasonDecisionStale)
+		return false, newForbidden(ReasonDecisionStale)
 	}
-	if !safe {
-		a.cancelLeases(dec, false)
-		return newForbidden(ReasonSafetyUnverified)
+	if epochMoved {
+		return true, nil
 	}
-	return nil
+	return false, nil
 }
 
 // AcquireLease authorizes req and registers a cancellable Lease for long-lived operations.
@@ -768,7 +813,9 @@ func (a *Authorizer) AcquireLease(ctx context.Context, req AuthorizeRequest) (*L
 	}
 
 	a.mu.RLock()
-	stale := leaseCtx.Err() != nil || dec.PolicyEpoch != a.policyEpoch || !a.validBindingLocked(dec)
+	// The lease is already registered, so any later policy notification
+	// revalidates it itself; an epoch-only move is not a denial here.
+	stale := leaseCtx.Err() != nil || !a.validBindingLocked(dec)
 	a.mu.RUnlock()
 	if stale {
 		lease.Release()
@@ -780,6 +827,14 @@ func (a *Authorizer) AcquireLease(ctx context.Context, req AuthorizeRequest) (*L
 // NotifyPolicyChange advances the policy epoch and revalidates all active Leases,
 // immediately canceling any Lease whose authorization is no longer valid (TD §3.4).
 func (a *Authorizer) NotifyPolicyChange(ctx context.Context) error {
+	// Serialize notifications. If ctx ends first we still advance the epoch and
+	// revalidate under the ended context, which fails closed by canceling the
+	// affected leases (never leaves a possibly revoked lease live).
+	select {
+	case a.notifySem <- struct{}{}:
+		defer func() { <-a.notifySem }()
+	case <-ctx.Done():
+	}
 	a.mu.Lock()
 	a.policyEpoch++
 	snapshot := make([]*Lease, 0, len(a.leases))

@@ -138,7 +138,11 @@ operational requests against the missing target deny with `ReasonTargetMissing`.
   SQLite snapshots cannot publish a successful decision or validation afterward.
   Lease registration and publication check the same revision. I/O is not
   performed under the revision writer lock. Overlapping evaluations may deny
-  conservatively; unchanged existing leases can re-evaluate against fresh policy.
+  conservatively for fresh `Authorize`. Lease revalidation that observes only a
+  policy-epoch move (binding intact, context live, backend unchanged and safe)
+  re-evaluates on a fresh snapshot with the epoch re-captured (bounded to 16
+  attempts, then fails closed); concurrent `NotifyPolicyChange` calls are
+  serialized so no-op notifications cannot cancel healthy leases.
 - Decisions are private issuance-bound handles: validation requires the issuing
   authorizer, endpoint backend revision, and explicit invalidation revision.
   Rebinding even the same backend, remove/re-register, and `InvalidateAll` cannot
@@ -146,7 +150,10 @@ operational requests against the missing target deny with `ReasonTargetMissing`.
   re-evaluation, rather than permanently revoking unrelated valid handles.
 - Local validation cancellation and credential failure cancel only matching
   principal/session/credential leases, not peers using the same group policy.
-  Shared backend/target failures still cancel affected peers; policy notification
+  Shared backend/target failures (protected or missing target, unverified or
+  unsafe backend) cancel affected peers even when co-observed with the caller's
+  own cancellation; only a pure cancellation with no shared fault stays local.
+  Policy notification
   revalidates every active lease.
 - Future session creation/authentication/activity or token issuance, negative
   idle ages, and validation before a decision's issuance time deny. This is
@@ -177,6 +184,7 @@ operational requests against the missing target deny with `ReasonTargetMissing`.
 | Revocation publication fence with held real SQLite snapshots and zero post-revocation dispatch | `TestPolicyRevocationPublicationFence` (`publication_test.go`) | P1.13 dispatch integration |
 | Permanent issuer/backend/invalidation bindings; sequential and concurrent rebind/invalidation | `TestDecisionIssuingBindings`, `TestConcurrentDecisionBindingPublication` (`binding_test.go`) | SELF-13, P1.13 |
 | Principal-local failure isolation and shared-failure cancellation | `TestSharedPolicyLeaseFailureIsolation` (`lease_isolation_test.go`) | C2, P1.13 |
+| Joined shared-fault vs caller cancellation, no-op notification survival, concurrent notifications, bounded epoch-churn retry | `TestLeaseSharedFaultNotMaskedByCallerCancellation`, `TestLeaseBackendUnsafeAtPublicationNotMaskedByCancellation`, `TestLeaseSurvivesOverlappingNoopNotification`, `TestConcurrentNoopNotificationsKeepHealthyLeases`, `TestConcurrentRevocationAmongNoopNotificationsStillCancels`, `TestEpochChurnExhaustsBoundedRetryFailClosed` (`lease_fault_scope_test.go`) | C2, P1.13 |
 | Observable clock rollback and future evidence denial with healthy boundary controls | `TestObservableClockRollbackDenies` (`clock_rollback_test.go`), existing expiry/overlap suite | RESTORE-04 bounded domain enforcement; P1.18 owns actual restore |
 | Human/agent success-path decision/lease `fmt`, JSON and text/JSON structured-log canaries | `TestSuccessfulAuthorizationSecretRedaction` (`redaction_test.go`) | TD §9.3; P1.13/P1.14 adapters |
 | **C1** integrated substrate gate (fresh/reopened SQLite + `MasterKey` secret store + tamper checks + `Authorizer` + `MockBackend` + log redaction + 0 operational calls on rejected fixtures) | `TestC1IntegratedSubstrateCheckpoint` (`c1_substrate_test.go`) | Independent reviewer gate check; P1.13/P1.14 |
