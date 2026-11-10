@@ -331,7 +331,7 @@ func verifyAgentToken(
 		return VerifiedPrincipal{}, newUnauthenticated(ReasonUnauthenticated)
 	}
 
-	cred, err := q.GetAgentCredentialByHash(ctx, tokenHash)
+	cred, err := q.GetAgentAuthRowByDigest(ctx, tokenHash)
 	if err != nil {
 		return VerifiedPrincipal{}, newUnauthenticated(ReasonUnauthenticated)
 	}
@@ -352,15 +352,16 @@ func verifyAgentToken(
 		return VerifiedPrincipal{}, newUnauthenticated(ReasonUnauthenticated)
 	}
 
-	if cred.NonexpiringApproved == 1 {
+	switch cred.NonexpiringApproved {
+	case 1:
 		if cred.ExpiresAt.Valid {
 			return VerifiedPrincipal{}, newUnauthenticated(ReasonUnauthenticated)
 		}
-	} else if cred.NonexpiringApproved == 0 {
+	case 0:
 		if !cred.ExpiresAt.Valid || cred.ExpiresAt.Int64 <= cred.IssuedAt || nowUnix >= cred.ExpiresAt.Int64 {
 			return VerifiedPrincipal{}, newUnauthenticated(ReasonUnauthenticated)
 		}
-	} else {
+	default:
 		return VerifiedPrincipal{}, newUnauthenticated(ReasonUnauthenticated)
 	}
 
