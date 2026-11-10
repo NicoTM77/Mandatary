@@ -100,8 +100,8 @@ func TestPolicyRevocationPublicationFence(t *testing.T) {
 			case <-v.entered:
 			case <-ctx.Done():
 				close(v.release)
-				_ = <-done // Join the worker before failing the barrier assertion.
-				t.Fatal("snapshot barrier not entered")
+				workerErr := <-done // Join before failing the barrier assertion.
+				t.Fatalf("snapshot barrier not entered (worker result: %v)", workerErr)
 			}
 			e.execSQL(`DELETE FROM policies WHERE id=?`, string(testPolicyID1))
 			if err := a.NotifyPolicyChange(ctx); err != nil {
