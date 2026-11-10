@@ -157,10 +157,22 @@ func freshSession(ctx context.Context, q *store.Queries, secret []byte, now int6
 	if e != nil {
 		return c, u, s, e
 	}
+	if !evidenceBacked(c, u, s, at.Int64, used, now) {
+		return deny()
+	}
+	return c, u, s, nil
+}
+
+// evidenceBacked is the single check that persisted achieved assurance/methods
+// are backed by live, unexpired, correctly owned factor bindings that existed
+// before the authentication time. A persisted label alone is never trusted, so a
+// forged or stale row cannot claim a stronger factor than the session really
+// used. freshSession (lifecycle writes) and the P1.08 session service share it.
+func evidenceBacked(c store.InstallationControl, u store.User, s store.Session, at int64, used []store.Authenticator, now int64) bool {
 	password, totp, key, uv := false, false, false, false
 	for _, a := range used {
-		if a.UserID != u.ID || !liveFactor(c, a, now) || a.BoundAt.Int64 > at.Int64 {
-			return deny()
+		if a.UserID != u.ID || !liveFactor(c, a, now) || a.BoundAt.Int64 > at {
+			return false
 		}
 		switch a.Kind {
 		case "password":
@@ -171,14 +183,10 @@ func freshSession(ctx context.Context, q *store.Queries, secret []byte, now int6
 			key = true
 			uv = a.UserVerified.Valid && a.UserVerified.Int64 == 1
 		default:
-			return deny()
+			return false
 		}
 	}
-	valid := (s.AchievedAssurance == 1 && s.Methods == 1 && password) || (s.AchievedAssurance == 2 && ((s.Methods == 3 && password && totp) || (s.Methods == 5 && password && key) || (s.Methods == 8 && key && uv)))
-	if !valid {
-		return deny()
-	}
-	return c, u, s, nil
+	return (s.AchievedAssurance == 1 && s.Methods == 1 && password) || (s.AchievedAssurance == 2 && ((s.Methods == 3 && password && totp) || (s.Methods == 5 && password && key) || (s.Methods == 8 && key && uv)))
 }
 
 // Absence is a normal authority denial; an actual query failure is uncertainty.
