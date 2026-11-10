@@ -172,6 +172,11 @@ P1.12 adds the `internal/docker` intermediary package (`DockerBackend`, official
 `moby/client` adapter, container-free `MockBackend`, `SELF-01`–`SELF-13`
 self-protection state machine, and inspect/log/error sanitizers) without exposing
 HTTP/MCP routes; see the [Docker backend reference](docs/docker-backend.md).
+P1.11 adds the shared `internal/authz` selector evaluator and default-deny
+authorizer (`Authorizer`, `MatchSelector`, parameter cap enforcement, lease
+invalidation, `SELF-01`–`SELF-13` service-level gates, and `C1` substrate
+integration) without exposing HTTP/MCP routes; see the
+[authorization reference](docs/authorization.md).
 Copied normalization source needs explicit upstream-advisory review; scanners do
 not automatically identify its parent module. No production footprint budget or
 NIST/FIPS claim changes. In this task's restricted worker, necessary Go race
