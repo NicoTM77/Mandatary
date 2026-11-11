@@ -31,7 +31,7 @@ type RevealResult struct {
 
 // findLive returns the single live generation of purpose/target, if any.
 func findLive(ctx context.Context, q *store.Queries, purpose SetupPurpose, target sql.NullString) (store.SetupToken, bool, error) {
-	tokens, err := q.ListLiveSetupTokens(ctx)
+	tokens, err := q.ListLiveSetupGenerations(ctx)
 	if err != nil {
 		return store.SetupToken{}, false, err
 	}
@@ -156,7 +156,7 @@ func (s *Setup) Reveal(ctx context.Context, purpose SetupPurpose, username strin
 		if e = s.step("reveal:before-claim"); e != nil {
 			return e
 		}
-		n, e := q.ClaimSetupToken(bounded, store.ClaimSetupTokenParams{Now: nullableInt(now), ID: found.ID})
+		n, e := q.ClaimSetupGeneration(bounded, store.ClaimSetupGenerationParams{Now: nullableInt(now), ID: found.ID})
 		if e != nil {
 			return e
 		}
@@ -212,7 +212,7 @@ func (s *Setup) Reveal(ctx context.Context, purpose SetupPurpose, username strin
 		if now < claimedAt {
 			now = claimedAt
 		}
-		n, e := q.FinishSetupTokenReveal(bounded, store.FinishSetupTokenRevealParams{Now: nullableInt(now), ID: tok.ID})
+		n, e := q.FinishSetupGenerationReveal(bounded, store.FinishSetupGenerationRevealParams{Now: nullableInt(now), ID: tok.ID})
 		if e != nil || n != 1 {
 			return ErrSetupDenied
 		}

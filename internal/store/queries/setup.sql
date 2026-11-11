@@ -24,35 +24,35 @@ SELECT (SELECT count(*) FROM users WHERE id NOT IN (SELECT staged_user_id FROM s
  + (SELECT count(*) FROM usage_stats_daily) + (SELECT count(*) FROM usage_recent_events)
  + (SELECT count(*) FROM endpoints WHERE state != 'quarantined') AS blockers;
 
--- name: CreateSetupToken :one
+-- name: CreateSetupGeneration :one
 INSERT INTO setup_tokens(purpose,target_user_id,installation_id,build_identity,digest,state,issued_at,expires_at,replace_password,risk_acknowledged)
 VALUES (?,?,?,?,?,'pending',?,?,?,?) RETURNING id;
 
--- name: GetSetupToken :one
+-- name: GetSetupGeneration :one
 SELECT * FROM setup_tokens WHERE id = ?;
 
--- name: GetSetupTokenByDigest :one
+-- name: GetSetupGenerationByDigest :one
 SELECT * FROM setup_tokens WHERE digest IN (sqlc.arg(first), sqlc.arg(second));
 
--- name: ListLiveSetupTokens :many
+-- name: ListLiveSetupGenerations :many
 SELECT * FROM setup_tokens WHERE state IN ('pending','available','claimed','retrieved') ORDER BY id;
 
--- name: ListRecentSetupTokens :many
+-- name: ListRecentSetupGenerations :many
 SELECT * FROM setup_tokens ORDER BY id DESC LIMIT 8;
 
--- name: MakeSetupTokenAvailable :execrows
+-- name: MakeSetupGenerationAvailable :execrows
 UPDATE setup_tokens SET state = 'available' WHERE id = ? AND state = 'pending';
 
--- name: ClaimSetupToken :execrows
+-- name: ClaimSetupGeneration :execrows
 UPDATE setup_tokens SET state = 'claimed', claimed_at = sqlc.arg(now) WHERE id = sqlc.arg(id) AND state = 'available' AND expires_at > sqlc.arg(now);
 
--- name: FinishSetupTokenReveal :execrows
+-- name: FinishSetupGenerationReveal :execrows
 UPDATE setup_tokens SET state = 'retrieved', retrieved_at = sqlc.arg(now) WHERE id = sqlc.arg(id) AND state = 'claimed';
 
--- name: ConsumeSetupToken :execrows
+-- name: ConsumeSetupGeneration :execrows
 UPDATE setup_tokens SET state = 'consumed', consumed_at = sqlc.arg(now) WHERE id = sqlc.arg(id) AND state = 'retrieved' AND expires_at > sqlc.arg(now);
 
--- name: RevokeSetupToken :execrows
+-- name: RevokeSetupGeneration :execrows
 UPDATE setup_tokens SET state = 'revoked', revoked_at = sqlc.arg(now), revoke_reason = CAST(sqlc.arg(reason) AS TEXT)
 WHERE id = sqlc.arg(id) AND state IN ('pending','available','claimed','retrieved');
 
@@ -87,7 +87,7 @@ UPDATE setup_sessions SET state = CAST(sqlc.arg(to_state) AS TEXT), ended_at = s
 UPDATE setup_sessions SET staged_user_id = sqlc.arg(user_id), staged_verifier = sqlc.arg(verifier), staged_password_format = sqlc.arg(format), staged_password_codepoints = sqlc.arg(codepoints)
 WHERE id = sqlc.arg(id) AND state = 'active' AND purpose = 'initial_setup' AND staged_user_id IS NULL AND staged_verifier IS NULL;
 
--- name: StageSetupPassword :execrows
+-- name: StageSetupVerifier :execrows
 UPDATE setup_sessions SET staged_verifier = sqlc.arg(verifier), staged_password_format = sqlc.arg(format), staged_password_codepoints = sqlc.arg(codepoints)
 WHERE id = sqlc.arg(id) AND state = 'active' AND purpose = 'mfa_reset' AND staged_verifier IS NULL;
 
@@ -153,7 +153,7 @@ WHERE singleton = 1 AND credential_generation = 0 AND session_generation = 0 AND
 -- name: ActivateStagedAdmin :execrows
 UPDATE users SET state = 'active', credential_generation = 1, authority_generation = 1 WHERE id = ? AND state = 'quarantined' AND mfa_requirement = 'required';
 
--- name: CreateAdminPassword :exec
+-- name: CreateAdminVerifier :exec
 INSERT INTO authenticators(id,user_id,kind,state,credential_generation,created_at,bound_at,changed_at,verifier_hash,password_codepoints,password_format,max_assurance)
 VALUES (?,?,'password','active',1,?,?,?,?,?,?,1);
 
@@ -186,5 +186,5 @@ DELETE FROM users WHERE id = ? AND state = 'quarantined';
 -- name: CountStagedAuthenticators :one
 SELECT count(*) FROM authenticators WHERE user_id = ?;
 
--- name: ListUserSetupTokens :many
+-- name: ListUserSetupGenerations :many
 SELECT * FROM setup_tokens WHERE target_user_id = ? ORDER BY id;

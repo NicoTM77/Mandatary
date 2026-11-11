@@ -28,9 +28,9 @@ type SetupSessionInfo struct {
 
 // SetupAddress is a staged notification address and whether control was proven.
 type SetupAddress struct {
-	ID        string
-	Address   string
-	Confirmed bool
+	ID        string `json:"id"`
+	Address   string `json:"address"`
+	Confirmed bool   `json:"confirmed"`
 }
 
 // SetupSession carries the opaque cookie secret. Formatting/logging are redacted.
@@ -54,7 +54,7 @@ func (s SetupSession) CSRFToken() string { return csrfToken(s.secret, s.ID) }
 // revokePurpose revokes every live generation of a purpose, whatever its target,
 // and ends the matching sessions. Used when a guessing campaign hits the ceiling.
 func revokePurpose(ctx context.Context, q *store.Queries, purpose SetupPurpose, now int64, reason string) ([]string, error) {
-	tokens, err := q.ListLiveSetupTokens(ctx)
+	tokens, err := q.ListLiveSetupGenerations(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -63,7 +63,7 @@ func revokePurpose(ctx context.Context, q *store.Queries, purpose SetupPurpose, 
 		if SetupPurpose(tok.Purpose) != purpose {
 			continue
 		}
-		n, err := q.RevokeSetupToken(ctx, store.RevokeSetupTokenParams{Now: nullableInt(now), Reason: reason, ID: tok.ID})
+		n, err := q.RevokeSetupGeneration(ctx, store.RevokeSetupGenerationParams{Now: nullableInt(now), Reason: reason, ID: tok.ID})
 		if err != nil {
 			return nil, err
 		}
@@ -135,7 +135,7 @@ func (s *Setup) Exchange(ctx context.Context, token, ip string) (SetupSession, e
 	)
 	err = s.run(ctx, func(ctx context.Context, q *store.Queries, now int64) error {
 		outcome, removals = outcomeDenied, nil
-		live, e := q.ListLiveSetupTokens(ctx)
+		live, e := q.ListLiveSetupGenerations(ctx)
 		if e != nil {
 			return e
 		}
@@ -207,14 +207,14 @@ func (s *Setup) Exchange(ctx context.Context, token, ip string) (SetupSession, e
 			if e != errSetupLogical {
 				return e
 			}
-			n, e := q.RevokeSetupToken(ctx, store.RevokeSetupTokenParams{Now: nullableInt(now), Reason: "not_eligible", ID: tok.ID})
+			n, e := q.RevokeSetupGeneration(ctx, store.RevokeSetupGenerationParams{Now: nullableInt(now), Reason: "not_eligible", ID: tok.ID})
 			if e != nil || n != 1 {
 				return errSetupLogical
 			}
 			removals = append(removals, revealFileName(tok.Purpose, tok.ID))
 			return nil
 		}
-		n, e := q.ConsumeSetupToken(ctx, store.ConsumeSetupTokenParams{Now: nullableInt(now), ID: tok.ID})
+		n, e := q.ConsumeSetupGeneration(ctx, store.ConsumeSetupGenerationParams{Now: nullableInt(now), ID: tok.ID})
 		if e != nil {
 			return e
 		}
@@ -294,7 +294,7 @@ func verifySession(ctx context.Context, q *store.Queries, secret []byte, now int
 	if err != nil {
 		return sess, tok, err
 	}
-	tok, err = q.GetSetupToken(ctx, sess.TokenID)
+	tok, err = q.GetSetupGeneration(ctx, sess.TokenID)
 	if err != nil {
 		return sess, tok, err
 	}

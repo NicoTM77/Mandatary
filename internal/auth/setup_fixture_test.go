@@ -74,8 +74,6 @@ type setupConfig struct {
 
 type setupOption func(*setupConfig)
 
-func withoutMail() setupOption { return func(c *setupConfig) { c.mail = false } }
-
 // withSyncProbe registers the real-SQLite xSync interposer BEFORE the repository
 // opens, so a later probe.fail=true makes an actual WAL sync fail.
 func withSyncProbe(t *testing.T, out **authSyncProbe) setupOption {

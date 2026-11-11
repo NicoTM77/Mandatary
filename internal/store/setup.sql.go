@@ -78,17 +78,17 @@ func (q *Queries) AdvanceSetupClock(ctx context.Context, now int64) (int64, erro
 	return result.RowsAffected()
 }
 
-const claimSetupToken = `-- name: ClaimSetupToken :execrows
+const claimSetupGeneration = `-- name: ClaimSetupGeneration :execrows
 UPDATE setup_tokens SET state = 'claimed', claimed_at = ?1 WHERE id = ?2 AND state = 'available' AND expires_at > ?1
 `
 
-type ClaimSetupTokenParams struct {
+type ClaimSetupGenerationParams struct {
 	Now sql.NullInt64
 	ID  int64
 }
 
-func (q *Queries) ClaimSetupToken(ctx context.Context, arg ClaimSetupTokenParams) (int64, error) {
-	result, err := q.db.ExecContext(ctx, claimSetupToken, arg.Now, arg.ID)
+func (q *Queries) ClaimSetupGeneration(ctx context.Context, arg ClaimSetupGenerationParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, claimSetupGeneration, arg.Now, arg.ID)
 	if err != nil {
 		return 0, err
 	}
@@ -123,17 +123,17 @@ func (q *Queries) ConsumeAddressProof(ctx context.Context, arg ConsumeAddressPro
 	return result.RowsAffected()
 }
 
-const consumeSetupToken = `-- name: ConsumeSetupToken :execrows
+const consumeSetupGeneration = `-- name: ConsumeSetupGeneration :execrows
 UPDATE setup_tokens SET state = 'consumed', consumed_at = ?1 WHERE id = ?2 AND state = 'retrieved' AND expires_at > ?1
 `
 
-type ConsumeSetupTokenParams struct {
+type ConsumeSetupGenerationParams struct {
 	Now sql.NullInt64
 	ID  int64
 }
 
-func (q *Queries) ConsumeSetupToken(ctx context.Context, arg ConsumeSetupTokenParams) (int64, error) {
-	result, err := q.db.ExecContext(ctx, consumeSetupToken, arg.Now, arg.ID)
+func (q *Queries) ConsumeSetupGeneration(ctx context.Context, arg ConsumeSetupGenerationParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, consumeSetupGeneration, arg.Now, arg.ID)
 	if err != nil {
 		return 0, err
 	}
@@ -207,12 +207,12 @@ func (q *Queries) CreateAddressProof(ctx context.Context, arg CreateAddressProof
 	return err
 }
 
-const createAdminPassword = `-- name: CreateAdminPassword :exec
+const createAdminVerifier = `-- name: CreateAdminVerifier :exec
 INSERT INTO authenticators(id,user_id,kind,state,credential_generation,created_at,bound_at,changed_at,verifier_hash,password_codepoints,password_format,max_assurance)
 VALUES (?,?,'password','active',1,?,?,?,?,?,?,1)
 `
 
-type CreateAdminPasswordParams struct {
+type CreateAdminVerifierParams struct {
 	ID                 string
 	UserID             string
 	CreatedAt          int64
@@ -223,8 +223,8 @@ type CreateAdminPasswordParams struct {
 	PasswordFormat     sql.NullString
 }
 
-func (q *Queries) CreateAdminPassword(ctx context.Context, arg CreateAdminPasswordParams) error {
-	_, err := q.db.ExecContext(ctx, createAdminPassword,
+func (q *Queries) CreateAdminVerifier(ctx context.Context, arg CreateAdminVerifierParams) error {
+	_, err := q.db.ExecContext(ctx, createAdminVerifier,
 		arg.ID,
 		arg.UserID,
 		arg.CreatedAt,
@@ -249,6 +249,40 @@ type CreateInitialAdminRoleParams struct {
 func (q *Queries) CreateInitialAdminRole(ctx context.Context, arg CreateInitialAdminRoleParams) error {
 	_, err := q.db.ExecContext(ctx, createInitialAdminRole, arg.ID, arg.UserID)
 	return err
+}
+
+const createSetupGeneration = `-- name: CreateSetupGeneration :one
+INSERT INTO setup_tokens(purpose,target_user_id,installation_id,build_identity,digest,state,issued_at,expires_at,replace_password,risk_acknowledged)
+VALUES (?,?,?,?,?,'pending',?,?,?,?) RETURNING id
+`
+
+type CreateSetupGenerationParams struct {
+	Purpose          string
+	TargetUserID     sql.NullString
+	InstallationID   []byte
+	BuildIdentity    string
+	Digest           []byte
+	IssuedAt         int64
+	ExpiresAt        int64
+	ReplacePassword  int64
+	RiskAcknowledged int64
+}
+
+func (q *Queries) CreateSetupGeneration(ctx context.Context, arg CreateSetupGenerationParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, createSetupGeneration,
+		arg.Purpose,
+		arg.TargetUserID,
+		arg.InstallationID,
+		arg.BuildIdentity,
+		arg.Digest,
+		arg.IssuedAt,
+		arg.ExpiresAt,
+		arg.ReplacePassword,
+		arg.RiskAcknowledged,
+	)
+	var id int64
+	err := row.Scan(&id)
+	return id, err
 }
 
 const createSetupSession = `-- name: CreateSetupSession :exec
@@ -276,40 +310,6 @@ func (q *Queries) CreateSetupSession(ctx context.Context, arg CreateSetupSession
 		arg.ExpiresAt,
 	)
 	return err
-}
-
-const createSetupToken = `-- name: CreateSetupToken :one
-INSERT INTO setup_tokens(purpose,target_user_id,installation_id,build_identity,digest,state,issued_at,expires_at,replace_password,risk_acknowledged)
-VALUES (?,?,?,?,?,'pending',?,?,?,?) RETURNING id
-`
-
-type CreateSetupTokenParams struct {
-	Purpose          string
-	TargetUserID     sql.NullString
-	InstallationID   []byte
-	BuildIdentity    string
-	Digest           []byte
-	IssuedAt         int64
-	ExpiresAt        int64
-	ReplacePassword  int64
-	RiskAcknowledged int64
-}
-
-func (q *Queries) CreateSetupToken(ctx context.Context, arg CreateSetupTokenParams) (int64, error) {
-	row := q.db.QueryRowContext(ctx, createSetupToken,
-		arg.Purpose,
-		arg.TargetUserID,
-		arg.InstallationID,
-		arg.BuildIdentity,
-		arg.Digest,
-		arg.IssuedAt,
-		arg.ExpiresAt,
-		arg.ReplacePassword,
-		arg.RiskAcknowledged,
-	)
-	var id int64
-	err := row.Scan(&id)
-	return id, err
 }
 
 const createStagedAddress = `-- name: CreateStagedAddress :exec
@@ -365,17 +365,17 @@ func (q *Queries) EndSetupSession(ctx context.Context, arg EndSetupSessionParams
 	return result.RowsAffected()
 }
 
-const finishSetupTokenReveal = `-- name: FinishSetupTokenReveal :execrows
+const finishSetupGenerationReveal = `-- name: FinishSetupGenerationReveal :execrows
 UPDATE setup_tokens SET state = 'retrieved', retrieved_at = ?1 WHERE id = ?2 AND state = 'claimed'
 `
 
-type FinishSetupTokenRevealParams struct {
+type FinishSetupGenerationRevealParams struct {
 	Now sql.NullInt64
 	ID  int64
 }
 
-func (q *Queries) FinishSetupTokenReveal(ctx context.Context, arg FinishSetupTokenRevealParams) (int64, error) {
-	result, err := q.db.ExecContext(ctx, finishSetupTokenReveal, arg.Now, arg.ID)
+func (q *Queries) FinishSetupGenerationReveal(ctx context.Context, arg FinishSetupGenerationRevealParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, finishSetupGenerationReveal, arg.Now, arg.ID)
 	if err != nil {
 		return 0, err
 	}
@@ -412,6 +412,67 @@ func (q *Queries) GetSetupAttempts(ctx context.Context, purpose string) (SetupAt
 	row := q.db.QueryRowContext(ctx, getSetupAttempts, purpose)
 	var i SetupAttempt
 	err := row.Scan(&i.Purpose, &i.Failed, &i.NextAttemptAt)
+	return i, err
+}
+
+const getSetupGeneration = `-- name: GetSetupGeneration :one
+SELECT id, purpose, target_user_id, installation_id, build_identity, digest, state, issued_at, expires_at, replace_password, risk_acknowledged, claimed_at, retrieved_at, consumed_at, revoked_at, revoke_reason FROM setup_tokens WHERE id = ?
+`
+
+func (q *Queries) GetSetupGeneration(ctx context.Context, id int64) (SetupToken, error) {
+	row := q.db.QueryRowContext(ctx, getSetupGeneration, id)
+	var i SetupToken
+	err := row.Scan(
+		&i.ID,
+		&i.Purpose,
+		&i.TargetUserID,
+		&i.InstallationID,
+		&i.BuildIdentity,
+		&i.Digest,
+		&i.State,
+		&i.IssuedAt,
+		&i.ExpiresAt,
+		&i.ReplacePassword,
+		&i.RiskAcknowledged,
+		&i.ClaimedAt,
+		&i.RetrievedAt,
+		&i.ConsumedAt,
+		&i.RevokedAt,
+		&i.RevokeReason,
+	)
+	return i, err
+}
+
+const getSetupGenerationByDigest = `-- name: GetSetupGenerationByDigest :one
+SELECT id, purpose, target_user_id, installation_id, build_identity, digest, state, issued_at, expires_at, replace_password, risk_acknowledged, claimed_at, retrieved_at, consumed_at, revoked_at, revoke_reason FROM setup_tokens WHERE digest IN (?1, ?2)
+`
+
+type GetSetupGenerationByDigestParams struct {
+	First  []byte
+	Second []byte
+}
+
+func (q *Queries) GetSetupGenerationByDigest(ctx context.Context, arg GetSetupGenerationByDigestParams) (SetupToken, error) {
+	row := q.db.QueryRowContext(ctx, getSetupGenerationByDigest, arg.First, arg.Second)
+	var i SetupToken
+	err := row.Scan(
+		&i.ID,
+		&i.Purpose,
+		&i.TargetUserID,
+		&i.InstallationID,
+		&i.BuildIdentity,
+		&i.Digest,
+		&i.State,
+		&i.IssuedAt,
+		&i.ExpiresAt,
+		&i.ReplacePassword,
+		&i.RiskAcknowledged,
+		&i.ClaimedAt,
+		&i.RetrievedAt,
+		&i.ConsumedAt,
+		&i.RevokedAt,
+		&i.RevokeReason,
+	)
 	return i, err
 }
 
@@ -494,67 +555,6 @@ func (q *Queries) GetSetupState(ctx context.Context) (SetupState, error) {
 	return i, err
 }
 
-const getSetupToken = `-- name: GetSetupToken :one
-SELECT id, purpose, target_user_id, installation_id, build_identity, digest, state, issued_at, expires_at, replace_password, risk_acknowledged, claimed_at, retrieved_at, consumed_at, revoked_at, revoke_reason FROM setup_tokens WHERE id = ?
-`
-
-func (q *Queries) GetSetupToken(ctx context.Context, id int64) (SetupToken, error) {
-	row := q.db.QueryRowContext(ctx, getSetupToken, id)
-	var i SetupToken
-	err := row.Scan(
-		&i.ID,
-		&i.Purpose,
-		&i.TargetUserID,
-		&i.InstallationID,
-		&i.BuildIdentity,
-		&i.Digest,
-		&i.State,
-		&i.IssuedAt,
-		&i.ExpiresAt,
-		&i.ReplacePassword,
-		&i.RiskAcknowledged,
-		&i.ClaimedAt,
-		&i.RetrievedAt,
-		&i.ConsumedAt,
-		&i.RevokedAt,
-		&i.RevokeReason,
-	)
-	return i, err
-}
-
-const getSetupTokenByDigest = `-- name: GetSetupTokenByDigest :one
-SELECT id, purpose, target_user_id, installation_id, build_identity, digest, state, issued_at, expires_at, replace_password, risk_acknowledged, claimed_at, retrieved_at, consumed_at, revoked_at, revoke_reason FROM setup_tokens WHERE digest IN (?1, ?2)
-`
-
-type GetSetupTokenByDigestParams struct {
-	First  []byte
-	Second []byte
-}
-
-func (q *Queries) GetSetupTokenByDigest(ctx context.Context, arg GetSetupTokenByDigestParams) (SetupToken, error) {
-	row := q.db.QueryRowContext(ctx, getSetupTokenByDigest, arg.First, arg.Second)
-	var i SetupToken
-	err := row.Scan(
-		&i.ID,
-		&i.Purpose,
-		&i.TargetUserID,
-		&i.InstallationID,
-		&i.BuildIdentity,
-		&i.Digest,
-		&i.State,
-		&i.IssuedAt,
-		&i.ExpiresAt,
-		&i.ReplacePassword,
-		&i.RiskAcknowledged,
-		&i.ClaimedAt,
-		&i.RetrievedAt,
-		&i.ConsumedAt,
-		&i.RevokedAt,
-		&i.RevokeReason,
-	)
-	return i, err
-}
-
 const listAddressProofs = `-- name: ListAddressProofs :many
 SELECT id, user_id, address_id, address_version, purpose, proof_hash, issued_at, expires_at, consumed_at, credential_generation FROM notification_address_proofs WHERE user_id = ? ORDER BY id
 `
@@ -632,6 +632,50 @@ func (q *Queries) ListConfirmedStagedAddresses(ctx context.Context, userID strin
 	return items, nil
 }
 
+const listLiveSetupGenerations = `-- name: ListLiveSetupGenerations :many
+SELECT id, purpose, target_user_id, installation_id, build_identity, digest, state, issued_at, expires_at, replace_password, risk_acknowledged, claimed_at, retrieved_at, consumed_at, revoked_at, revoke_reason FROM setup_tokens WHERE state IN ('pending','available','claimed','retrieved') ORDER BY id
+`
+
+func (q *Queries) ListLiveSetupGenerations(ctx context.Context) ([]SetupToken, error) {
+	rows, err := q.db.QueryContext(ctx, listLiveSetupGenerations)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []SetupToken{}
+	for rows.Next() {
+		var i SetupToken
+		if err := rows.Scan(
+			&i.ID,
+			&i.Purpose,
+			&i.TargetUserID,
+			&i.InstallationID,
+			&i.BuildIdentity,
+			&i.Digest,
+			&i.State,
+			&i.IssuedAt,
+			&i.ExpiresAt,
+			&i.ReplacePassword,
+			&i.RiskAcknowledged,
+			&i.ClaimedAt,
+			&i.RetrievedAt,
+			&i.ConsumedAt,
+			&i.RevokedAt,
+			&i.RevokeReason,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listLiveSetupSessions = `-- name: ListLiveSetupSessions :many
 SELECT id, token_id, purpose, target_user_id, secret_hash, created_at, expires_at, state, ended_at, staged_user_id, staged_verifier, staged_password_format, staged_password_codepoints, totp_authenticator_id, totp_proven_at, proof_failures, proof_next_attempt_at, last_proof_sent_at FROM setup_sessions WHERE state = 'active' ORDER BY id
 `
@@ -678,56 +722,12 @@ func (q *Queries) ListLiveSetupSessions(ctx context.Context) ([]SetupSession, er
 	return items, nil
 }
 
-const listLiveSetupTokens = `-- name: ListLiveSetupTokens :many
-SELECT id, purpose, target_user_id, installation_id, build_identity, digest, state, issued_at, expires_at, replace_password, risk_acknowledged, claimed_at, retrieved_at, consumed_at, revoked_at, revoke_reason FROM setup_tokens WHERE state IN ('pending','available','claimed','retrieved') ORDER BY id
-`
-
-func (q *Queries) ListLiveSetupTokens(ctx context.Context) ([]SetupToken, error) {
-	rows, err := q.db.QueryContext(ctx, listLiveSetupTokens)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []SetupToken{}
-	for rows.Next() {
-		var i SetupToken
-		if err := rows.Scan(
-			&i.ID,
-			&i.Purpose,
-			&i.TargetUserID,
-			&i.InstallationID,
-			&i.BuildIdentity,
-			&i.Digest,
-			&i.State,
-			&i.IssuedAt,
-			&i.ExpiresAt,
-			&i.ReplacePassword,
-			&i.RiskAcknowledged,
-			&i.ClaimedAt,
-			&i.RetrievedAt,
-			&i.ConsumedAt,
-			&i.RevokedAt,
-			&i.RevokeReason,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listRecentSetupTokens = `-- name: ListRecentSetupTokens :many
+const listRecentSetupGenerations = `-- name: ListRecentSetupGenerations :many
 SELECT id, purpose, target_user_id, installation_id, build_identity, digest, state, issued_at, expires_at, replace_password, risk_acknowledged, claimed_at, retrieved_at, consumed_at, revoked_at, revoke_reason FROM setup_tokens ORDER BY id DESC LIMIT 8
 `
 
-func (q *Queries) ListRecentSetupTokens(ctx context.Context) ([]SetupToken, error) {
-	rows, err := q.db.QueryContext(ctx, listRecentSetupTokens)
+func (q *Queries) ListRecentSetupGenerations(ctx context.Context) ([]SetupToken, error) {
+	rows, err := q.db.QueryContext(ctx, listRecentSetupGenerations)
 	if err != nil {
 		return nil, err
 	}
@@ -812,12 +812,12 @@ func (q *Queries) ListSetupSessionsByStagedUser(ctx context.Context, stagedUserI
 	return items, nil
 }
 
-const listUserSetupTokens = `-- name: ListUserSetupTokens :many
+const listUserSetupGenerations = `-- name: ListUserSetupGenerations :many
 SELECT id, purpose, target_user_id, installation_id, build_identity, digest, state, issued_at, expires_at, replace_password, risk_acknowledged, claimed_at, retrieved_at, consumed_at, revoked_at, revoke_reason FROM setup_tokens WHERE target_user_id = ? ORDER BY id
 `
 
-func (q *Queries) ListUserSetupTokens(ctx context.Context, targetUserID sql.NullString) ([]SetupToken, error) {
-	rows, err := q.db.QueryContext(ctx, listUserSetupTokens, targetUserID)
+func (q *Queries) ListUserSetupGenerations(ctx context.Context, targetUserID sql.NullString) ([]SetupToken, error) {
+	rows, err := q.db.QueryContext(ctx, listUserSetupGenerations, targetUserID)
 	if err != nil {
 		return nil, err
 	}
@@ -856,12 +856,12 @@ func (q *Queries) ListUserSetupTokens(ctx context.Context, targetUserID sql.Null
 	return items, nil
 }
 
-const makeSetupTokenAvailable = `-- name: MakeSetupTokenAvailable :execrows
+const makeSetupGenerationAvailable = `-- name: MakeSetupGenerationAvailable :execrows
 UPDATE setup_tokens SET state = 'available' WHERE id = ? AND state = 'pending'
 `
 
-func (q *Queries) MakeSetupTokenAvailable(ctx context.Context, id int64) (int64, error) {
-	result, err := q.db.ExecContext(ctx, makeSetupTokenAvailable, id)
+func (q *Queries) MakeSetupGenerationAvailable(ctx context.Context, id int64) (int64, error) {
+	result, err := q.db.ExecContext(ctx, makeSetupGenerationAvailable, id)
 	if err != nil {
 		return 0, err
 	}
@@ -1031,19 +1031,19 @@ func (q *Queries) ResetSetupAttempts(ctx context.Context, purpose string) error 
 	return err
 }
 
-const revokeSetupToken = `-- name: RevokeSetupToken :execrows
+const revokeSetupGeneration = `-- name: RevokeSetupGeneration :execrows
 UPDATE setup_tokens SET state = 'revoked', revoked_at = ?1, revoke_reason = CAST(?2 AS TEXT)
 WHERE id = ?3 AND state IN ('pending','available','claimed','retrieved')
 `
 
-type RevokeSetupTokenParams struct {
+type RevokeSetupGenerationParams struct {
 	Now    sql.NullInt64
 	Reason string
 	ID     int64
 }
 
-func (q *Queries) RevokeSetupToken(ctx context.Context, arg RevokeSetupTokenParams) (int64, error) {
-	result, err := q.db.ExecContext(ctx, revokeSetupToken, arg.Now, arg.Reason, arg.ID)
+func (q *Queries) RevokeSetupGeneration(ctx context.Context, arg RevokeSetupGenerationParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, revokeSetupGeneration, arg.Now, arg.Reason, arg.ID)
 	if err != nil {
 		return 0, err
 	}
@@ -1082,31 +1082,6 @@ func (q *Queries) SetSetupTOTP(ctx context.Context, arg SetSetupTOTPParams) (int
 	return result.RowsAffected()
 }
 
-const stageSetupPassword = `-- name: StageSetupPassword :execrows
-UPDATE setup_sessions SET staged_verifier = ?1, staged_password_format = ?2, staged_password_codepoints = ?3
-WHERE id = ?4 AND state = 'active' AND purpose = 'mfa_reset' AND staged_verifier IS NULL
-`
-
-type StageSetupPasswordParams struct {
-	Verifier   []byte
-	Format     sql.NullString
-	Codepoints sql.NullInt64
-	ID         string
-}
-
-func (q *Queries) StageSetupPassword(ctx context.Context, arg StageSetupPasswordParams) (int64, error) {
-	result, err := q.db.ExecContext(ctx, stageSetupPassword,
-		arg.Verifier,
-		arg.Format,
-		arg.Codepoints,
-		arg.ID,
-	)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected()
-}
-
 const stageSetupUser = `-- name: StageSetupUser :execrows
 UPDATE setup_sessions SET staged_user_id = ?1, staged_verifier = ?2, staged_password_format = ?3, staged_password_codepoints = ?4
 WHERE id = ?5 AND state = 'active' AND purpose = 'initial_setup' AND staged_user_id IS NULL AND staged_verifier IS NULL
@@ -1123,6 +1098,31 @@ type StageSetupUserParams struct {
 func (q *Queries) StageSetupUser(ctx context.Context, arg StageSetupUserParams) (int64, error) {
 	result, err := q.db.ExecContext(ctx, stageSetupUser,
 		arg.UserID,
+		arg.Verifier,
+		arg.Format,
+		arg.Codepoints,
+		arg.ID,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const stageSetupVerifier = `-- name: StageSetupVerifier :execrows
+UPDATE setup_sessions SET staged_verifier = ?1, staged_password_format = ?2, staged_password_codepoints = ?3
+WHERE id = ?4 AND state = 'active' AND purpose = 'mfa_reset' AND staged_verifier IS NULL
+`
+
+type StageSetupVerifierParams struct {
+	Verifier   []byte
+	Format     sql.NullString
+	Codepoints sql.NullInt64
+	ID         string
+}
+
+func (q *Queries) StageSetupVerifier(ctx context.Context, arg StageSetupVerifierParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, stageSetupVerifier,
 		arg.Verifier,
 		arg.Format,
 		arg.Codepoints,

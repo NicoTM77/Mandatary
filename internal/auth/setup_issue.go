@@ -125,7 +125,7 @@ func purgeStaging(ctx context.Context, q *store.Queries, sess store.SetupSession
 // It returns the reveal-file names the caller must remove after the commit.
 func revokeLive(ctx context.Context, q *store.Queries, purpose SetupPurpose, target sql.NullString, now int64, reason string) ([]string, error) {
 	var removals []string
-	tokens, err := q.ListLiveSetupTokens(ctx)
+	tokens, err := q.ListLiveSetupGenerations(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -133,7 +133,7 @@ func revokeLive(ctx context.Context, q *store.Queries, purpose SetupPurpose, tar
 		if !sameTarget(tok, purpose, target) {
 			continue
 		}
-		n, err := q.RevokeSetupToken(ctx, store.RevokeSetupTokenParams{Now: nullableInt(now), Reason: reason, ID: tok.ID})
+		n, err := q.RevokeSetupGeneration(ctx, store.RevokeSetupGenerationParams{Now: nullableInt(now), Reason: reason, ID: tok.ID})
 		if err != nil {
 			return nil, err
 		}
@@ -261,7 +261,7 @@ func (s *Setup) issue(ctx context.Context, req IssueRequest, automatic bool) (To
 			return e
 		}
 		issued, expires = now, now+int64(SetupTokenLifetime/time.Second)
-		generation, e = q.CreateSetupToken(bounded, store.CreateSetupTokenParams{
+		generation, e = q.CreateSetupGeneration(bounded, store.CreateSetupGenerationParams{
 			Purpose: string(req.Purpose), TargetUserID: target, InstallationID: meta.InstallationID, BuildIdentity: s.settings.Build,
 			Digest: digest, IssuedAt: issued, ExpiresAt: expires, ReplacePassword: boolInt(req.ReplacePassword), RiskAcknowledged: boolInt(req.RiskAcknowledged),
 		})
@@ -288,7 +288,7 @@ func (s *Setup) issue(ctx context.Context, req IssueRequest, automatic bool) (To
 		}
 		return s.step("issue:after-file")
 	}, func(q *store.Queries) error {
-		n, e := q.MakeSetupTokenAvailable(bounded, generation)
+		n, e := q.MakeSetupGenerationAvailable(bounded, generation)
 		if e != nil {
 			return e
 		}
@@ -333,7 +333,7 @@ func (s *Setup) Reconcile(ctx context.Context) (ReconcileReport, error) {
 	var removals []string
 	err := s.run(ctx, func(ctx context.Context, q *store.Queries, now int64) error {
 		report, removals = ReconcileReport{}, nil
-		tokens, e := q.ListLiveSetupTokens(ctx)
+		tokens, e := q.ListLiveSetupGenerations(ctx)
 		if e != nil {
 			return e
 		}
@@ -353,7 +353,7 @@ func (s *Setup) Reconcile(ctx context.Context) (ReconcileReport, error) {
 				}
 			}
 			if reason != "" {
-				n, e := q.RevokeSetupToken(ctx, store.RevokeSetupTokenParams{Now: nullableInt(now), Reason: reason, ID: tok.ID})
+				n, e := q.RevokeSetupGeneration(ctx, store.RevokeSetupGenerationParams{Now: nullableInt(now), Reason: reason, ID: tok.ID})
 				if e != nil {
 					return e
 				}
@@ -473,7 +473,7 @@ func (s *Setup) Status(ctx context.Context) (SetupStatus, error) {
 			return e
 		}
 		out.Completed = st.CompletedAt.Valid
-		rows, e := q.ListRecentSetupTokens(ctx)
+		rows, e := q.ListRecentSetupGenerations(ctx)
 		if e != nil {
 			return e
 		}

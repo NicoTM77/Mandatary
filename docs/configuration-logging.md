@@ -17,6 +17,7 @@ quarantine, generation, WAL and durability contracts.
 | `MANDATARY_LOG_LEVEL` | `info` | Exactly `debug`, `info`, `warn`, `error`; minimum severity, including the global slog/standard-log and HTTP error-log bridges. |
 | `MANDATARY_LOG_FORMAT` | `json` | Exactly `json` or `text`; both write to **stdout**. Local `make dev` explicitly selects `text` unless overridden. |
 | `MANDATARY_DATA_DIR` | `/data` | Absolute, already-clean path without control characters. The repository additionally enforces actual owner/ancestor/file safety; config parsing creates nothing. |
+| `MANDATARY_PUBLIC_ORIGIN`, `MANDATARY_SMTP_RELAY`, `MANDATARY_SMTP_TLS`, `MANDATARY_SMTP_SENDER`, `MANDATARY_NOTICE_CONTACT` | Unset | P1.09 first-administrator setup and notice delivery; validated strictly, never echoed on error. See `setup-recovery.md`. |
 | `MANDATARY_MASTER_KEY` / `MANDATARY_MASTER_KEY_FILE` | Required; no generated/default key | Exactly one nonempty source, using P1.03 `store.LoadMasterKey` unchanged: nonzero 32-byte hex/base64 value, or protected key file. Missing, conflicting, invalid or unreadable sources deny before storage/listener access. Never put real values in commands, examples, logs or issue reports. |
 
 Empty values select documented defaults (except key sources, which remain
@@ -107,9 +108,11 @@ or extra personal-data processing is required by this change.
 Per security-contracts §S3, ordinary logging has **no credential-disclosure
 exception**. In particular, a token-bearing setup URL, error, cookie, response
 trace or environment value is redacted at every severity/format. There is no
-setup route/token or reveal helper in this PR. P1.09 must emit only a validated,
-configured secret-free setup URL and deliver plaintext solely through its real
-protected host-local terminal protocol, never slog/stdout container logging.
+setup route/token or reveal helper in P1.04. P1.09 (see `setup-recovery.md`) emits
+only a validated, configured secret-free setup URL — the logger admits exactly
+`https://host[:port]/setup` for the `setup_url` attribute and redacts any other
+value — and delivers plaintext solely through its real protected host-local
+terminal protocol, never slog/stdout container logging.
 This logger does not offer a `reveal`, `unsafe` or redaction-disable switch.
 
 `TestSecretTypeAndSeparateControlOutput` keeps a synthetic control sink distinct
@@ -124,7 +127,7 @@ the synthetic sink is not a mock substitute for their acceptance evidence.
 | --- | --- | --- |
 | TD §9.3, R shared logging; P1.04 all 4 levels × both formats | `TestSecretCanariesAllLevelsAndFormats`, `TestLevelFilteringAndUsefulMetadata`, `TestLoggingConfiguration` | No claim that arbitrary outside writers/proxies are redacted. |
 | SETUP-02 logging portion; NIST D-10, O04 / `N63B4-OTP-CLAIMS`, I09 / `N63B4-THREAT-BROWSER` logging portion | Canary matrix; `TestRequestAndErrorPathsNeverLogPayloads`; native HTTP panic/error-log test; runtime integration tests | Actual setup/recovery/browser/proxy flows and OTP replay/account-parity behavior stay with P1.06/08/09/16/19/20. |
-| S3 ordinary/control separation | `TestSecretTypeAndSeparateControlOutput`; ordinary canary matrix includes synthetic setup token | Actual protected host disclosure is **not implemented/tested** here. |
+| S3 ordinary/control separation | `TestSecretTypeAndSeparateControlOutput`; ordinary canary matrix includes synthetic setup token | Actual protected host disclosure is implemented and tested by P1.09 (`setup-recovery.md`), not by the logging tests. |
 | A08/A09, S10, I10 / `N63B4-GOV-RETENTION`, `N63B4-GOV-PRIVACY`, `N63B4-SESSION-MONITORING`, `N63B4-PRIVACY-REVIEW` | No IP/identity/path/body/headers, no persistence/telemetry/monitoring; schema and HTTP tests enforce exclusion | Deployment/operator-specific legal retention/privacy/control tailoring and redress evidence must be settled in owning product/release review; no NIST/federal conformance claim. |
 | A05 / `N63B4-AAL-TIMEOUTS`, `REAUTH-*` mapping | No session configuration, session issuance, assurance or timeout change is introduced | P1.08 implements/tests 12h/30m clocks and prevents incompatible timeout settings; logging cannot establish AAL2. |
 | SELF, RESTORE, N1/N2/R1/A1 | Existing storage/security regression suite retained unchanged; no authority/restore/bootstrap/notification transition added | Later owners still implement integrated SELF/RESTORE/authentication/notices/controlled-runtime acceptance. |

@@ -178,7 +178,7 @@ func (s *Setup) StageAccount(ctx context.Context, secret []byte, req AccountRequ
 			if e != nil || !bytes.Equal(current.VerifierHash, p.binding.VerifierHash) {
 				return errSetupLogical
 			}
-			n, e := q.StageSetupPassword(ctx, store.StageSetupPasswordParams{Verifier: verifier, Format: format, Codepoints: cp, ID: sess.ID})
+			n, e := q.StageSetupVerifier(ctx, store.StageSetupVerifierParams{Verifier: verifier, Format: format, Codepoints: cp, ID: sess.ID})
 			if e != nil {
 				return e
 			}
@@ -247,7 +247,7 @@ func canonicalProof(input string) ([]byte, bool) {
 	}
 	for i := 0; i < len(compact); i++ {
 		c := compact[i]
-		if !(c >= 'A' && c <= 'Z') && !(c >= '2' && c <= '7') {
+		if (c < 'A' || c > 'Z') && (c < '2' || c > '7') {
 			return nil, false
 		}
 	}
@@ -429,7 +429,7 @@ func (s *Setup) BeginTOTP(ctx context.Context, secret []byte, algorithm string) 
 			}
 			userID = sess.StagedUserID.String
 		case PurposeMFAReset:
-			tok, e := q.GetSetupToken(ctx, sess.TokenID)
+			tok, e := q.GetSetupGeneration(ctx, sess.TokenID)
 			if e != nil {
 				return e
 			}
@@ -642,7 +642,7 @@ func (s *Setup) completeInitial(ctx context.Context, q *store.Queries, sess stor
 	if err != nil {
 		return CompleteResult{}, nil, err
 	}
-	if err = q.CreateAdminPassword(ctx, store.CreateAdminPasswordParams{ID: passwordID, UserID: user.ID, CreatedAt: now, BoundAt: nullableInt(now), ChangedAt: nullableInt(now), VerifierHash: sess.StagedVerifier, PasswordCodepoints: sess.StagedPasswordCodepoints, PasswordFormat: sess.StagedPasswordFormat}); err != nil {
+	if err = q.CreateAdminVerifier(ctx, store.CreateAdminVerifierParams{ID: passwordID, UserID: user.ID, CreatedAt: now, BoundAt: nullableInt(now), ChangedAt: nullableInt(now), VerifierHash: sess.StagedVerifier, PasswordCodepoints: sess.StagedPasswordCodepoints, PasswordFormat: sess.StagedPasswordFormat}); err != nil {
 		return CompleteResult{}, nil, err
 	}
 	if n, err = q.ActivateProvenTOTP(ctx, store.ActivateProvenTOTPParams{Generation: 1, Now: nullableInt(now), ID: totp.ID}); err != nil {

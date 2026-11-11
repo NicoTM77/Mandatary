@@ -206,7 +206,7 @@ func canonicalToken(input string) ([]byte, bool) {
 	}
 	for i := 0; i < len(compact); i++ {
 		c := compact[i]
-		if !(c >= 'A' && c <= 'Z') && !(c >= '2' && c <= '7') {
+		if (c < 'A' || c > 'Z') && (c < '2' || c > '7') {
 			return nil, false
 		}
 	}
