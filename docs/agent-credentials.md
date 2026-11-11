@@ -74,8 +74,15 @@ route layer reads only the `__Host-` session cookie, and the service has no bear
 digits (62⁴³ > 2²⁵⁶, so no bit is discarded): 47 characters. `crypto/rand` is the only
 source; a short read, an error or an all-zero draw issues nothing and there is no fallback
 (`TestAgentTokenRandomnessFailureNeverIssues`, `TestRandomnessFailureIssuesNoCredential`).
-The Go standard-library generator is implementation evidence for G16/RANDOM-EVIDENCE, **not**
-a claim of a NIST-validated random bit generator construction or FIPS validation.
+**RANDOM-EVIDENCE (G16) inventory for this card.** Token bits, credential identifiers (UUIDv4 via
+`domain.NewUUID`) and the display identifier all come from `crypto/rand.Reader`. Per the Go 1.27.4
+source/documentation inspected for this card (`crypto/rand/rand.go`), that reader is `getrandom(2)` on
+Linux and passes through an SP 800-90A Rev. 1 DRBG only in Go's FIPS 140-3 mode, which Mandatary does
+not enable; the Go 1.26.11 compatibility line was not separately inspected. This is implementation
+evidence, **not** a claim of a NIST-approved RBG construction with a stated security strength, FIPS
+validation or an assessed deployment kernel; any such claim remains a P1.19/P1.20 evidence item.
+Output length is exactly 256 bits; the base62 encoding is an exact integer rendering (no modulo
+bias, no discarded or padded entropy); the all-zero draw is refused.
 
 - **Hash-only persistence.** SQLite stores only SHA-256(token), a unique 32-byte value. The
   whole database, WAL and shm contain neither the token, its body, its hex/base64 forms nor
