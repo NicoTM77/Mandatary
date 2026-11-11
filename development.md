@@ -47,7 +47,7 @@ is not implied by the installer or a Linux test. Windows is not first-class.
 
 Approved tuple (checked before install/build/test):
 
-- Go **1.27.3** primary; **1.26.10** compatibility (`GOTOOLCHAIN=local`).
+- Go **1.27.4** primary; **1.26.11** compatibility (`GOTOOLCHAIN=local`). Go 1.27.3 and 1.26.10 are refused: they are affected by GO-2026-6859 (net/http), fixed in these patch releases.
 - Node **24.22.1 LTS**, including npm **11.19.1**. Node is build tooling only.
 
 Either put that exact tuple on PATH yourself or install into a project-local,
@@ -55,7 +55,7 @@ ignored directory (never system or Hermes tooling):
 
 ```bash
 bash scripts/bootstrap.sh
-export PATH="$PWD/.toolchains/go1.27.3/bin:$PWD/.toolchains/node24.22.1/bin:$PATH"
+export PATH="$PWD/.toolchains/go1.27.4/bin:$PWD/.toolchains/node24.22.1/bin:$PATH"
 mkdir -p -m 0700 "$PWD/.toolchains/test-tmp"
 export TMPDIR="$PWD/.toolchains/test-tmp"
 make install
@@ -90,9 +90,9 @@ install. A missing/unavailable approved version is an error, not a fallback.
 For compatibility, bootstrap separately and use the matching PATH/selector:
 
 ```bash
-MANDATARY_GO_VERSION=1.26.10 bash scripts/bootstrap.sh
-export PATH="$PWD/.toolchains/go1.26.10/bin:$PWD/.toolchains/node24.22.1/bin:$PATH"
-MANDATARY_GO_VERSION=1.26.10 make install check negative-control
+MANDATARY_GO_VERSION=1.26.11 bash scripts/bootstrap.sh
+export PATH="$PWD/.toolchains/go1.26.11/bin:$PWD/.toolchains/node24.22.1/bin:$PATH"
+MANDATARY_GO_VERSION=1.26.11 make install check negative-control
 ```
 
 ## Commands and locks

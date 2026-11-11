@@ -267,6 +267,59 @@ type SessionAuthenticator struct {
 	UserID          string
 }
 
+type SetupAttempt struct {
+	Purpose       string
+	Failed        int64
+	NextAttemptAt int64
+}
+
+type SetupSession struct {
+	ID                       string
+	TokenID                  int64
+	Purpose                  string
+	TargetUserID             sql.NullString
+	SecretHash               []byte
+	CreatedAt                int64
+	ExpiresAt                int64
+	State                    string
+	EndedAt                  sql.NullInt64
+	StagedUserID             sql.NullString
+	StagedVerifier           []byte
+	StagedPasswordFormat     sql.NullString
+	StagedPasswordCodepoints sql.NullInt64
+	TotpAuthenticatorID      sql.NullString
+	TotpProvenAt             sql.NullInt64
+	ProofFailures            int64
+	ProofNextAttemptAt       int64
+	LastProofSentAt          int64
+}
+
+type SetupState struct {
+	Singleton      int64
+	InitialIssued  int64
+	CompletedAt    sql.NullInt64
+	ClockHighWater int64
+}
+
+type SetupToken struct {
+	ID               int64
+	Purpose          string
+	TargetUserID     sql.NullString
+	InstallationID   []byte
+	BuildIdentity    string
+	Digest           []byte
+	State            string
+	IssuedAt         int64
+	ExpiresAt        int64
+	ReplacePassword  int64
+	RiskAcknowledged int64
+	ClaimedAt        sql.NullInt64
+	RetrievedAt      sql.NullInt64
+	ConsumedAt       sql.NullInt64
+	RevokedAt        sql.NullInt64
+	RevokeReason     sql.NullString
+}
+
 type SmtpSecret struct {
 	ID         string
 	Ciphertext []byte

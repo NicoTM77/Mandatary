@@ -29,7 +29,7 @@ Other tools and agents interact through an API and an MCP server, with access co
 ### Web UI and frontend technology
 
 - Provide both dark and light modes for the web UI, including the later-stage container-operations interface.
-- Use up-to-date, supported web frameworks evaluated against security and maintainability. The approved frontend is React 19 + TypeScript + Vite, Tailwind CSS + shadcn/ui (Radix), with embedded static assets (`technical-decisions.md` §5). Go1.27.3 primary/1.26.10 compatibility and Node24.22.1/npm11.19.1 plus the support/update policy are approved. Candidate library pins require actual locked builds/tests in P1.01; the framework choice is not reopened.
+- Use up-to-date, supported web frameworks evaluated against security and maintainability. The approved frontend is React 19 + TypeScript + Vite, Tailwind CSS + shadcn/ui (Radix), with embedded static assets (`technical-decisions.md` §5). Go1.27.4 primary/1.26.11 compatibility and Node24.22.1/npm11.19.1 plus the support/update policy are approved. Candidate library pins require actual locked builds/tests in P1.01; the framework choice is not reopened.
 
 ### Lightweight deployment
 

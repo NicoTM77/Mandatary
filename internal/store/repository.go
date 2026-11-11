@@ -18,7 +18,7 @@ import (
 	sqlite "modernc.org/sqlite"
 )
 
-const currentSchemaVersion = 10
+const currentSchemaVersion = 11
 
 var ErrStorage = errors.New("storage unavailable or unsafe")
 
@@ -285,7 +285,25 @@ func (r *Repository) FailedClosed() bool { return r.poisoned.Load() }
 // and identity verification; it must be bounded and must not reenter Repository.
 // A failed/uncertain callback poisons this handle: the owning protocol must
 // reconcile non-revealable persisted state before reopening/serving again.
-func (r *Repository) Control(ctx context.Context, fn func(*Queries) error, afterDurable func() error) (result error) {
+func (r *Repository) Control(ctx context.Context, fn func(*Queries) error, afterDurable func() error) error {
+	return r.control(ctx, fn, afterDurable, nil)
+}
+
+// ControlThen is Control plus a SECOND durable transaction under the SAME shared
+// lock acquisition: fn commits and syncs, afterDurable performs the bounded
+// delivery/file step, then finish commits and syncs the resulting state before
+// the lock is released. Reveal/issue protocols need this so no other process can
+// observe or reconcile the intermediate persisted state between the steps (S3.1a).
+// A failure in any step after the first commit poisons this handle and leaves the
+// persisted intermediate state for explicit, conservative reconciliation.
+func (r *Repository) ControlThen(ctx context.Context, fn func(*Queries) error, afterDurable func() error, finish func(*Queries) error) error {
+	if finish == nil {
+		return ErrStorage
+	}
+	return r.control(ctx, fn, afterDurable, finish)
+}
+
+func (r *Repository) control(ctx context.Context, fn func(*Queries) error, afterDurable func() error, finish func(*Queries) error) (result error) {
 	r.lifecycle.RLock()
 	defer r.lifecycle.RUnlock()
 	// This final atomic health observation is the acknowledgement boundary,
@@ -364,6 +382,50 @@ func (r *Repository) Control(ctx context.Context, fn func(*Queries) error, after
 			r.poisoned.Store(true)
 			return ErrStorage
 		}
+	}
+	if finish != nil {
+		return r.finishLocked(ctx, conn, finish)
+	}
+	return nil
+}
+
+// finishLocked runs the second durable step of ControlThen on the already locked
+// writer connection. Every failure poisons the handle: the first step's persisted
+// state may already have been acted on (for example a delivered secret).
+func (r *Repository) finishLocked(ctx context.Context, conn *sql.Conn, finish func(*Queries) error) error {
+	if r.poisoned.Load() || verifyWriter(ctx, conn) != nil {
+		r.poisoned.Store(true)
+		return ErrStorage
+	}
+	tx, err := conn.BeginTx(ctx, nil)
+	if err != nil {
+		r.poisoned.Store(true)
+		return ErrStorage
+	}
+	defer func() { _ = tx.Rollback() }() // also after commit; ErrTxDone is expected
+	q := New(tx)
+	if _, err := q.GetInstallationControl(ctx); err != nil {
+		r.poisoned.Store(true)
+		return ErrStorage
+	}
+	if err := finish(q); err != nil {
+		r.poisoned.Store(true)
+		return ErrStorage
+	}
+	if err := tx.Commit(); err != nil {
+		r.poisoned.Store(true)
+		return ErrStorage
+	}
+	if err := r.syncFiles(); err != nil {
+		r.poisoned.Store(true)
+		return ErrStorage
+	}
+	if err := r.verifyFiles(); err != nil {
+		r.poisoned.Store(true)
+		return ErrStorage
+	}
+	if r.poisoned.Load() {
+		return ErrStorage
 	}
 	return nil
 }

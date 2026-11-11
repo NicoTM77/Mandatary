@@ -2,7 +2,7 @@
 
 ## Authorization and graph boundary
 
-Retain approved **sqlc v1.31.1**, Go1.27.3/1.26.10 and Node24.22.1/npm11.19.1.
+Retain approved **sqlc v1.31.1**, Go1.27.4/1.26.11 and Node24.22.1/npm11.19.1.
 The owner-approved exception on original P1.02 permits explicitly pinned security
 updates only in the **new** `tools/sqlc` module, plus required compatibility
 transitives. App, frontend and scanner locks are unchanged by this remediation.

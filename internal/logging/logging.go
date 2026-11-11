@@ -6,6 +6,8 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"net/url"
+	"strings"
 )
 
 const redacted = "[REDACTED]"
@@ -18,7 +20,27 @@ const (
 	StartupFailed      = "startup failed"
 	ServerFailed       = "server failed"
 	StorageCloseFailed = "storage close failed"
+	// Initial-setup events (security-contracts.md S3). They may carry ONLY the
+	// configured secret-free setup URL, a generation number, the absolute expiry
+	// and a fixed reason. The token itself has no logging path at all.
+	SetupAvailable   = "initial setup available"
+	SetupUnavailable = "initial setup unavailable"
+	SetupNoMail      = "setup notice delivery not configured"
 )
+
+// SetupReasons are the only admitted values of the "reason" attribute.
+var setupReasons = map[string]bool{"origin_not_configured": true, "rotation_required": true, "storage": true, "clock": true}
+
+// validSetupURL admits exactly one shape: https://host[:port]/setup with no
+// userinfo, query or fragment. Anything else (including any token-bearing URL) is
+// redacted, so a mistaken caller cannot turn the setup URL into a secret channel.
+func validSetupURL(s string) bool {
+	if len(s) > 255 || strings.ContainsAny(s, " 	\r\n\x00") {
+		return false
+	}
+	u, err := url.Parse(s)
+	return err == nil && u.Scheme == "https" && u.Host != "" && u.User == nil && u.Path == "/setup" && u.RawQuery == "" && u.Fragment == "" && !u.ForceQuery && u.Opaque == ""
+}
 
 // secretValue deliberately has no exported plaintext/serialization API. This is
 // a formatting guard, not secure memory or the protected host-reveal protocol.
@@ -60,7 +82,7 @@ func (h *handler) Enabled(ctx context.Context, level slog.Level) bool {
 func (h *handler) Handle(ctx context.Context, r slog.Record) error {
 	message := redacted
 	switch r.Message {
-	case RequestCompleted, RequestPanicked, ServerStarted, StartupFailed, ServerFailed, StorageCloseFailed:
+	case RequestCompleted, RequestPanicked, ServerStarted, StartupFailed, ServerFailed, StorageCloseFailed, SetupAvailable, SetupUnavailable, SetupNoMail:
 		message = r.Message
 	}
 	level := r.Level
@@ -131,6 +153,22 @@ func sanitize(a slog.Attr, deny bool) slog.Attr {
 			case "configuration", "storage", "listener":
 				return a
 			}
+		}
+	case "setup_url":
+		if a.Value.Kind() == slog.KindString && validSetupURL(a.Value.String()) {
+			return a
+		}
+	case "reason":
+		if a.Value.Kind() == slog.KindString && setupReasons[a.Value.String()] {
+			return a
+		}
+	case "generation":
+		if a.Value.Kind() == slog.KindInt64 && a.Value.Int64() > 0 {
+			return a
+		}
+	case "expires_at":
+		if a.Value.Kind() == slog.KindTime {
+			return a
 		}
 	}
 	return slog.String("redacted", redacted)

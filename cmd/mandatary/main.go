@@ -1,4 +1,5 @@
-// Mandatary currently runs a loopback-only static development skeleton.
+// Mandatary currently runs a loopback-only development skeleton plus the P1.09
+// first-administrator setup surface and its host-local recovery helper.
 package main
 
 import (
@@ -8,23 +9,113 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"sync"
 	"time"
 
+	"github.com/NicoTM77/Mandatary/internal/auth"
 	"github.com/NicoTM77/Mandatary/internal/config"
 	"github.com/NicoTM77/Mandatary/internal/logging"
+	"github.com/NicoTM77/Mandatary/internal/store"
 	"github.com/NicoTM77/Mandatary/web"
 )
 
 func developmentServer(logger *slog.Logger) *http.Server {
+	return developmentServerWith(logger, web.Handler())
+}
+
+func developmentServerWith(logger *slog.Logger, handler http.Handler) *http.Server {
 	return &http.Server{
 		Addr:              "127.0.0.1:8080",
-		Handler:           logging.HTTP(logger, web.Handler()),
+		Handler:           logging.HTTP(logger, handler),
 		ErrorLog:          slog.NewLogLogger(logger.Handler(), slog.LevelError),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,
 		WriteTimeout:      10 * time.Second,
 		IdleTimeout:       60 * time.Second,
 		MaxHeaderBytes:    16 * 1024,
+	}
+}
+
+// maintenanceInterval bounds how long an expired generation's plaintext file or
+// stale setup session can linger before protected cleanup runs.
+const maintenanceInterval = 30 * time.Second
+
+// startSetup wires the setup surface. It returns the handler to serve, a stop
+// function (which must run before the repository closes) and ok=false only for an
+// invalid operator configuration. It never issues a token on restart, after
+// expiry, or when the store is not an eligible empty one; it logs only the
+// configured secret-free setup URL.
+func startSetup(ctx context.Context, logger *slog.Logger, c config.Config, repo *store.Repository) (http.Handler, func(), bool) {
+	static := web.Handler()
+	noop := func() {}
+	if c.PublicOrigin == "" {
+		if pending, err := auth.SetupPending(ctx, repo, time.Now()); err == nil && pending {
+			logger.Warn(logging.SetupUnavailable, "reason", "origin_not_configured")
+		}
+		return static, noop, true
+	}
+	var lifecycle *auth.Lifecycle
+	if c.NoticeRelay != "" {
+		l, err := auth.NewLifecycle(repo, auth.NoticeSettings{Origin: c.PublicOrigin, Contact: c.NoticeContact, Sender: c.NoticeSender, Relay: c.NoticeRelay, Mode: c.NoticeTLS})
+		if err != nil {
+			return nil, noop, false
+		}
+		lifecycle = l
+	}
+	setup, err := auth.NewSetup(repo, lifecycle, auth.SetupSettings{Origin: c.PublicOrigin, Build: buildIdentity()})
+	if err != nil {
+		return nil, noop, false
+	}
+	result, err := setup.EnsureInitial(ctx)
+	if err != nil {
+		// Reconciliation/eligibility could not be established (storage, clock or an
+		// unsafe reveal directory): no setup surface exists and nothing is issued.
+		logger.Error(logging.SetupUnavailable, "reason", "storage")
+		return static, noop, true
+	}
+	switch result.Outcome {
+	case "issued", "active":
+		url, _ := (auth.SetupSettings{Origin: c.PublicOrigin}).SetupURL()
+		logger.Info(logging.SetupAvailable, "setup_url", url, "generation", result.Token.Generation, "expires_at", result.Token.ExpiresAt)
+		if lifecycle == nil {
+			logger.Warn(logging.SetupNoMail)
+		}
+	case "rotation_required":
+		logger.Warn(logging.SetupUnavailable, "reason", "rotation_required")
+	}
+	adapter, err := auth.NewSetupHTTP(setup)
+	if err != nil {
+		return nil, noop, false
+	}
+	mux := http.NewServeMux()
+	mux.Handle(auth.SetupPathPrefix, adapter.Handler())
+	mux.Handle("/", static)
+	background, cancel := context.WithCancel(ctx)
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		ticker := time.NewTicker(maintenanceInterval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-background.Done():
+				return
+			case <-ticker.C:
+				maintainOnce(background, setup, lifecycle)
+			}
+		}
+	}()
+	return mux, func() { cancel(); wg.Wait() }, true
+}
+
+// maintainOnce performs protected cleanup of expired generations/sessions/files
+// and, when notice delivery is configured, one bounded dispatch of pending
+// security notices. Failures are not logged with detail; the next tick retries.
+func maintainOnce(ctx context.Context, setup *auth.Setup, lifecycle *auth.Lifecycle) {
+	_, _ = setup.Reconcile(ctx)
+	if lifecycle != nil {
+		_, _ = lifecycle.DispatchNotices(ctx, 32)
 	}
 }
 
@@ -52,12 +143,20 @@ func run(ctx context.Context, getenv func(string) string, stdout io.Writer, serv
 		logger.Error(logging.StartupFailed, "stage", "storage")
 		return 1
 	}
+	handler, stopSetup, ok := startSetup(ctx, logger, c, repository)
+	if !ok {
+		stopSetup()
+		_ = repository.Close()
+		logger.Error(logging.StartupFailed, "stage", "configuration")
+		return 1
+	}
 	result := 0
 	logger.Info(logging.ServerStarted)
-	if err := serve(developmentServer(logger)); err != nil && !errors.Is(err, http.ErrServerClosed) {
+	if err := serve(developmentServerWith(logger, handler)); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		logger.Error(logging.ServerFailed, "stage", "listener")
 		result = 1
 	}
+	stopSetup() // stop background work before the repository closes
 	if err := repository.Close(); err != nil {
 		logger.Error(logging.StorageCloseFailed)
 		result = 1
@@ -66,5 +165,8 @@ func run(ctx context.Context, getenv func(string) string, stdout io.Writer, serv
 }
 
 func main() {
+	if len(os.Args) > 1 {
+		os.Exit(runCLI(productionCLI(os.Args[1:])))
+	}
 	os.Exit(run(context.Background(), os.Getenv, os.Stdout, func(s *http.Server) error { return s.ListenAndServe() }))
 }

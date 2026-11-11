@@ -120,7 +120,7 @@ Phase 1 callable interface.
 
 The primitive is Go standard-library `crypto/aes`, `crypto/cipher`, `crypto/hkdf`,
 `crypto/sha256` and OS-backed `crypto/rand.Reader`, exercised on the locked Go
-1.27.3 and 1.26.10 builds. Every seal obtains a fresh 256-bit salt and 96-bit
+1.27.4 and 1.26.11 builds. Every seal obtains a fresh 256-bit salt and 96-bit
 nonce; entropy failure denies with no deterministic fallback. A separate
 installation-bound authenticated known-text check detects the wrong master key
 at startup even before any SMTP/TOTP records exist. The master key and local

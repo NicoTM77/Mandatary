@@ -160,6 +160,20 @@ func (l *Lifecycle) sendNotice(parent context.Context, n store.NextNoticeRow) st
 	if !validMailbox(n.RecipientSnapshot) {
 		return "recipient"
 	}
+	// Only schema-allowlisted event types and server-generated IDs appear in the
+	// payload. No password, code, seed, bearer, approval link or Docker content.
+	reference := n.EventID
+	return l.submit(parent, n.RecipientSnapshot, func() string {
+		return fmt.Sprintf("From: %s\r\nTo: %s\r\nSubject: Mandatary security event\r\nMessage-ID: <%s.%s@mandatary.invalid>\r\nContent-Type: text/plain; charset=utf-8\r\n\r\nSecurity event: %s\r\nUTC: %s\r\nAccount reference: %s\r\nIf this was not you, dispute this event through %s. This message does not authorize any access.\r\nService: %s\r\nRelay acceptance is not proof of inbox delivery or human receipt.\r\n", l.notices.Sender, n.RecipientSnapshot, reference, n.ID, n.EventType, time.Unix(n.OccurredAt, 0).UTC().Format(time.RFC3339), n.UserID, l.notices.Contact, strings.TrimSuffix(l.notices.Origin, "/"))
+	})
+}
+
+// submit is the single verified-TLS SMTP submission path shared by security
+// notices and address-confirmation proofs. TLS (implicit or mandatory STARTTLS,
+// verified chain and hostname, >= TLS 1.2) precedes authentication and DATA;
+// only fixed classified outcomes leave it. message is invoked only after the
+// relay accepted the recipient, so it is never built for a failed connection.
+func (l *Lifecycle) submit(parent context.Context, recipient string, message func() string) string {
 	ctx, cancel := context.WithTimeout(parent, 10*time.Second)
 	defer cancel()
 	host, _, e := net.SplitHostPort(l.notices.Relay)
@@ -222,7 +236,7 @@ func (l *Lifecycle) sendNotice(parent context.Context, n store.NextNoticeRow) st
 	if e = client.Mail(l.notices.Sender); e != nil {
 		return smtpFailure(e)
 	}
-	if e = client.Rcpt(n.RecipientSnapshot); e != nil {
+	if e = client.Rcpt(recipient); e != nil {
 		var reply *textproto.Error
 		if errors.As(e, &reply) && reply.Code >= 500 {
 			return "recipient"
@@ -233,11 +247,7 @@ func (l *Lifecycle) sendNotice(parent context.Context, n store.NextNoticeRow) st
 	if e != nil {
 		return smtpFailure(e)
 	}
-	// Only schema-allowlisted event types and server-generated IDs appear in the
-	// payload. No password, code, seed, bearer, approval link or Docker content.
-	reference := n.EventID
-	message := fmt.Sprintf("From: %s\r\nTo: %s\r\nSubject: Mandatary security event\r\nMessage-ID: <%s.%s@mandatary.invalid>\r\nContent-Type: text/plain; charset=utf-8\r\n\r\nSecurity event: %s\r\nUTC: %s\r\nAccount reference: %s\r\nIf this was not you, dispute this event through %s. This message does not authorize any access.\r\nService: %s\r\nRelay acceptance is not proof of inbox delivery or human receipt.\r\n", l.notices.Sender, n.RecipientSnapshot, reference, n.ID, n.EventType, time.Unix(n.OccurredAt, 0).UTC().Format(time.RFC3339), n.UserID, l.notices.Contact, strings.TrimSuffix(l.notices.Origin, "/"))
-	if _, e = data.Write([]byte(message)); e != nil {
+	if _, e = data.Write([]byte(message())); e != nil {
 		return "ambiguous"
 	}
 	if e = data.Close(); e != nil {

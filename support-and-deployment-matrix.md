@@ -12,7 +12,7 @@ Primary release/policy/registry endpoints below were fetched directly, independe
 
 | Component | Approved toolchain / candidate library pin / supported line | Retrieved primary evidence and limitation |
 | --- | --- | --- |
-| Go | Production/toolchain **1.27.3**; CI also **1.26.10**, `go` minimum **1.26.0** after module verification. Support only latest patched releases of the newest two Go release lines while upstream supports them. | https://go.dev/dl/?mode=json&include=all and https://go.dev/doc/devel/release list those patches, both security fixes published 2026-10-19; release policy supports a line until two newer major releases exist. Several approved-module current releases declare Go 1.26.0. TD §5 records the approved 1.27.3/1.26.10 tuple; no Go1.23 support promise remains. |
+| Go | Production/toolchain **1.27.4**; CI also **1.26.11**, `go` minimum **1.26.0** after module verification. Support only latest patched releases of the newest two Go release lines while upstream supports them. | https://go.dev/dl/?mode=json&include=all and https://go.dev/doc/devel/release list those patches; release policy supports a line until two newer major releases exist. Several approved-module current releases declare Go 1.26.0. TD §5 records the approved 1.27.4/1.26.11 tuple; no Go1.23 support promise remains. Owner-approved patch update (2026-11-11): 1.27.3 and 1.26.10 are affected by GO-2026-6859 (net/http HTTP/1 server crash via a MaxBytesReader header race; fixed in 1.27.4 and 1.26.11), so these exact patches replace them. Archives are pinned in `scripts/toolchains.sha256`; this is a vulnerability fix, not a product/NIST/FIPS compatibility claim. |
 | Node.js / npm | **Node 24.22.1 LTS + bundled npm 11.19.1**. Support Node 24's security-maintained LTS line for frontend tooling; no Node runtime in production image. | https://nodejs.org/dist/index.json identifies that exact pair, release 2026-10-20, LTS Krypton. https://raw.githubusercontent.com/nodejs/Release/main/schedule.json puts Node 24 in Maintenance LTS from 2026-10-20 to EOL 2028-04-30. Node 22 EOL is 2027-04-30; Node 26's LTS date **2026-10-28 is still future** at this snapshot, so do not call it LTS now. |
 | React / React DOM | **19.3.1 / 19.3.1**, retain approved React 19 major. | https://registry.npmjs.org/react/latest ; https://registry.npmjs.org/react-dom/latest . DOM peer requires React `^19.3.1`. These stable tags have no deprecation marker; not a formal LTS claim. |
 | TypeScript | Candidate **7.0.2**, current stable line; locked compiler, strict typechecking. | https://registry.npmjs.org/typescript/latest reports Node `>=16.20.0`. Candidate needs actual React types/plugin/emit validation; no automatic major upgrade if P1.01 evidence fails. TD did not select a TypeScript major. |
@@ -69,7 +69,7 @@ The table defines concrete **test targets**, not a claim that those tests have r
 
 ### Measurable matrix acceptance tests
 
-- **SUP-01 / P1.01:** clean locked install/build/typecheck/race tests with Go1.27.3 primary and1.26.10 compatibility, Node24.22.1/npm11.19.1; CI records actual versions. Full graph constraints and generated output must pass; unsupported pins/deprecated packages or an unresolved scanner gate block acceptance.
+- **SUP-01 / P1.01:** clean locked install/build/typecheck/race tests with Go1.27.4 primary and1.26.11 compatibility, Node24.22.1/npm11.19.1; CI records actual versions. Full graph constraints and generated output must pass; unsupported pins/deprecated packages or an unresolved scanner gate block acceptance.
 - **SUP-02 / P1.03:** query actual embedded SQLite version; WAL/FKs/migrations/concurrency and restart on both CPU targets. Never substitute upstream SQLite headline version as evidence for modernc's build.
 - **SUP-03 / P1.12–14:** same restricted-operation suite against Docker29 candidate with negotiation; API below1.44 denied before operations, incompatible server/client safe, unknown fields sanitized, SELF/authorization cases unchanged. Unsupported fixture target cannot be counted as green.
 - **SUP-04 / P1.16–17:** auth/setup/step-up/recovery and user/policy flows at each declared browser floor and current stable supported engine; dark/light modes, CSP/CSRF/origin, secret leakage and required WebAuthn behavior. Record separate branded browser/manual-device evidence and known limitations.
@@ -91,7 +91,7 @@ Compose and Unraid operator runbooks must both demonstrate the host-local setup/
 Nico's original P1.05 comments95/98/99 select a portable pure-Go, fixed Unicode17
 stabilized ordinary-NFC profile with version-matched assigned repertoire and a
 narrow reviewed x/text0.43.0 source/table adaptation. This is an explicit password
-compatibility contract across Go1.27.3 and1.26.10, not an upstream-current-Unicode
+compatibility contract across Go1.27.4 and1.26.11, not an upstream-current-Unicode
 or general OS/browser support claim. Reject malformed/non-scalars/frozen17 Cn;
 retain assigned/private-use/control/format characters and explicit user CGJ,
 without inserted stream-safe CGJ, NFKC, trim or casefold. Immutable verifier
