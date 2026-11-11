@@ -135,6 +135,12 @@ invoke it.
 * Restore-administrator recovery is intentionally refused until the restore
   service exists (P1.18).
 * No SMTP credential can be stored by a command in this change.
+* The adapter uses the connection's own peer address and never a forwarded header.
+  Behind a reverse proxy that address is the proxy, so the per-address traffic
+  smoothing is coarse; the durable per-purpose guess counters (wait after five
+  failures, generation revoked at 100) are the actual brute-force control.
+* The deployment's reverse proxy must not log request bodies; that proxy
+  configuration is P1.19 / SETUP-10 work and is not exercised here.
 * Control tables and the reveal directory are non-importable local state; no
   export path maps them (asserted structurally by
   `TestSetupControlStateIsNotPartOfAnyExportSurface`).
