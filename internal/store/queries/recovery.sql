@@ -33,3 +33,8 @@ UPDATE recovery_capabilities SET state='bound' WHERE id=sqlc.arg(id) AND state='
 
 -- name: GetRecoveryCapability :one
 SELECT * FROM recovery_capabilities WHERE secret_hash=?;
+
+-- name: ResolveRetiredFactors :exec
+-- An approved restricted recovery that bound a replacement settles earlier protective or
+-- pre-migration ambiguous retirements. It never touches deliberately removed rows.
+UPDATE authenticators SET retirement_reason='recovery_replacement',changed_at=sqlc.arg(now) WHERE user_id=sqlc.arg(user_id) AND kind IN ('totp','webauthn') AND state='revoked' AND revoked_at IS NOT NULL AND (retirement_reason IS NULL OR retirement_reason='protective');

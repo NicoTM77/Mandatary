@@ -91,6 +91,7 @@ type Authenticator struct {
 	UserVerified         sql.NullInt64
 	TotpAlgorithm        sql.NullString
 	RecoveryBatchID      sql.NullString
+	RetirementReason     sql.NullString
 }
 
 type ContainerSelector struct {

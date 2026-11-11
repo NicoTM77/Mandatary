@@ -118,11 +118,13 @@ func (l *Lifecycle) reportCompromise(ctx context.Context, name string, password 
 			logicalDenial = true
 			return ErrDenied
 		}
+		// Password-only evidence: the retirement is recorded as protective in the
+		// SAME statement, so it can never lower the required-assurance floor.
 		var n int64
 		if kind == "webauthn" {
-			n, e = q.RevokeWebAuthn(ctx, store.RevokeWebAuthnParams{ID: id, Now: nullable(now)})
+			n, e = q.RevokeWebAuthn(ctx, store.RevokeWebAuthnParams{ID: id, Now: nullable(now), Reason: retireProtective})
 		} else {
-			n, e = q.RevokeTOTP(ctx, store.RevokeTOTPParams{ID: id, Now: nullable(now)})
+			n, e = q.RevokeTOTP(ctx, store.RevokeTOTPParams{ID: id, Now: nullable(now), Reason: retireProtective})
 		}
 		if e != nil || n != 1 {
 			return ErrDenied

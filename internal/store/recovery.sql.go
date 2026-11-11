@@ -179,6 +179,22 @@ func (q *Queries) RecoveryFailure(ctx context.Context, arg RecoveryFailureParams
 	return result.RowsAffected()
 }
 
+const resolveRetiredFactors = `-- name: ResolveRetiredFactors :exec
+UPDATE authenticators SET retirement_reason='recovery_replacement',changed_at=?1 WHERE user_id=?2 AND kind IN ('totp','webauthn') AND state='revoked' AND revoked_at IS NOT NULL AND (retirement_reason IS NULL OR retirement_reason='protective')
+`
+
+type ResolveRetiredFactorsParams struct {
+	Now    sql.NullInt64
+	UserID string
+}
+
+// An approved restricted recovery that bound a replacement settles earlier protective or
+// pre-migration ambiguous retirements. It never touches deliberately removed rows.
+func (q *Queries) ResolveRetiredFactors(ctx context.Context, arg ResolveRetiredFactorsParams) error {
+	_, err := q.db.ExecContext(ctx, resolveRetiredFactors, arg.Now, arg.UserID)
+	return err
+}
+
 const revokeRecoveryBatches = `-- name: RevokeRecoveryBatches :exec
 UPDATE recovery_batches SET state='revoked' WHERE user_id=? AND state!='revoked'
 `

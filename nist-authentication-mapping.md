@@ -242,6 +242,38 @@ restart/TLS delivery, storage-failure and no-premature-notice component cases.
 | S09 — §5.2 federated RP SHALL authoritative reauth; IdP/RP sessions independent.[1] | Phase3 Authentik follow-up retains Mandatary12h/30m and sensitive-step-up policy; freshly issued assertion without fresh adequate authentication does not necessarily satisfy it. Validate mapped strength/auth_time and force required reauth as supported; logout/revocation at RP not asserted to log out IdP/all RPs. | `N63B4-REAUTH-FEDERATION`: future stubbed old IdP session/new assertion fails freshness, invalid/missing assurance fails admin; P1 no real federation added. | P1.08, P1.20; Phase3 follow-up | O now/C later |
 | S10 — §5.3 monitoring MAY; potential-fraud SHOULD reauth/terminate/support action; collected characteristics SHALL privacy assessment.[1] | No unapproved continuous behavioral/biometric/device fingerprinting system. If IP/session monitoring used, minimize data, assess privacy/efficacy and define response. Risk signal cannot manufacture a factor or reset timeout. | `N63B4-SESSION-MONITORING`: review enabled signals/data retention and conditional incident response; no silent new collection, signal alone never extends assurance or session lifetime. | P1.04–05, P1.08, P1.19–20 | C/G |
 
+### 4.7.1 P1.08 component implementation crosswalk (not conformance)
+
+The [session/browser-security contract](docs/sessions-browser-security.md) maps
+S01–S08, S10, A05, A01/A04 (session assurance), E03/E12/E13 (session
+invalidation), G02 `RATE-RESET-AAL` (no weaker-session reset), W02/S04 (application
+Host/Origin part only), I09 and the TD §4.3 sensitive-write list to actual
+component tests: server-bound assurance/methods/authentication time/generations,
+password-only/preauth/recovery/setup/agent exclusion from AAL2, `__Host-`
+Secure/HttpOnly/SameSite=Strict cookie, exact Origin + per-session CSRF + JSON
+content type, strict API CSP and headers, 12h/30m clocks, 15-minute inclusive
+step-up with successor-session rotation, and negative plus step-up-positive tests
+for every declared sensitive class and every session-gated lifecycle mutation.
+Rework (reviewer F1/F2, Nico-approved bounded migration): a single
+required-assurance floor, separate from the factors currently usable, now decides
+login issuance, the session gate, step-up and `freshSession`, so a password-only
+compromise report (E12/I08), an exhausted/expired factor or a pre-migration
+ambiguous revocation can never lower the gate and unlock replacement,
+recovery-code issuance or other maximum-assurance writes (E03/E09/D-04). Only a
+durably recorded deliberate retirement (migration `00010`: fresh-maximum-assurance
+removal or approved recovery replacement) lets an optional-MFA account return to
+AAL1; existing ambiguous records are not backfilled, and such accounts use the
+approved restricted recovery. Schema, transitions and migration consequence are in
+the contract's "Required-assurance floor" section.
+`N63B4-SESSION-STORAGE`'s browser-restart behaviour, `N63B4-TLS-BOUNDARY`'s
+proxy/hop topology, `N63B4-SESSION-MONITORING` data-flow review, the bounded
+session-row retention policy, branded-browser/password-manager/WebAuthn UX, own-
+session visibility (Phase 3), login/step-up HTTP adapters (P1.16), setup/recovery
+sessions (P1.09), agent bearer adapters (P1.14) and every later-owner mutation
+route remain with their named owners; no route is mounted by P1.08. No NIST, FIPS,
+browser or runtime conformance is claimed. Exact-head execution results and review
+are recorded on the original P1.08 card and draft PR, not in this register.
+
 ## 5. Informative sections and complete scope-disposition register
 
 These rows deliberately distinguish informative advice from the normative controls it explains. They keep all final sections in scope for evaluation without making unsupported factors or later phases mandatory.

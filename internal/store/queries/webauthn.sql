@@ -22,7 +22,7 @@ INSERT INTO authenticators(id,user_id,kind,state,credential_generation,created_a
 -- name: PutWebAuthnKeyRecord :exec
 INSERT INTO webauthn_credentials(authenticator_id,label,envelope) VALUES(?,?,?);
 -- name: RevokeWebAuthn :execrows
-UPDATE authenticators SET state='revoked',revoked_at=sqlc.arg(now),changed_at=sqlc.arg(now) WHERE id=sqlc.arg(id) AND kind='webauthn' AND state IN ('active','disabled') AND revoked_at IS NULL;
+UPDATE authenticators SET state='revoked',revoked_at=sqlc.arg(now),changed_at=sqlc.arg(now),retirement_reason=CAST(sqlc.arg(reason) AS TEXT) WHERE id=sqlc.arg(id) AND kind='webauthn' AND state IN ('active','disabled') AND revoked_at IS NULL;
 -- name: GetWebAuthnKeyRecord :one
 SELECT * FROM webauthn_credentials WHERE authenticator_id=?;
 -- name: UpdateWebAuthnKeyRecord :execrows

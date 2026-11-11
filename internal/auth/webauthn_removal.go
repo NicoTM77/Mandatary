@@ -65,7 +65,8 @@ func (w *WebAuthnService) Revoke(ctx context.Context, session []byte, id string)
 			return e
 		}
 		now := l.now().Unix()
-		n, e := q.RevokeWebAuthn(ctx, store.RevokeWebAuthnParams{ID: id, Now: nullable(now)})
+		// authorize() passed freshSession: fresh maximum-account-assurance removal.
+		n, e := q.RevokeWebAuthn(ctx, store.RevokeWebAuthnParams{ID: id, Now: nullable(now), Reason: retireAuthorized})
 		if e != nil || n != 1 {
 			return ErrDenied
 		}

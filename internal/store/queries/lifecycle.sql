@@ -38,7 +38,7 @@ UPDATE authenticators SET last_accepted_totp_step=sqlc.arg(step) WHERE id=sqlc.a
 DELETE FROM totp_acceptances WHERE authenticator_id=sqlc.arg(id) AND step<sqlc.arg(earliest);
 
 -- name: RevokeTOTP :execrows
-UPDATE authenticators SET state='revoked',revoked_at=sqlc.arg(now),changed_at=sqlc.arg(now),encrypted_secret=NULL WHERE id=sqlc.arg(id) AND kind='totp' AND state IN ('active','disabled','pending') AND revoked_at IS NULL;
+UPDATE authenticators SET state='revoked',revoked_at=sqlc.arg(now),changed_at=sqlc.arg(now),retirement_reason=CAST(sqlc.arg(reason) AS TEXT),encrypted_secret=NULL WHERE id=sqlc.arg(id) AND kind='totp' AND state IN ('active','disabled','pending') AND revoked_at IS NULL;
 
 -- name: ReadyNoticeIntent :exec
 INSERT INTO security_notice_outbox(id,event_id,user_id,address_id,address_version,recipient_snapshot,retain_until,dispatch_state,authority_generation) VALUES(?,?,?,?,?,?,?,'ready',?);
