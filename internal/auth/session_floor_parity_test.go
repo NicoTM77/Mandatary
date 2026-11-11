@@ -362,13 +362,15 @@ func TestSessionFloorConcurrentReportAndLoginLeaveNoPasswordOnlySession(t *testi
 	go func() {
 		defer wg.Done()
 		// The single shared password-work slot may be busy with a racing login,
-		// which denies the report without any state change; retry until admitted.
+		// which denies the report without any state change. Retry until admitted,
+		// from a fresh address each time (the fixed test clock never reopens the
+		// per-IP window) and bounded by wall time, so a slow runner still passes.
 		var err error
-		for i := 0; i < 200; i++ {
-			if err = e.l.ReportTOTPCompromise(t.Context(), "synthetic-user", []byte(sessionTestPassword), id, "192.0.2.99"); err == nil {
+		for deadline, i := time.Now().Add(2*time.Minute), 0; time.Now().Before(deadline); i++ {
+			if err = e.l.ReportTOTPCompromise(t.Context(), "synthetic-user", []byte(sessionTestPassword), id, fmt.Sprintf("198.51.100.%d", i%250+1)); err == nil {
 				break
 			}
-			time.Sleep(5 * time.Millisecond)
+			time.Sleep(10 * time.Millisecond)
 		}
 		errs <- err
 	}()
