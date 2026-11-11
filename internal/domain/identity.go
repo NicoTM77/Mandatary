@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
+	"io"
 )
 
 // EndpointID is a canonical, non-nil UUID, not a mutable display name or slug.
@@ -43,12 +44,23 @@ func ParseEndpointID(value string) (EndpointID, error) {
 
 // NewEndpointID generates a random UUIDv4 using the OS-backed CSPRNG.
 func NewEndpointID() (EndpointID, error) {
-	var b [16]byte
-	if _, err := rand.Read(b[:]); err != nil {
+	id, err := NewUUID(rand.Reader)
+	if err != nil {
 		return "", errors.New("generate endpoint UUID")
+	}
+	return EndpointID(id), nil
+}
+
+// NewUUID reads 16 bytes from source and formats a canonical lowercase UUIDv4.
+// Production callers pass crypto/rand.Reader; a failing source yields an error
+// and never a predictable fallback value.
+func NewUUID(source io.Reader) (string, error) {
+	var b [16]byte
+	if _, err := io.ReadFull(source, b[:]); err != nil {
+		return "", errors.New("generate UUID")
 	}
 	b[6] = (b[6] & 0x0f) | 0x40
 	b[8] = (b[8] & 0x3f) | 0x80
 	h := hex.EncodeToString(b[:])
-	return EndpointID(h[:8] + "-" + h[8:12] + "-" + h[12:16] + "-" + h[16:20] + "-" + h[20:]), nil
+	return h[:8] + "-" + h[8:12] + "-" + h[12:16] + "-" + h[16:20] + "-" + h[20:], nil
 }

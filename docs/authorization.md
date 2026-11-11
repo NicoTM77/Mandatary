@@ -171,7 +171,7 @@ operational requests against the missing target deny with `ReasonTargetMissing`.
 | --- | --- | --- |
 | Precedence order (`Self -> 401 -> DENY -> ALLOW -> Default 403`) | `TestAuthorizerPrecedenceOrder` (`authorizer_test.go`) | P1.13 (service), P1.14 (REST/MCP status codes) |
 | Storage fail-closed & canary/error/log redaction | `TestStorageFailClosedAndDenialRedaction` (`authorizer_test.go`) | P1.13, P1.14 |
-| Cross-product of direct/group `DENY`-overrides-`ALLOW`, 20 principal/credential states, endpoint selector (`ep_local` vs `ep_foreign`), and all 6 operations (1,560 subtests) | `TestAuthorizationCrossProductMatrix` (`matrix_test.go`) | C2 (live P1.08–P1.10 credential issuers) |
+| Cross-product of direct/group `DENY`-overrides-`ALLOW`, 20 principal/credential states, endpoint selector (`ep_local` vs `ep_foreign`), and all 6 operations (1,560 subtests) | `TestAuthorizationCrossProductMatrix` (`matrix_test.go`) | C2 (live P1.08–P1.10 credential issuers; P1.10 issuer/administration delivered, see [agent-credentials.md](agent-credentials.md)) |
 | Agent owner non-inheritance (`owner_user_id`, `owner_group_id`) & `super_admin` zero implicit container grants | `TestAgentOwnerNonInheritanceAndAdminZeroGrant` (`matrix_test.go`) | P1.13, P1.14 |
 | Assurance & session purpose boundaries (`preauth`, `setup`, `recovery`, AAL1 vs AAL2, `webauthn`, admin MFA, untrusted caller fields) | `TestAssuranceAndPurposeBoundaries` (`matrix_test.go`) | C2, P1.08, P1.09 |
 | Selector evaluation matrix (exact, glob, compose guardrails, image pattern, container ID pin, image digest pin, cross-endpoint, protected labels) | `TestSelectorEvaluationMatrix` (`selector_test.go`) | P1.16 (UI policy editor) |

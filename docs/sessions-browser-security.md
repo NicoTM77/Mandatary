@@ -184,9 +184,9 @@ factors) never can with a password alone.
 | `password-change` | floor, ≤15 min | `Service.ReplacePassword` primitive; P1.16 adapter |
 | `authenticator-change` | floor, ≤15 min | `BeginTOTP/ConfirmTOTP/RevokeTOTP`, `IssueRecoveryCodes`, WebAuthn `Begin/FinishRegistration/Revoke` (each re-checks freshness itself via `freshSession`) |
 | `notification-address-change` | floor, ≤15 min | `RetryNotice` repair; address ceremony P1.16 |
-| `agent-credential-change` | AAL2, ≤15 min | P1.10 |
+| `agent-credential-change` | AAL2, ≤15 min | `AdminHTTP` credential/disable routes and `Admin` service (P1.10, [contract](agent-credentials.md)) |
 | `backup-export`, `backup-restore` | AAL2, ≤15 min | P1.18 |
-| `security-policy-change` | AAL2, ≤15 min | P1.11/P1.17 administration |
+| `security-policy-change` | AAL2, ≤15 min | user/group/agent/membership administration (P1.10); policy rules P1.11/P1.17 |
 
 The protective **compromise report** is deliberately *not* a session step-up
 class: per NIST E12 it is authorized by the password plus bound-factor protocol in
