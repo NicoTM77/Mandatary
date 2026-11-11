@@ -712,34 +712,10 @@ func (s *Setup) completeReset(ctx context.Context, q *store.Queries, sess store.
 	} else if !ok {
 		return CompleteResult{}, nil, errSetupLogical
 	}
-	// Old factors never revive: every previous second factor and saved code, and
-	// any restricted recovery capability, is retired in this same transaction.
-	factors, err := q.ListUserAuthenticators(ctx, user.ID)
-	if err != nil {
-		return CompleteResult{}, nil, err
-	}
-	for _, f := range factors {
-		if f.ID == totp.ID || f.RevokedAt.Valid {
-			continue
-		}
-		switch f.Kind {
-		case "totp":
-			if _, err = q.RevokeTOTP(ctx, store.RevokeTOTPParams{ID: f.ID, Now: nullableInt(now), Reason: retireRecovered}); err != nil {
-				return CompleteResult{}, nil, err
-			}
-		case "webauthn":
-			if _, err = q.RevokeWebAuthn(ctx, store.RevokeWebAuthnParams{ID: f.ID, Now: nullableInt(now), Reason: retireRecovered}); err != nil {
-				return CompleteResult{}, nil, err
-			}
-		}
-	}
-	if err = q.RevokeRecoveryCodes(ctx, store.RevokeRecoveryCodesParams{Now: nullableInt(now), UserID: user.ID}); err != nil {
-		return CompleteResult{}, nil, err
-	}
-	if err = q.RevokeRecoveryBatches(ctx, user.ID); err != nil {
-		return CompleteResult{}, nil, err
-	}
-	if err = q.RevokeRecoveryCapabilities(ctx, user.ID); err != nil {
+	// Old factors never revive. They were already retired when this generation was
+	// issued (S3.2); repeating it is idempotent and also covers anything bound
+	// since. The newly proven factor is the only survivor.
+	if err = retireUserCredentials(ctx, q, user.ID, totp.ID, retireRecovered, now); err != nil {
 		return CompleteResult{}, nil, err
 	}
 	if n, err := q.ActivateProvenTOTP(ctx, store.ActivateProvenTOTPParams{Generation: control.CredentialGeneration, Now: nullableInt(now), ID: totp.ID}); err != nil {

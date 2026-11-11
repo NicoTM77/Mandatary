@@ -234,14 +234,15 @@ func (s *Setup) issue(ctx context.Context, req IssueRequest, automatic bool) (To
 				return fail(errSetupLogical)
 			}
 			target = nullStr(user.ID)
-			// Before issuance (S3.2): end the account's browser sessions and any
-			// restricted saved-code recovery capability. Factors are retired only
-			// at completion, so an abandoned ceremony cannot lock the owner out.
-			now2 := nullableInt(now)
-			if e = q.RevokeUserSessions(bounded, store.RevokeUserSessionsParams{UserID: user.ID, Now: now2}); e != nil {
+			// Before issuance (S3.2), in this same transaction: end the account's
+			// browser sessions and durably retire every old second factor, saved
+			// code and recovery capability. Nothing issued before the ceremony can
+			// authenticate or start a recovery during it. An abandoned or expired
+			// ceremony is recovered only by explicit host re-issuance.
+			if e = q.RevokeUserSessions(bounded, store.RevokeUserSessionsParams{UserID: user.ID, Now: nullableInt(now)}); e != nil {
 				return e
 			}
-			if e = q.RevokeRecoveryCapabilities(bounded, user.ID); e != nil {
+			if e = retireUserCredentials(bounded, q, user.ID, "", retireProtective, now); e != nil {
 				return e
 			}
 		default:
@@ -302,6 +303,40 @@ func (s *Setup) issue(ctx context.Context, req IssueRequest, automatic bool) (To
 	}
 	status := TokenStatus{Generation: generation, Purpose: req.Purpose, State: "available", IssuedAt: time.Unix(issued, 0).UTC(), ExpiresAt: time.Unix(expires, 0).UTC(), ReplacePassword: req.ReplacePassword, TargetUser: req.Username}
 	return status, nil
+}
+
+// retireUserCredentials durably retires every second factor, saved code, code
+// batch and restricted recovery capability of one account except keep (the
+// factor proven in the current ceremony, "" for none). At MFA-reset issuance it
+// runs with the protective provenance, so a retired factor can never lower the
+// account's assurance floor; completion settles it. Nothing here is reversed:
+// an abandoned ceremony is recovered only by explicit host re-issuance.
+func retireUserCredentials(ctx context.Context, q *store.Queries, userID, keep, reason string, now int64) error {
+	factors, err := q.ListUserAuthenticators(ctx, userID)
+	if err != nil {
+		return err
+	}
+	for _, f := range factors {
+		if f.ID == keep || f.RevokedAt.Valid {
+			continue
+		}
+		switch f.Kind {
+		case "totp":
+			_, err = q.RevokeTOTP(ctx, store.RevokeTOTPParams{ID: f.ID, Now: nullableInt(now), Reason: reason})
+		case "webauthn":
+			_, err = q.RevokeWebAuthn(ctx, store.RevokeWebAuthnParams{ID: f.ID, Now: nullableInt(now), Reason: reason})
+		}
+		if err != nil {
+			return err
+		}
+	}
+	if err = q.RevokeRecoveryCodes(ctx, store.RevokeRecoveryCodesParams{Now: nullableInt(now), UserID: userID}); err != nil {
+		return err
+	}
+	if err = q.RevokeRecoveryBatches(ctx, userID); err != nil {
+		return err
+	}
+	return q.RevokeRecoveryCapabilities(ctx, userID)
 }
 
 func boolInt(b bool) int64 {

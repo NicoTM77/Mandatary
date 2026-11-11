@@ -96,13 +96,14 @@ func TestHostMFAResetEndToEnd(t *testing.T) {
 	if e.scalar(`SELECT count(*) FROM sessions WHERE state='active'`) != 0 {
 		t.Fatal("administrator sessions survived recovery issuance")
 	}
-	// ... but factors are untouched until completion, so an abandoned ceremony
-	// cannot lock the owner out.
-	if e.scalar(`SELECT count(*) FROM authenticators WHERE kind='totp' AND state='active'`) != 1 {
-		t.Fatal("the existing factor was retired at issuance")
+	// ... and (S3.2) the old second factors are durably retired in the same
+	// issuance transaction, so nothing issued before the ceremony can
+	// authenticate during it.
+	if e.scalar(`SELECT count(*) FROM authenticators WHERE kind IN ('totp','webauthn') AND state='active'`) != 0 {
+		t.Fatal("an old second factor stayed usable after recovery issuance")
 	}
 	e.advance(31 * time.Second)
-	e.loginAAL2(admin, "192.0.2.81")
+	e.assertOldFactorsDenied(admin, "192.0.2.81")
 
 	// Wrong target at the host reveals nothing.
 	other := &fakeTerminal{}
@@ -151,8 +152,8 @@ func TestHostMFAResetEndToEnd(t *testing.T) {
 	if result.Purpose != PurposeMFAReset || result.Username != setupTestUser {
 		t.Fatalf("result %+v", result)
 	}
-	// Retired old factor; one active new one; the credential generation moved so
-	// every pre-existing capability is dead; still no session was minted.
+	// The old factor was retired at issuance (and settled here); exactly one new
+	// factor is active; still no session was minted.
 	if e.scalar(`SELECT count(*) FROM authenticators WHERE kind='totp' AND state='active'`) != 1 || e.text(`SELECT state FROM authenticators WHERE id=?`, admin.totp.ID) == "active" {
 		t.Fatal("old TOTP was not retired / new TOTP not active")
 	}
@@ -218,14 +219,18 @@ func TestHostMFAResetWithPasswordReplacement(t *testing.T) {
 		t.Fatal("the current password was accepted as its own replacement")
 	}
 	const replacement = "a different uncommon passphrase 77"
+	const verifierQuery = `SELECT hex(verifier_hash) FROM authenticators WHERE kind='password' AND state='active'`
+	verifierBefore := e.text(verifierQuery)
 	if _, err = e.s.StageAccount(e.ctx(), session.Secret(), AccountRequest{Password: []byte(replacement)}); err != nil {
 		t.Fatal(err)
 	}
-	// Staged, not applied: the old password still verifies until completion.
-	sessions := e.sessions()
-	if _, err = sessions.PasswordLogin(e.ctx(), setupTestUser, []byte(setupTestPassword), "192.0.2.90"); err != nil {
-		t.Fatalf("old password stopped working before completion: %v", err)
+	// Staged, not applied: the stored password verifier is unchanged until
+	// completion. (An ordinary login is already impossible: issuance retired
+	// every second factor, so no administrator login can reach AAL2.)
+	if verifierBefore == "" || e.text(verifierQuery) != verifierBefore {
+		t.Fatal("the staged password replaced the stored verifier before completion")
 	}
+	sessions := e.sessions()
 	en, err := e.s.BeginTOTP(e.ctx(), session.Secret(), "SHA256")
 	if err != nil {
 		t.Fatal(err)
@@ -287,5 +292,117 @@ func TestClockRollbackDeniesSetupOperations(t *testing.T) {
 	}
 	if _, err := e.s.Issue(e.ctx(), IssueRequest{Purpose: PurposeInitialSetup}); err == nil {
 		t.Fatal("issuance accepted after the clock moved backwards")
+	}
+}
+
+// assertOldFactorsDenied proves the pre-issuance password+TOTP cannot mint any
+// session: it must never reach AAL2 (nor any other session) after issuance.
+func (e *setupEnv) assertOldFactorsDenied(a firstAdmin, ip string) {
+	e.t.Helper()
+	sessions := e.sessions()
+	before := e.scalar(`SELECT count(*) FROM sessions WHERE state='active'`)
+	login, err := sessions.PasswordLogin(e.ctx(), setupTestUser, []byte(setupTestPassword), ip)
+	if err == nil {
+		e.advance(31 * time.Second)
+		if _, err = sessions.LoginTOTP(e.ctx(), login.Session.Secret(), a.totp.ID, enrollmentCode(e.t, a.totp, e.clock.Now()), ip); err == nil {
+			e.t.Fatal("old password+TOTP minted a session during the recovery window")
+		}
+	}
+	if e.scalar(`SELECT count(*) FROM sessions WHERE state='active' AND achieved_assurance>=2`) != 0 || e.scalar(`SELECT count(*) FROM sessions WHERE state='active'`) > before {
+		e.t.Fatal("a usable session exists after old-factor login during the recovery window")
+	}
+}
+
+// S3.2: issuance invalidates old second factors, saved codes and recovery
+// capabilities BEFORE the token exists; an abandoned or expired ceremony is
+// recovered by explicit host re-issuance, never by reviving old credentials.
+func TestHostMFAResetIssuanceInvalidatesOldCredentials(t *testing.T) {
+	e := newSetupEnv(t)
+	admin := e.firstAdmin()
+	e.advance(time.Minute)
+	sessions := e.sessions()
+	login, err := sessions.PasswordLogin(e.ctx(), setupTestUser, []byte(setupTestPassword), "192.0.2.90")
+	if err != nil {
+		t.Fatal(err)
+	}
+	e.advance(31 * time.Second)
+	fresh, err := sessions.LoginTOTP(e.ctx(), login.Session.Secret(), admin.totp.ID, enrollmentCode(t, admin.totp, e.clock.Now()), "192.0.2.90")
+	if err != nil {
+		t.Fatal(err)
+	}
+	codes, err := e.l.IssueRecoveryCodes(e.ctx(), fresh.Secret())
+	if err != nil {
+		t.Fatal(err)
+	}
+	saved := codes.ExportOnce()
+	if len(saved) < 3 {
+		t.Fatal("no saved codes issued")
+	}
+	// A recovery capability already obtained with a saved code must also die.
+	e.advance(31 * time.Second)
+	capability, err := e.l.Recover(e.ctx(), setupTestUser, []byte(setupTestPassword), saved[0], "192.0.2.91")
+	if err != nil {
+		t.Fatalf("precondition: saved-code recovery: %v", err)
+	}
+	if cap, _ := capability.ExportOnce(); len(cap) == 0 || e.scalar(`SELECT count(*) FROM recovery_capabilities WHERE state!='revoked'`) == 0 {
+		t.Fatal("precondition: no live recovery capability")
+	}
+
+	if _, err = e.s.Issue(e.ctx(), IssueRequest{Purpose: PurposeMFAReset, Username: setupTestUser, RiskAcknowledged: true}); err != nil {
+		t.Fatal(err)
+	}
+	for name, q := range map[string]string{
+		"second factors": `SELECT count(*) FROM authenticators WHERE kind IN ('totp','webauthn') AND state!='revoked'`,
+		"saved codes":    `SELECT count(*) FROM authenticators WHERE kind='recovery_code' AND state!='revoked'`,
+		"code batches":   `SELECT count(*) FROM recovery_batches WHERE state!='revoked'`,
+		"capabilities":   `SELECT count(*) FROM recovery_capabilities WHERE state!='revoked'`,
+		"sessions":       `SELECT count(*) FROM sessions WHERE state='active'`,
+	} {
+		if n := e.scalar(q); n != 0 {
+			t.Fatalf("%d live %s survived MFA-reset issuance", n, name)
+		}
+	}
+	// Old second factors are retired as protective (never lowering the floor).
+	if e.text(`SELECT retirement_reason FROM authenticators WHERE id=?`, admin.totp.ID) != retireProtective {
+		t.Fatal("old factor not retired with protective provenance")
+	}
+	e.advance(31 * time.Second)
+	e.assertOldFactorsDenied(admin, "192.0.2.92")
+	e.advance(31 * time.Second)
+	if _, err = e.l.Recover(e.ctx(), setupTestUser, []byte(setupTestPassword), saved[1], "192.0.2.93"); err == nil {
+		t.Fatal("a saved code started a recovery after MFA-reset issuance")
+	}
+
+	// Abandoned ceremony: the generation expires unused. Old credentials do not
+	// revive; explicit host re-issuance recovers, and completion succeeds.
+	e.advance(SetupTokenLifetime + time.Minute)
+	e.assertOldFactorsDenied(admin, "192.0.2.95")
+	if _, err = e.s.Issue(e.ctx(), IssueRequest{Purpose: PurposeMFAReset, Username: setupTestUser, RiskAcknowledged: true}); err != nil {
+		t.Fatalf("host re-issue after an abandoned ceremony: %v", err)
+	}
+	session, err := e.s.Exchange(e.ctx(), e.reveal(PurposeMFAReset, setupTestUser), setupTestIP)
+	if err != nil {
+		t.Fatal(err)
+	}
+	en, err := e.s.BeginTOTP(e.ctx(), session.Secret(), "SHA256")
+	if err != nil {
+		t.Fatal(err)
+	}
+	e.advance(31 * time.Second)
+	if err = e.s.ConfirmTOTP(e.ctx(), session.Secret(), enrollmentCode(t, en, e.clock.Now()), setupTestIP); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = e.s.Complete(e.ctx(), session.Secret()); err != nil {
+		t.Fatal(err)
+	}
+	e.advance(31 * time.Second)
+	login, err = sessions.PasswordLogin(e.ctx(), setupTestUser, []byte(setupTestPassword), "192.0.2.96")
+	if err != nil {
+		t.Fatal(err)
+	}
+	e.advance(31 * time.Second)
+	issued, err := sessions.LoginTOTP(e.ctx(), login.Session.Secret(), en.ID, enrollmentCode(t, en, e.clock.Now()), "192.0.2.96")
+	if err != nil || issued.Info.Assurance != AssuranceAAL2 {
+		t.Fatalf("new factor login after re-issued recovery: %v", err)
 	}
 }

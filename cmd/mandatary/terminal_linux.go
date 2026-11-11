@@ -45,10 +45,15 @@ func (t *hostTerminal) Verify() error {
 // WriteSecret performs one bounded write. A timeout/partial/failed write is
 // reported as failure and treated by the protocol as uncertain delivery.
 func (t *hostTerminal) WriteSecret(ctx context.Context, data []byte) error {
+	// The writer owns a private copy: after a timeout or cancellation this call
+	// returns while the goroutine may still be blocked in Write, and the caller
+	// clears its payload on return. The copy is wiped once the write ends.
+	own := append([]byte(nil), data...)
 	done := make(chan error, 1)
 	go func() {
-		n, err := t.out.Write(data)
-		if err == nil && n != len(data) {
+		defer clear(own)
+		n, err := t.out.Write(own)
+		if err == nil && n != len(own) {
 			err = io.ErrShortWrite
 		}
 		done <- err
