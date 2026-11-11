@@ -73,9 +73,10 @@ func TestHostRecoveryIssuanceScope(t *testing.T) {
 	})
 }
 
-// End-to-end: reset replaces the TOTP, retires the old one only at completion,
-// ends sessions at issuance, notifies the existing verified address, never issues
-// a login session, and a second reset needs a new explicit host action.
+// End-to-end: reset replaces the TOTP, retires the old one (and its sessions) at
+// issuance and settles it to the replacement at completion, notifies the
+// existing verified address, never issues a login session, and a second reset
+// needs a new explicit host action.
 func TestHostMFAResetEndToEnd(t *testing.T) {
 	e := newSetupEnv(t)
 	admin := e.firstAdmin()

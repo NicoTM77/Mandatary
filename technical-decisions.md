@@ -137,7 +137,7 @@ Mandatary targets **NIST SP 800-63B-4 (July 2025) Authentication Assurance Level
 
 | Layer | Selected Technology | Rationale (Security & Maintainability) |
 | :--- | :--- | :--- |
-| **Backend Language** | **Go 1.27.3 primary; Go 1.26.10 compatibility CI** | Static binary (`CGO_ENABLED=0`); newest two upstream-supported security-patched lines per the approved support policy; full module graph/build verification required. |
+| **Backend Language** | **Go 1.27.4 primary; Go 1.26.11 compatibility CI** | Static binary (`CGO_ENABLED=0`); newest two upstream-supported security-patched lines per the approved support policy; full module graph/build verification required. |
 | **HTTP Router & API** | Standard library `net/http` (`http.ServeMux`) + strict JSON schema middleware (or `chi` + `huma` / OpenAPI 3.1 validation) | Zero heavy framework lock-in; strict request validation rejects unknown fields (`DisallowUnknownFields`). |
 | **MCP Server** | Streamable HTTP (`/mcp`) + optional CLI bridge (`mandatary mcp-stdio`) using `mcp-go` / official MCP JSON-RPC 2.0 spec | Supports both remote/containerized agents over HTTP with Bearer auth and local desktop MCP clients expecting `stdio`. |
 | **Frontend Framework** | **React 19 + TypeScript + Vite (SPA)** | Mature ecosystem, strict TypeScript type safety, compiled to static assets and embedded directly into the Go binary via `embed.FS`. |

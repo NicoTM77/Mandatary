@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Isolated, checksum-verified developer toolchains; never a global install.
 set -euo pipefail
-version=${MANDATARY_GO_VERSION:-1.27.3}
+version=${MANDATARY_GO_VERSION:-1.27.4}
 case "$version" in
-  1.27.3|1.26.10) ;;
+  1.27.4|1.26.11) ;;
   *) printf 'UNAPPROVED_GO_VERSION: %s\n' "$version" >&2; exit 1 ;;
 esac
 root=$(cd "$(dirname "$0")/.." && pwd)
