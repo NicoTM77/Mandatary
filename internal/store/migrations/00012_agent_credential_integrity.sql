@@ -7,22 +7,11 @@
 --     identifier of a credential are immutable;
 --   * a rotation overlap window may only be shortened, never extended or
 --     cleared, so a rotated-out token cannot be revived;
---   * an active credential requires an active agent, and an agent cannot leave
---     the active state while it still holds an active credential.
+-- Agent-state coupling (active credential vs. non-active agent) is deliberately
+-- NOT a trigger: the shared verifier refuses such credentials itself and its
+-- defence-in-depth tests model that state; the service revokes before disabling.
 -- Quarantine/restore stay stricter than this: imported credentials are never
 -- inserted active, and these rules cannot activate anything.
-
--- +goose StatementBegin
-CREATE TRIGGER agent_credential_active_requires_agent_insert BEFORE INSERT ON agent_credentials
-WHEN NEW.state = 'active' AND NOT EXISTS (SELECT 1 FROM agents WHERE id = NEW.agent_id AND state = 'active')
-BEGIN SELECT RAISE(ABORT, 'active credential requires an active agent'); END;
--- +goose StatementEnd
-
--- +goose StatementBegin
-CREATE TRIGGER agent_credential_active_requires_agent_update BEFORE UPDATE ON agent_credentials
-WHEN NEW.state = 'active' AND NOT EXISTS (SELECT 1 FROM agents WHERE id = NEW.agent_id AND state = 'active')
-BEGIN SELECT RAISE(ABORT, 'active credential requires an active agent'); END;
--- +goose StatementEnd
 
 -- +goose StatementBegin
 CREATE TRIGGER agent_credential_revoked_is_final BEFORE UPDATE ON agent_credentials
@@ -45,16 +34,7 @@ WHEN OLD.rotation_overlap_until IS NOT NULL AND (NEW.rotation_overlap_until IS N
 BEGIN SELECT RAISE(ABORT, 'a rotation overlap window can only be shortened'); END;
 -- +goose StatementEnd
 
--- +goose StatementBegin
-CREATE TRIGGER agent_leaves_active_without_credentials BEFORE UPDATE OF state ON agents
-WHEN OLD.state = 'active' AND NEW.state != 'active' AND EXISTS (SELECT 1 FROM agent_credentials WHERE agent_id = OLD.id AND state = 'active')
-BEGIN SELECT RAISE(ABORT, 'revoke every active credential before an agent leaves the active state'); END;
--- +goose StatementEnd
-
 -- +goose Down
-DROP TRIGGER agent_leaves_active_without_credentials;
 DROP TRIGGER agent_credential_overlap_shrinks_only;
 DROP TRIGGER agent_credential_identity_immutable;
 DROP TRIGGER agent_credential_revoked_is_final;
-DROP TRIGGER agent_credential_active_requires_agent_update;
-DROP TRIGGER agent_credential_active_requires_agent_insert;

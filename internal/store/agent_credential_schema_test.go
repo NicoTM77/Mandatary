@@ -29,15 +29,6 @@ func hashOf(b byte) []byte {
 	return out
 }
 
-func TestAgentCredentialActiveRequiresActiveAgent(t *testing.T) {
-	db := credentialSchema(t)
-	rejects(t, db, "INSERT INTO agent_credentials(id,agent_id,token_hash,display_prefix,issued_at,expires_at,credential_generation,state) VALUES ('c-q','a2',?,'mdt_q',100,200,1,'active')", hashOf(1))
-	exec(t, db, "INSERT INTO agent_credentials(id,agent_id,token_hash,display_prefix,issued_at,expires_at,credential_generation,state) VALUES ('c-ok','a1',?,'mdt_ok',100,200,1,'active')", hashOf(2))
-	// A quarantined credential may be stored for a quarantined agent but never activated under it.
-	exec(t, db, "INSERT INTO agent_credentials(id,agent_id,token_hash,display_prefix,issued_at,expires_at) VALUES ('c-staged','a2',?,'mdt_s',100,200)", hashOf(3))
-	rejects(t, db, "UPDATE agent_credentials SET state='active',credential_generation=1 WHERE id='c-staged'")
-}
-
 func TestRevokedAgentCredentialIsFinal(t *testing.T) {
 	db := credentialSchema(t)
 	exec(t, db, "INSERT INTO agent_credentials(id,agent_id,token_hash,display_prefix,issued_at,expires_at,credential_generation,state) VALUES ('c1','a1',?,'mdt_c1',100,900,1,'active')", hashOf(1))
@@ -78,17 +69,6 @@ func TestRotationOverlapCanOnlyShrink(t *testing.T) {
 	if integer(t, db, "SELECT rotation_overlap_until FROM agent_credentials WHERE id='c1'") != 399 {
 		t.Fatal("overlap did not shrink")
 	}
-}
-
-func TestAgentCannotLeaveActiveWhileACredentialIsActive(t *testing.T) {
-	db := credentialSchema(t)
-	exec(t, db, "INSERT INTO agent_credentials(id,agent_id,token_hash,display_prefix,issued_at,expires_at,credential_generation,state) VALUES ('c1','a1',?,'mdt_c1',100,900,1,'active')", hashOf(1))
-	rejects(t, db, "UPDATE agents SET state='disabled' WHERE id='a1'")
-	rejects(t, db, "UPDATE agents SET state='quarantined' WHERE id='a1'")
-	exec(t, db, "UPDATE agent_credentials SET state='revoked',revoked_at=200 WHERE id='c1'")
-	exec(t, db, "UPDATE agents SET state='disabled' WHERE id='a1'")
-	// A disabled agent can never receive a new active credential.
-	rejects(t, db, "INSERT INTO agent_credentials(id,agent_id,token_hash,display_prefix,issued_at,expires_at,credential_generation,state) VALUES ('c2','a1',?,'mdt_c2',300,900,1,'active')", hashOf(2))
 }
 
 func TestAgentCredentialHashIsUniqueAndFixedLength(t *testing.T) {

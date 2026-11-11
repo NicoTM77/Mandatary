@@ -60,8 +60,8 @@ BLOB length/column names alone cannot guarantee ciphertext/hash authenticity.
 Migration `00012` (P1.10) adds triggers that make the agent-credential lifecycle
 one-way in SQLite: a revoked credential is final, the verifier/owner/issue
 time/expiry/display identifier are immutable once out of quarantine, a rotation
-overlap can only shorten, and an active credential requires an active agent (an
-agent cannot leave the active state while it holds one). See the
+overlap can only shorten (agent state is not trigger-coupled; the verifier refuses
+credentials behind non-active agents). See the
 [agent-credential contract](agent-credentials.md).
 
 The retry ceiling is 1–100 **per authenticator**, with bounded counter and
@@ -129,7 +129,7 @@ NIST/RESTORE/SETUP/SELF/SUP product specification passed.
 | UUID/local identity, TD3.4 | `TestEndpointID`, `TestFreshDownUpMigration`, `TestEndpointConstraints` | P1.03 persistent initialization; P1.12 endpoint/daemon proof |
 | Goose fresh/down/up, populated FK teardown | `TestFreshDownUpMigration`, `TestPopulatedMigrationReopenAndDown` | P1.03 upgrade/durability; no production rollback promise |
 | TD3.1 owner XOR/FKs/independent membership | `TestPrincipalOwnershipAndRoles`, `TestGeneratedModelsAndBoundParameters` | P1.10 service administration/no inheritance (delivered: [agent-credentials.md](agent-credentials.md)); P1.11 enforcement |
-| P1.10 credential lifecycle integrity (revoked final, immutable verifier/window, shrink-only overlap, active needs active agent) | `TestAgentCredentialActiveRequiresActiveAgent`, `TestRevokedAgentCredentialIsFinal`, `TestAgentCredentialVerifierAndWindowAreImmutable`, `TestRotationOverlapCanOnlyShrink`, `TestAgentCannotLeaveActiveWhileACredentialIsActive` | P1.18 restore import must keep imported credentials quarantined |
+| P1.10 credential lifecycle integrity (revoked final, immutable verifier/window, shrink-only overlap) | `TestRevokedAgentCredentialIsFinal`, `TestAgentCredentialVerifierAndWindowAreImmutable`, `TestRotationOverlapCanOnlyShrink` | P1.18 restore import must keep imported credentials quarantined |
 | TD11.1 nullable global/scoped roles, single admin/inactive future scope | `TestAdministrativeRoleModelNullableScope`, `TestPrincipalOwnershipAndRoles`, `TestEndpointConstraints` | P1.08/09 admin assurance; future phases remain unavailable |
 | TD7 endpoint-separated selectors, policy effect/subject/catalog | `TestEndpointScopedSelectorsAndPolicies`, `TestGeneratedModelsAndBoundParameters` | P1.11 deny precedence/selector lifecycle; P1.13/14 zero-call denial |
 | S2/RESTORE-01–09/11 and N63B4-RESTORE-AUTH-STATE structural substrate | `TestControlGenerationAndRevocationStructure`, `TestFreshDownUpMigration`, `TestAuthenticatorAndSessionStructure`, `TestRetryAndReplayStateSurviveReopen` | P1.03/08/10/11/18 current control/quarantine/reissue/reapproval/expiry/crash/restore service matrix |

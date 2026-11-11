@@ -160,8 +160,9 @@ Additive triggers; no column, row or constraint changes. Whatever writes (servic
 repair tooling) the database itself enforces: a **revoked credential is final** (no field changes);
 verifier, owning agent, issue time, expiry, non-expiry approval and display identifier are
 **immutable** once a credential has left quarantine; a **rotation overlap can only be shortened**,
-never extended or cleared; an **active credential requires an active agent**, and an agent cannot
-leave the active state while it holds an active credential. Imported/quarantined rows stay inactive.
+never extended or cleared. Agent state is **not** coupled by trigger: the shared verifier refuses any
+credential behind a non-active agent (its own defence-in-depth tests build that state), and the service
+revokes every credential before disabling. Imported/quarantined rows stay inactive.
 
 ## Requirement-to-executable-test map
 
@@ -172,13 +173,13 @@ are not browser, MCP-client, hardware or provider evidence, and not a NIST/FIPS 
 
 | Acceptance / contract | Tests |
 | --- | --- |
-| Exactly one owning user XOR group; invalid ownership | `TestAgentOwnershipIsExactlyOneUserXORGroup`, `TestAgentCredentialActiveRequiresActiveAgent`, `TestAdministrativeIdentityCreationIsInertUntilExplicitlyGranted` |
+| Exactly one owning user XOR group; invalid ownership | `TestAgentOwnershipIsExactlyOneUserXORGroup`, `TestAdministrativeIdentityCreationIsInertUntilExplicitlyGranted` |
 | No inherited owner grant | `TestOwningAnAgentGrantsNothingEndToEnd`, `TestGroupMembershipIsExplicitIdempotentAndNotified` |
 | 256-bit token, shown once, hash-only, redaction | `TestAgentTokenCarries256RandomBitsInCanonicalBase62`, `TestValidAgentTokenFormat`, `TestIssuedCredentialRedactsEveryFormattingPath`, `TestIssuedTokenIsShownOnceAndOnlyItsHashIsPersisted`, `TestAdministrativeViewsAreSecretFreeAndComplete`, `TestAdministrationOverHTTPEndToEndRevealsTheTokenOnce`, `TestIssuedTokenNeverReachesLogsOrErrorBodies`, `TestAdministrativeErrorsAreFixedCodesThatNeverEchoInput` |
 | RANDOM-EVIDENCE fail-closed | `TestAgentTokenRandomnessFailureNeverIssues`, `TestRandomnessFailureIssuesNoCredential`, `TestNewUUIDIsCanonicalV4AndFailsClosedOnShortOrBrokenSource` |
 | Expiry and TTL policy | `TestCredentialExpiryBoundaryIsExact`, `TestTokenLifetimePolicy`, `TestAdminConstructionRejectsUnsafeSettings` |
 | Deterministic overlap-window boundaries, rotation | `TestOverlapWindowBoundaryIsDeterministic`, `TestRotationWithoutOverlapAndDefaultOverlap`, `TestRotatingAgainRevokesTheCredentialStillOverlapping`, `TestRotateAndIssueRulesForLiveCredentials`, `TestRotationOverlapFieldSemanticsOverHTTP`, `TestRotationOverlapKeepsTheOldTokensLeaseUntilTheBoundary` |
-| Revocation, disabling, no revival | `TestRevocationIsImmediateIdempotentAndAgentScoped`, `TestRevokedAndRotatedOutCredentialsCannotBeRevived`, `TestDisablingAnAgentRevokesEveryCredentialAndBlocksReissue`, `TestRevokedAgentCredentialIsFinal`, `TestAgentCredentialVerifierAndWindowAreImmutable`, `TestRotationOverlapCanOnlyShrink`, `TestAgentCannotLeaveActiveWhileACredentialIsActive`, `TestAgentCredentialHashIsUniqueAndFixedLength` |
+| Revocation, disabling, no revival | `TestRevocationIsImmediateIdempotentAndAgentScoped`, `TestRevokedAndRotatedOutCredentialsCannotBeRevived`, `TestDisablingAnAgentRevokesEveryCredentialAndBlocksReissue`, `TestRevokedAgentCredentialIsFinal`, `TestAgentCredentialVerifierAndWindowAreImmutable`, `TestRotationOverlapCanOnlyShrink`, `TestAgentCredentialHashIsUniqueAndFixedLength` |
 | Old generation / quarantine (RESTORE-01/-11 substrate) | `TestOldGenerationAndQuarantineRejectEveryCredentialAndAdministration`, `TestRestoreQuarantineDeniesAdministrationAndAcceptance`, `TestIssueRefusesAnAgentOutsideTheCurrentGenerations`, `TestNonExpiringTokensDieWithTheCredentialGenerationAndRevocation` |
 | Old/expired/revoked/rotated-out token rejected on the shared acceptance path | `TestRetiredTokensAreRejectedByTheSharedAuthorizerAndLeases`, `TestAdministrativeRevocationTerminatesActiveLeasesBeforeReturning`, `TestCredentialStatusMatchesTheSharedVerifierOverTheStateMatrix`, `TestNotificationFailureDoesNotUndoARevocationButIsReported` |
 | Privilege escalation; single administrator | `TestOnlyTheSingleActiveAdministratorMayAdminister`, `TestMutationsNeedFreshAAL2EvidenceButReadsDoNot`, `TestMultiplePolicyAdministratorsStayUnavailable`, `TestOrdinaryUsersAndOwnersCannotAdministerOverHTTP`, `TestAgentTokensNeverAuthenticateAdministration`, `TestAgentCredentialRoutesNeverAcceptAgentTokens`, `TestAgentTokensNeverAuthenticateTheSetupSurface` |

@@ -90,8 +90,16 @@ func TestDeterministicClockExpiryBoundaries(t *testing.T) {
 		t.Fatalf("t+200s agent overlap boundary: expected 401, got %v", err)
 	}
 
-	// Clear rotation_overlap_until to test main ExpiresAt boundary at start+500.
-	env.execSQL(`UPDATE agent_credentials SET rotation_overlap_until = NULL WHERE id = ?`, string(testCredID1))
+	// An overlap window can never be extended or cleared (schema trigger, P1.10), so the
+	// main ExpiresAt boundary at start+500 is exercised on a separate credential that
+	// never had an overlap window.
+	tok2 := env.seedAgentCredential(seedAgentCredentialOpts{
+		ID:        testCredID2,
+		AgentID:   testAgentID1,
+		IssuedAt:  start,
+		ExpiresAt: sql.NullInt64{Int64: start + 500, Valid: true},
+	})
+	agentReq.Principal = authz.PrincipalCredentials{AgentToken: tok2}
 	if _, err := env.authorizer.Authorize(ctx, agentReq); err != nil {
 		t.Fatalf("t+200s agent without overlap: %v", err)
 	}
