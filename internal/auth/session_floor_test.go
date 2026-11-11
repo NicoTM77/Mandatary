@@ -63,6 +63,29 @@ func (e *sessionEnv) denyEveryWeakWrite(t *testing.T, secret []byte, label strin
 	}
 }
 
+// A password-only session that already exists on a stranded floor-2 account is
+// judged like the shared authorizer verifier judges it (C2 parity: both accept it
+// as AAL1; new issuance is what is blocked), and it carries no sensitive
+// authority: every gate reports assurance-unavailable.
+func (e *sessionEnv) requireStrandedSessionHasNoAuthority(t *testing.T, secret []byte) {
+	t.Helper()
+	info, err := e.s.Authenticate(t.Context(), secret, true)
+	if _, theirs := e.verify(secret); (err == nil) != (theirs == nil) {
+		t.Fatalf("C2 disagreement: session service err=%v, authorizer verifier err=%v", err, theirs)
+	}
+	if err != nil {
+		t.Fatal("an existing AAL1 session must stay accepted by both layers", err)
+	}
+	if info.RequiredAssurance != 2 || info.UsableAssurance != 1 || info.Assurance != AssurancePasswordOnly {
+		t.Fatalf("stranded session mislabelled: %+v", info.SessionInfo)
+	}
+	for _, op := range SensitiveOperations() {
+		if err := e.s.RequireSensitive(info.SessionInfo, op); err != ErrAssuranceUnavailable {
+			t.Fatalf("%s: stranded session must be assurance-unavailable, got %v", op, err)
+		}
+	}
+}
+
 func (e *sessionEnv) normalSessions() int64 {
 	return e.scalar(`SELECT count(*) FROM sessions WHERE purpose IN ('normal','preauth')`)
 }
@@ -103,9 +126,7 @@ func TestSessionFloorReportChainCannotMintReplacementFactor(t *testing.T) { // E
 				t.Fatal("denied login persisted a session row")
 			}
 			planted := e.plantPasswordOnly()
-			if _, err := e.s.Authenticate(t.Context(), planted, true); err == nil {
-				t.Fatal("password-only session accepted for an account whose only factor was reported")
-			}
+			e.requireStrandedSessionHasNoAuthority(t, planted)
 			e.denyEveryWeakWrite(t, planted, "after report")
 		})
 	}
@@ -143,9 +164,7 @@ func TestSessionFloorUnavailableBoundFactorCannotLowerGate(t *testing.T) { // E0
 				t.Fatal("denied login persisted a session row")
 			}
 			planted := e.plantPasswordOnly()
-			if _, err := e.s.Authenticate(t.Context(), planted, true); err == nil {
-				t.Fatal("password-only session accepted although the bound factor is unavailable")
-			}
+			e.requireStrandedSessionHasNoAuthority(t, planted)
 			e.denyEveryWeakWrite(t, planted, name)
 		})
 	}

@@ -108,15 +108,35 @@ report or an exhausted factor *lower* an account's gate. They are now separate:
   conflated the two; `/session` now reports `required_assurance` and
   `usable_assurance`.)
 
-The same floor decides login issuance, `Authenticate`, `RequireSensitive`,
-step-up and `freshSession`. A lower-assurance (password-only) session exists only
-where policy allows it **and** (floor < 2 or a usable second factor exists to step
-up with). Consequently a password-only compromise report that removes the last
-usable factor of an AAL2-capable optional-MFA account yields **no** normal session
-and no preauth capability: the way back is the already-approved restricted
+The same floor decides login issuance, `RequireSensitive`, step-up and
+`freshSession`. A lower-assurance (password-only) session is **issued** only where
+policy allows it **and** (floor < 2 or a usable second factor exists to step up
+with). Consequently a password-only compromise report that removes the last
+usable factor of an AAL2-capable optional-MFA account yields **no** new normal
+session and no preauth capability: the way back is the already-approved restricted
 recovery (password + saved code, then a proven replacement factor). A genuine
 AAL1-only account, and an account that deliberately removed its factors with fresh
 maximum assurance, keep the approved password-only behaviour.
+
+**Issuance rule, not a verification rule (C2 parity).** The "no stranded
+password-only session" test is applied only when a session is issued
+(`PasswordLogin`, `LoginWithoutMFA`). `Authenticate` does **not** re-apply it, so a
+legitimately issued skip-MFA AAL1 session is accepted or rejected by
+`Sessions.Authenticate` exactly as by the shared authorizer verifier
+(`authz.VerifyPrincipal`, used for both authorization and decision revalidation)
+after the account's factor later becomes exhausted, expired or retired
+(`TestSkipMFASessionParityAfterFactorBecomesUnusable`,
+`TestSkipMFASessionParityAfterRealRetryCeilingCrossing`). Such a session never
+gains authority: while the floor is 2 every sensitive class returns
+`assurance_unavailable` and the lifecycle writes deny. Protective reports and
+factor removal still revoke the sessions that depend on the affected factor.
+
+Known consequence (reviewer note L4, accepted as the conservative rule): a fresh
+AAL2 removal of an account's last live factor while a protectively reported
+sibling still exists is recorded `authorized_removal`, but the protective sibling
+keeps the floor at 2, so the account has no password-only session afterwards and
+uses the approved restricted recovery (saved codes). Operators should remove or
+recover the reported sibling first; no self-service shortcut is added.
 
 ### Retirement provenance (migration 00010)
 
@@ -218,7 +238,7 @@ browser-engine or provider evidence.
 | --- | --- |
 | A05, S06 / `N63B4-AAL-TIMEOUTS`, `SESSION-CLOCKS` | `TestSessionSettingsBoundaries`, `TestSessionClocksIdleAndAbsolute`, `TestBackgroundRoutesDoNotKeepSessionsAlive`, `TestSessionLifetimeFollowsConfiguredStricterSettings` |
 | S01 / `SESSION-CREATION`, G16 / `RANDOM-EVIDENCE` | `TestSessionSecretGenerationAndStorage`, `TestPreauthCapabilityIsNotASession`, `TestConcurrentCompletionOfOnePreauthYieldsOneSession`, `TestAuthenticateReturnsOnlyServerBoundEvidence` |
-| D-01 / `SCOPE-PASSWORD`, `SCOPE-ADMIN`, `SCOPE-TRANSACTION` | `TestPasswordOnlyIsLowerAssuranceNeverAAL2`, `TestSecondFactorRequiredAccountsCannotSkipMFA`, `TestIssuedSessionsAreAcceptedAndRejectedIdenticallyByTheAuthorizerVerifier` |
+| D-01 / `SCOPE-PASSWORD`, `SCOPE-ADMIN`, `SCOPE-TRANSACTION` | `TestPasswordOnlyIsLowerAssuranceNeverAAL2`, `TestSecondFactorRequiredAccountsCannotSkipMFA`, `TestIssuedSessionsAreAcceptedAndRejectedIdenticallyByTheAuthorizerVerifier`, `TestSkipMFASessionParityAfterFactorBecomesUnusable`, `TestSkipMFASessionParityAfterRealRetryCeilingCrossing` |
 | A01, A04, W03 / `AAL-FACTORS`, `AAL-PHISHING`, `WA-UV` | `TestOnlyDefinedAAL2CombinationsAreAccepted`, `TestSecondFactorRequiredAccountsCannotSkipMFA` (WebAuthn-only subtest), `TestStepUpWebAuthnAndWebAuthnOnlyPolicy` |
 | S07, SB-4 / `REAUTH-STRENGTH`, G02 / `RATE-RESET-AAL` | `TestSensitiveOperationPolicyMatrix`, `TestStepUpTOTPRotatesAndResetsBothClocks`, `TestStepUpCannotDowngradeOrCrossAccounts`, `TestStepUpPasswordForAAL1OnlyAccount`, `TestConcurrentStepUpYieldsOneSuccessor` |
 | E03, E08, E12, TD §4.3 every sensitive mutation | `TestSessionGatedLifecycleMutationsNegativeAndStepUpPositive`, `TestSessionGatedMutationBoundaryExactlyFifteenMinutes`, `TestSensitiveRoutesStepUpOverHTTP` |

@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -175,5 +176,140 @@ func TestProtectiveReportInvalidatesCopiedSessions(t *testing.T) { // COMPROMISE
 	r, err := e.s.PasswordLogin(t.Context(), "synthetic-user", []byte(sessionTestPassword), sessionTestIP)
 	if err == nil && r.Session.Info.Assurance == AssuranceAAL2 {
 		t.Fatal("compromise report produced an AAL2 session")
+	}
+}
+
+// C2 parity after a factor becomes unusable (rework 430, review F3). A legitimate
+// skip-MFA AAL1 session is issued while the second factor is live (approved
+// optional-MFA behaviour); the factor is then made unusable in every way the
+// product can. The session service and the shared authorizer verifier must keep
+// judging that SAME session identically (both accept it as AAL1: blocked issuance
+// plus revocation is the control, not a Sessions-only rejection), and the
+// session carries no sensitive authority while the retained floor stays 2.
+func TestSkipMFASessionParityAfterFactorBecomesUnusable(t *testing.T) { // C2, E03, E09, E12, D-04
+	disable := `UPDATE authenticators SET state='disabled',failed_attempts=retry_ceiling WHERE id=?`
+	expire := `UPDATE authenticators SET expires_at=created_at+1 WHERE id=?`
+	retire := func(r string) string {
+		if r == "" {
+			return `UPDATE authenticators SET state='revoked',revoked_at=?,changed_at=? WHERE id=?`
+		}
+		return `UPDATE authenticators SET state='revoked',revoked_at=?,changed_at=?,retirement_reason='` + r + `' WHERE id=?`
+	}
+	type factor struct {
+		name  string
+		setup func(e *sessionEnv) string
+	}
+	factors := []factor{
+		{"TOTP", func(e *sessionEnv) string { id, _ := e.mfaAccount(); return id }},
+		{"key", func(e *sessionEnv) string {
+			_, id := e.enrollKey()
+			e.retireSeed()
+			e.clock.Advance(time.Minute)
+			return id
+		}},
+	}
+	mutations := []struct {
+		name string
+		sql  func() string
+		gate bool // true: the floor drops to 1 and sensitive writes are admitted
+	}{
+		{"exhausted or disabled", func() string { return disable }, false},
+		{"expired", func() string { return expire }, false},
+		{"retired protective", func() string { return retire(retireProtective) }, false},
+		{"retired legacy NULL provenance", func() string { return retire("") }, false},
+		{"retired authorized removal", func() string { return retire(retireAuthorized) }, true},
+		{"retired recovery replacement", func() string { return retire(retireRecovered) }, true},
+	}
+	for _, f := range factors {
+		for _, m := range mutations {
+			t.Run(f.name+" "+m.name, func(t *testing.T) {
+				e := newSessionEnv(t)
+				id := f.setup(e)
+				po := e.passwordOnly()
+				if po.Info.Assurance != AssurancePasswordOnly {
+					t.Fatalf("control: skip-MFA session is %v", po.Info.Assurance)
+				}
+				if _, err := e.s.Authenticate(t.Context(), po.Secret(), false); err != nil {
+					t.Fatal("control: session service rejected the issued session", err)
+				}
+				if _, err := e.verify(po.Secret()); err != nil {
+					t.Fatal("control: authorizer verifier rejected the issued session", err)
+				}
+				e.clock.Advance(time.Second)
+				now := e.clock.Now().Unix()
+				switch q := m.sql(); {
+				case strings.Contains(q, "revoked_at=?"):
+					e.exec(q, now, now, id)
+				default:
+					e.exec(q, id)
+				}
+				e.clock.Advance(time.Second)
+				info, ours := e.s.Authenticate(t.Context(), po.Secret(), false)
+				vp, theirs := e.verify(po.Secret())
+				if (ours == nil) != (theirs == nil) {
+					t.Fatalf("C2 disagreement: session service err=%v, authorizer verifier err=%v", ours, theirs)
+				}
+				if ours != nil {
+					t.Fatalf("an already-issued AAL1 session must stay accepted by both layers, got %v", ours)
+				}
+				if vp.AchievedAssurance != 1 || info.Assurance != AssurancePasswordOnly {
+					t.Fatalf("assurance upgraded: verifier=%d session=%v", vp.AchievedAssurance, info.Assurance)
+				}
+				for _, op := range SensitiveOperations() {
+					err := e.s.RequireSensitive(info.SessionInfo, op)
+					// AAL2-only classes are never admitted to an AAL1 session; the
+					// floor-based classes follow the retained floor.
+					want := m.gate && !sensitivePolicies[op].aal2
+					if want != (err == nil) {
+						t.Fatalf("%s: sensitive gate err=%v, want admitted=%v (floor %d)", op, err, want, info.RequiredAssurance)
+					}
+					if err != nil && err != ErrAssuranceUnavailable {
+						t.Fatalf("%s: an AAL1 session without a usable factor must be assurance-unavailable, got %v", op, err)
+					}
+				}
+				if _, lifeErr := e.l.BeginTOTP(t.Context(), po.Secret(), "SHA256"); m.gate != (lifeErr == nil) {
+					t.Fatalf("lifecycle binding err=%v, want admitted=%v", lifeErr, m.gate)
+				}
+			})
+		}
+	}
+}
+
+// A password holder can push a live TOTP over its retry ceiling through the real
+// LoginTOTP path. That crossing revokes no sessions, so both layers must keep
+// agreeing on the skip-MFA session issued before it, and the session still has no
+// sensitive authority.
+func TestSkipMFASessionParityAfterRealRetryCeilingCrossing(t *testing.T) { // C2, E09, D-04
+	e := newSessionEnv(t)
+	id, _ := e.mfaAccount()
+	po := e.passwordOnly()
+	e.exec(`UPDATE authenticators SET failed_attempts=retry_ceiling-1 WHERE id=?`, id)
+	r, err := e.s.PasswordLogin(t.Context(), "synthetic-user", []byte(sessionTestPassword), "192.0.2.40")
+	if err != nil {
+		t.Fatal(err)
+	}
+	e.clock.Advance(31 * time.Second)
+	if _, err = e.s.LoginTOTP(t.Context(), r.Session.Secret(), id, "000000", "192.0.2.40"); err == nil {
+		t.Fatal("wrong code accepted")
+	}
+	if e.scalar(`SELECT failed_attempts>=retry_ceiling AND state='disabled' FROM authenticators WHERE id=?`, id) != 1 {
+		t.Fatal("setup: the ceiling was not really crossed")
+	}
+	info, ours := e.s.Authenticate(t.Context(), po.Secret(), false)
+	_, theirs := e.verify(po.Secret())
+	if (ours == nil) != (theirs == nil) {
+		t.Fatalf("C2 disagreement after real ceiling crossing: session service err=%v, authorizer verifier err=%v", ours, theirs)
+	}
+	if ours != nil {
+		t.Fatalf("ceiling crossing must not revoke or reject the earlier AAL1 session in either layer: %v", ours)
+	}
+	for _, op := range SensitiveOperations() {
+		if err := e.s.RequireSensitive(info.SessionInfo, op); err != ErrAssuranceUnavailable {
+			t.Fatalf("%s admitted or mis-signalled after the factor was exhausted: %v", op, err)
+		}
+	}
+	// New password-only issuance stays blocked: the blocked-issuance control.
+	if r, err := e.s.PasswordLogin(t.Context(), "synthetic-user", []byte(sessionTestPassword), "192.0.2.41"); err == nil {
+		t.Fatalf("password login issued a session on a stranded floor-2 account: %+v", r.Session.Info)
 	}
 }

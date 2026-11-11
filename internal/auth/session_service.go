@@ -150,9 +150,11 @@ func (a accountView) passwordOnlyAllowed() bool {
 
 // lowerAssuranceUsable additionally requires that the lower-assurance session
 // is not a stranded one: with a required floor of 2 and no usable second factor
-// the account could never step up, so password evidence alone gets NO session
+// the account could never step up, so password evidence alone gets NO NEW session
 // (a protective report or exhausted factor must not turn into password-only
-// access, NIST E12/I08/D-04). Recovery is the approved way back.
+// access, NIST E12/I08/D-04). Recovery is the approved way back. This is an
+// ISSUANCE rule only; verifySession and the authorizer verifier do not re-apply it
+// to sessions that already exist (C2 parity).
 func (a accountView) lowerAssuranceUsable() bool {
 	return a.passwordOnlyAllowed() && (a.floor < 2 || a.hasSecondFactor())
 }
@@ -343,11 +345,13 @@ func (s *Sessions) verifySession(ctx context.Context, q *store.Queries, secret [
 	if acct.mfaRequired() && row.AchievedAssurance < 2 {
 		return c, row, acct, ErrDenied
 	}
-	// A lower-assurance session on an account that requires 2 is only meaningful
-	// while a usable second factor exists to step up with.
-	if row.AchievedAssurance < 2 && !acct.lowerAssuranceUsable() {
-		return c, row, acct, ErrDenied
-	}
+	// Deliberately NO "stranded floor-2" rejection here. Whether a lower-assurance
+	// session may be ISSUED is decided once, at issuance (lowerAssuranceUsable). An
+	// already-issued AAL1 session is judged exactly as the shared authorizer
+	// verifier (authz.VerifyPrincipal) judges it, so the two layers cannot
+	// disagree (C2). It carries no sensitive authority while the floor is 2
+	// (RequireSensitive/freshSession), and compromise reports and factor removal
+	// revoke sessions through the existing generation/revocation paths.
 	if acct.user.MfaRequirement == "webauthn" && (row.AchievedAssurance != 2 || row.Methods != evidenceWebAuthnUV || row.PhishingResistant != 1) {
 		return c, row, acct, ErrDenied
 	}

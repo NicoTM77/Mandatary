@@ -61,6 +61,9 @@ func TestSessionFloorGateAndLifecycleAgreeAcrossAccountStates(t *testing.T) { //
 		return id, keyID
 	}
 	denied := accountOutcome{"denied", false, false, false}
+	// stranded: new password-only issuance is blocked, but a session issued earlier
+	// is still judged like the authorizer verifier does (C2) and has no sensitive power.
+	stranded := accountOutcome{"denied", true, false, false}
 	aal1 := accountOutcome{"aal1", true, true, true}
 	stepUp := accountOutcome{"preauth", true, false, false}
 	disable := `UPDATE authenticators SET state='disabled',failed_attempts=retry_ceiling WHERE id=?`
@@ -73,16 +76,16 @@ func TestSessionFloorGateAndLifecycleAgreeAcrossAccountStates(t *testing.T) { //
 		{"AAL1-only never bound a factor", func(e *sessionEnv) {}, aal1},
 		{"live TOTP keeps approved lower-assurance login but no sensitive authority", func(e *sessionEnv) { totp(e) }, stepUp},
 		{"live key", func(e *sessionEnv) { key(e) }, stepUp},
-		{"TOTP exhausted", func(e *sessionEnv) { e.exec(disable, totp(e)) }, denied},
-		{"TOTP expired", func(e *sessionEnv) { e.exec(expire, totp(e)) }, denied},
-		{"key disabled", func(e *sessionEnv) { e.exec(disable, key(e)) }, denied},
-		{"key expired", func(e *sessionEnv) { e.exec(expire, key(e)) }, denied},
-		{"TOTP retired, legacy NULL provenance", func(e *sessionEnv) { e.retireRaw(totp(e), reason("")) }, denied},
-		{"TOTP retired protective", func(e *sessionEnv) { e.retireRaw(totp(e), reason(retireProtective)) }, denied},
+		{"TOTP exhausted", func(e *sessionEnv) { e.exec(disable, totp(e)) }, stranded},
+		{"TOTP expired", func(e *sessionEnv) { e.exec(expire, totp(e)) }, stranded},
+		{"key disabled", func(e *sessionEnv) { e.exec(disable, key(e)) }, stranded},
+		{"key expired", func(e *sessionEnv) { e.exec(expire, key(e)) }, stranded},
+		{"TOTP retired, legacy NULL provenance", func(e *sessionEnv) { e.retireRaw(totp(e), reason("")) }, stranded},
+		{"TOTP retired protective", func(e *sessionEnv) { e.retireRaw(totp(e), reason(retireProtective)) }, stranded},
 		{"TOTP retired authorized removal", func(e *sessionEnv) { e.retireRaw(totp(e), reason(retireAuthorized)) }, aal1},
 		{"TOTP retired recovery replacement", func(e *sessionEnv) { e.retireRaw(totp(e), reason(retireRecovered)) }, aal1},
-		{"key retired legacy NULL provenance", func(e *sessionEnv) { e.retireRaw(key(e), reason("")) }, denied},
-		{"key retired protective", func(e *sessionEnv) { e.retireRaw(key(e), reason(retireProtective)) }, denied},
+		{"key retired legacy NULL provenance", func(e *sessionEnv) { e.retireRaw(key(e), reason("")) }, stranded},
+		{"key retired protective", func(e *sessionEnv) { e.retireRaw(key(e), reason(retireProtective)) }, stranded},
 		{"key retired authorized removal", func(e *sessionEnv) { e.retireRaw(key(e), reason(retireAuthorized)) }, aal1},
 		{"key retired recovery replacement", func(e *sessionEnv) { e.retireRaw(key(e), reason(retireRecovered)) }, aal1},
 		{"live key with disabled TOTP sibling", func(e *sessionEnv) { id, _ := both(e); e.exec(disable, id) }, stepUp},
@@ -90,12 +93,12 @@ func TestSessionFloorGateAndLifecycleAgreeAcrossAccountStates(t *testing.T) { //
 			id, keyID := both(e)
 			e.retireRaw(id, reason(retireAuthorized))
 			e.exec(disable, keyID)
-		}, denied},
+		}, stranded},
 		{"authorized removal of the only live factor leaves a protectively retired sibling counted", func(e *sessionEnv) {
 			id, keyID := both(e)
 			e.retireRaw(id, reason(retireAuthorized))
 			e.retireRaw(keyID, reason(retireProtective))
-		}, denied},
+		}, stranded},
 		{"required policy without any factor", func(e *sessionEnv) { e.exec(`UPDATE users SET mfa_requirement='required'`) }, denied},
 		{"administrator without any factor", func(e *sessionEnv) {
 			e.exec(`INSERT INTO administrative_roles(id,user_id,role,state,authority_generation) VALUES('adm','u','super_admin','active',1)`)
@@ -118,6 +121,11 @@ func TestSessionFloorGateAndLifecycleAgreeAcrossAccountStates(t *testing.T) { //
 			planted := e.plantPasswordOnly()
 			info, err := e.s.Authenticate(t.Context(), planted, true)
 			got.authOK = err == nil
+			// C2: the shared authorizer verifier must judge the planted session the
+			// same way in every one of these states.
+			if _, theirs := e.verify(planted); (theirs == nil) != got.authOK {
+				t.Fatalf("C2 disagreement: session service err=%v, authorizer verifier err=%v", err, theirs)
+			}
 			if got.authOK {
 				got.gateOK = e.s.RequireSensitive(info.SessionInfo, OpAuthenticatorChange) == nil
 				// the password-change class shares the floor: it must agree too
