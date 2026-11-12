@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"net/url"
 	"reflect"
-	"sort"
 	"strings"
 	"sync"
 	"testing"
@@ -20,7 +19,6 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/NicoTM77/Mandatary/internal/api"
-	"github.com/NicoTM77/Mandatary/internal/docker"
 )
 
 // call is one transport-neutral request of the matrix. op is an MCP tool name (the six
@@ -134,7 +132,7 @@ func (restTransport) do(t *testing.T, e *env, c call) outcome {
 	if err != nil {
 		t.Fatalf("REST %s %s: %v", method, u, err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	data, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode == http.StatusOK {
 		var payload map[string]any
@@ -235,7 +233,7 @@ func (mcpTransport) do(t *testing.T, e *env, c call) outcome {
 		}
 		t.Fatalf("MCP connect: %v", err)
 	}
-	defer cs.Close()
+	defer func() { _ = cs.Close() }()
 	args := map[string]any{"endpoint": c.endpoint, "container": c.container}
 	for k, v := range c.args {
 		args[k] = v
@@ -379,14 +377,3 @@ func assertNoSecrets(t *testing.T, name, text string) {
 		}
 	}
 }
-
-func sortedKeys(m map[string]any) []string {
-	out := make([]string, 0, len(m))
-	for k := range m {
-		out = append(out, k)
-	}
-	sort.Strings(out)
-	return out
-}
-
-var _ = docker.OpLogs

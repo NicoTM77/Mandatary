@@ -101,15 +101,15 @@ type Call struct {
 // JSON and slog path and is never stored in an error.
 type Token struct{ v string }
 
-const redactedToken = "api.Token{[REDACTED]}"
+const redactionMark = "api.Token{[REDACTED]}"
 
-func (Token) String() string             { return redactedToken }
-func (Token) GoString() string           { return redactedToken }
-func (Token) Format(f fmt.State, _ rune) { _, _ = f.Write([]byte(redactedToken)) }
+func (Token) String() string             { return redactionMark }
+func (Token) GoString() string           { return redactionMark }
+func (Token) Format(f fmt.State, _ rune) { _, _ = f.Write([]byte(redactionMark)) }
 func (Token) MarshalJSON() ([]byte, error) {
-	return []byte(`"` + redactedToken + `"`), nil
+	return []byte(`"` + redactionMark + `"`), nil
 }
-func (Token) LogValue() slog.Value { return slog.StringValue(redactedToken) }
+func (Token) LogValue() slog.Value { return slog.StringValue(redactionMark) }
 
 // Response shapes (JSON). Inspect operations return docker.InspectStatus and
 // docker.InspectConfig unchanged: the P1.12 allowlisted, sanitized structures.

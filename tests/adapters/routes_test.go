@@ -43,7 +43,7 @@ func rawDo(t *testing.T, e *env, method, target string, hdr http.Header, body []
 	if err != nil {
 		t.Fatalf("%s %s: %v", method, target, err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	data, _ := io.ReadAll(resp.Body)
 	return resp.StatusCode, resp.Header, data
 }
@@ -286,7 +286,7 @@ func listTools(t *testing.T, e *env, tok string) []*mcp.Tool {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer cs.Close()
+	defer func() { _ = cs.Close() }()
 	res, err := cs.ListTools(ctx, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -360,14 +360,23 @@ func TestMCPServerAdvertisesOnlyToolsAndNoHiddenFeatures(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer cs.Close()
+	defer func() { _ = cs.Close() }()
 	init := cs.InitializeResult()
 	if init.ServerInfo.Name != "mandatary" || init.ServerInfo.Version != api.ContractVersion {
 		t.Fatalf("server info %+v", init.ServerInfo)
 	}
-	caps := init.Capabilities
-	if caps.Tools == nil || caps.Prompts != nil || caps.Resources != nil || caps.Logging != nil || caps.Completions != nil || caps.Experimental != nil {
-		t.Fatalf("capabilities %+v: only tools may be advertised", caps)
+	// Compare the wire form: only the "tools" capability may be advertised (this also
+	// covers capabilities the SDK deprecates or adds later).
+	capsJSON, err := json.Marshal(init.Capabilities)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var capsMap map[string]json.RawMessage
+	if err := json.Unmarshal(capsJSON, &capsMap); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := capsMap["tools"]; !ok || len(capsMap) != 1 {
+		t.Fatalf("capabilities %s: only tools may be advertised", capsJSON)
 	}
 	// The SDK answers these with empty lists even when the capability is not advertised;
 	// what matters is that nothing is served.
@@ -397,7 +406,7 @@ func TestMCPAuthorityIsEvaluatedPerRequestAndNeverCarriedByASession(t *testing.T
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer cs.Close()
+	defer func() { _ = cs.Close() }()
 	callStatus := func(container string) (*mcp.CallToolResult, error) {
 		return cs.CallTool(ctx, &mcp.CallToolParams{Name: "container_status", Arguments: map[string]any{"endpoint": "local", "container": container}})
 	}
