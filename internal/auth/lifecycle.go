@@ -106,6 +106,15 @@ func nullable(n int64) sql.NullInt64 { return sql.NullInt64{Int64: n, Valid: tru
 // cookies/session and cannot turn enrollment or a caller's assurance field into
 // authentication. P1.08 owns creation and transport of normal sessions.
 func freshSession(ctx context.Context, q *store.Queries, secret []byte, now int64) (store.InstallationControl, store.User, store.Session, error) {
+	return sessionWithin(ctx, q, secret, now, 900)
+}
+
+// sessionWithin is freshSession with an explicit authentication-age ceiling in
+// seconds. A negative ceiling disables ONLY the age limit: every other check
+// (generations, expiry, idle, assurance floor, evidence) is identical. Sensitive
+// writes must keep using freshSession; the P1.10 administrative reads use -1 so
+// listing identities never forces a step-up while mutation always does.
+func sessionWithin(ctx context.Context, q *store.Queries, secret []byte, now, maxAge int64) (store.InstallationControl, store.User, store.Session, error) {
 	var c store.InstallationControl
 	var u store.User
 	var s store.Session
@@ -137,7 +146,7 @@ func freshSession(ctx context.Context, q *store.Queries, secret []byte, now int6
 	if s.ReauthenticatedAt.Valid {
 		at = s.ReauthenticatedAt
 	}
-	if s.Purpose != "normal" || s.State != "active" || s.RevokedAt.Valid || s.CredentialGeneration != c.CredentialGeneration || s.SessionGeneration != c.SessionGeneration || !at.Valid || at.Int64 > now || now-at.Int64 > 900 || now < s.CreatedAt || now >= s.ExpiresAt || s.LastActivityAt > now || now-s.LastActivityAt >= s.IdleTimeoutSeconds {
+	if s.Purpose != "normal" || s.State != "active" || s.RevokedAt.Valid || s.CredentialGeneration != c.CredentialGeneration || s.SessionGeneration != c.SessionGeneration || !at.Valid || at.Int64 > now || (maxAge >= 0 && now-at.Int64 > maxAge) || now < s.CreatedAt || now >= s.ExpiresAt || s.LastActivityAt > now || now-s.LastActivityAt >= s.IdleTimeoutSeconds {
 		return deny()
 	}
 	all, e := q.ListUserAuthenticators(ctx, u.ID)

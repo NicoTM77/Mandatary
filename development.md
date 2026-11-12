@@ -190,6 +190,16 @@ lifecycle freshness check; see the
 [session/browser contract](docs/sessions-browser-security.md) for tests, limits and
 owning later tasks (P1.09 setup/recovery sessions, P1.16 UI adapters, P1.19 TLS
 topology, Phase 3 own-session visibility).
+P1.10 adds the administrative **service and route adapter** for the single policy
+administrator (`auth.Admin`, `auth.AdminHTTP`): inert users/groups/agents with an
+exactly-one-owner rule, explicit group membership, and agent bearer tokens (256-bit
+`mdt_`, shown once, SHA-256 only at rest, expiry, overlap rotation, revocation) plus
+additive migration `00012`. Owning an agent grants nothing; revoked, expired,
+rotated-out and old-generation tokens are refused by the shared authorizer. The
+routes are registered on an `auth.Browser` but, like P1.08, **no administrative or
+API route is mounted by the static server**; REST/MCP Bearer adapters are P1.14. See
+the [agent-credential contract](docs/agent-credentials.md) for boundaries, tests and
+residual risks.
 Copied normalization source needs explicit upstream-advisory review; scanners do
 not automatically identify its parent module. No production footprint budget or
 NIST/FIPS claim changes. In this task's restricted worker, necessary Go race
