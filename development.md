@@ -147,6 +147,15 @@ versions with locked Node/npm. Baseline and Security checks are required evidenc
 not permission to merge; Nico controls merge and independent native review is
 required for the exact head.
 
+The negative control runs as its own job per pinned Go version (`Negative control
+(Go 1.27.4)` and `(Go 1.26.11)`), on separate runners in parallel with Baseline and
+independent of it, so the positive and negative full-suite runs no longer share one
+30-minute job. The Security check depends on every Baseline and negative-control job
+and fails (not skips) unless all of them succeeded, so a failing negative control
+blocks through the already-required Security check without any repository-setting
+change. Branch protection is not altered by this file; making the two new check
+names directly required is an owner setting.
+
 `tests/security/surface_test.go` rejects unimplemented product/raw-Docker paths.
 Its negative control injects `/` (a genuinely public static route) into that
 must-be-404 matrix; the unchanged race command must fail. CI invokes the control
@@ -172,6 +181,14 @@ P1.12 adds the `internal/docker` intermediary package (`DockerBackend`, official
 `moby/client` adapter, container-free `MockBackend`, `SELF-01`–`SELF-13`
 self-protection state machine, and inspect/log/error sanitizers) without exposing
 HTTP/MCP routes; see the [Docker backend reference](docs/docker-backend.md).
+P1.13 adds the shared operation execution service `internal/ops` (`Service.Execute`
+for the six approved permission keys, revalidated cancellable `LogStream`s, and
+`Service.NotifyAuthorityChange`) over the P1.11 authorizer and the P1.12 backend,
+plus the additive `Authorizer.BackendFor`. It exposes no HTTP/MCP route, accepts no
+raw Docker path or query, and dispatches only on the immutable authorized container
+ID; see the [operation service reference](docs/operations.md) for the zero-call
+spy contract, bounds, stream termination (including the C2 O1 session-revocation
+disposition) and test map.
 P1.11 adds the shared `internal/authz` selector evaluator and default-deny
 authorizer (`Authorizer`, `MatchSelector`, parameter cap enforcement, lease
 invalidation, `SELF-01`–`SELF-13` service-level gates, and `C1` substrate

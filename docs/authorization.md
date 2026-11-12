@@ -8,7 +8,10 @@ container selector evaluator for Mandatary (`TD §§2.1, 3.3–3.4, 7`;
 
 - `Authorizer`: unified default-deny authorization service shared by later REST
   and MCP execution paths (`Authorize`, `ValidateDecision`, `AcquireLease`,
-  `NotifyPolicyChange`, `InvalidateAll`, `InspectEndpointPolicyTargets`).
+  `NotifyPolicyChange`, `InvalidateAll`, `InspectEndpointPolicyTargets`, and
+  `BackendFor`, added by P1.13 so the execution service dispatches on exactly the
+  backend that authorized a decision and only while its issuing binding and the
+  backend's safety proof still hold).
 - `MatchSelector` and `MatchGlob`: deterministic linear-time selector evaluation
   with endpoint isolation, optional Compose/image guardrails, and optional
   immutable container ID and image digest pins.
@@ -29,10 +32,13 @@ container selector evaluator for Mandatary (`TD §§2.1, 3.3–3.4, 7`;
 
 The `cmd/mandatary` binary remains the loopback-only static skeleton. P1.11 does
 not expose HTTP/MCP routes, implement the P1.08/P1.10 credential issuers, or
-build the P1.13 operation execution/rate-limiting service. Later **C2**
+build the P1.13 operation execution service. Later **C2**
 integration binds these same authorization suites to live session/token issuer
-services from P1.08–P1.10; **P1.13** binds `Authorizer` to shared execution,
-rate limiting, and audit/usage recording; **P1.14** exposes REST/MCP handlers;
+services from P1.08–P1.10; **P1.13** (delivered in `internal/ops`, see
+[operations.md](operations.md)) binds `Authorizer` to shared execution and
+cancellable log streams (the approved P1.13 card scope lists neither operation
+rate limiting nor usage recording; usage persistence is P1.15 and TD only
+specifies authentication throttling, P1.05); **P1.14** exposes REST/MCP handlers;
 and **P1.19** provides live-container deployment evidence.
 
 ## Precedence order and trust boundary

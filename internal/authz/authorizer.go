@@ -233,6 +233,25 @@ func (a *Authorizer) getBackend(endpointID domain.EndpointID) (docker.DockerBack
 	return b, ok
 }
 
+// BackendFor returns the DockerBackend that authorized dec so a dispatcher
+// executes on exactly the instance the decision was issued against (P1.13). It
+// refuses a zero or foreign decision, any decision whose issuing binding was
+// revoked (rebinding, removal or InvalidateAll), and an endpoint whose backend is
+// no longer ready and self/peer verified; so a refusal causes zero backend calls.
+func (a *Authorizer) BackendFor(dec Decision) (docker.DockerBackend, error) {
+	a.mu.RLock()
+	backend, ok := a.backends[dec.Target.EndpointID]
+	bound := a.validBindingLocked(dec)
+	a.mu.RUnlock()
+	if !bound || !ok || backend == nil {
+		return nil, newForbidden(ReasonDecisionStale)
+	}
+	if !backendSafe(backend) {
+		return nil, newForbidden(ReasonSafetyUnverified)
+	}
+	return backend, nil
+}
+
 // validBindingLocked requires mu to be held for reading or writing.
 func (a *Authorizer) validBindingLocked(dec Decision) bool {
 	return dec.binding.issuer == a &&
