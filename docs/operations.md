@@ -143,6 +143,14 @@ shared authorization or backend state.
   daemon did not perform a start, stop or restart: the caller is told only that it
   left. The lease is released when the call returns, so nothing leaks and no sibling
   is touched.
+* **The Logs open call is bounded too (reviewer F4).** It runs under the same
+  `OperationTimeout` deadline as an inspect. The deadline ends only the *open*: a
+  watcher releases the lease (which cancels the open call) if the open has not
+  returned when the deadline fires, `Execute` then returns the deadline's context
+  error with no stream and no lease, and a stream that finishes opening only after
+  that is closed and never handed out. The watcher is retired the moment the open
+  returns, so the deadline can never end a handed-off stream (its lifetime is the
+  lease, not a deadline).
 * **An open stream is bound to the caller.** Once a log stream has been handed off, the
   request context ending releases its lease and ends the stream with the request's
   context error as its terminal error. Canceling an already-open stream is a local
@@ -223,6 +231,7 @@ Tests run with the container-free mock only. "Fixture IDs" follow the C2 checkpo
 | A caller leaving mid-call never cancels the backend operational context, for all six keys (reviewer RP-04 regression + control); result withheld, own ctx error, no leak, sibling intact; revocation (with or without the caller leaving) still cancels it; an open stream still ends with its request | `TestCallerLeavingMidBackendCallNeverCancelsTheBackendContext`, `TestRevocationStillCancelsAMidCallBackendContextWhenCallerAlsoLeft`, `TestAdmittedLeaseStaysBoundToTheCallerLifetime` |
 | Revocation isolation; healthy streams survive | `TestRevocationIsolationBetweenStreams`, `TestHealthyStreamSurvivesTicksAndNoopNotifications`, `TestNotifyAuthorityChangeIsNotKilledByRequestContext` |
 | Stop/restart bounds and dispatch deadline | `TestStopAndRestartForwardOnlyNormalizedBoundedTimeouts`, `TestPolicyStopTimeoutCapIsEnforced`, `TestOneShotDispatchIsBoundedByDeadline`, `TestDispatchDeadlineFiringReleasesInFlightOperation` |
+| The Logs open call is bounded by the dispatch deadline even with the caller gone (reviewer RP-06 regression + inspect control); a late-opening stream is closed, never handed out; a handed-off stream survives the deadline | `TestHungOpenIsBoundedByTheDispatchDeadline`, `TestStreamOpenedAfterItsDeadlineIsClosedNotHandedOut`, `TestHandedOffStreamSurvivesTheOpenDeadline` |
 | In-flight revocation cancels the call and withholds data; concurrency under `-race` | `TestRevocationDuringInFlightOperationCancelsItAndWithholdsData`, `TestConcurrentExecuteAndRevocation` |
 | SELF-01/04/05/08/09/13 service level (SELF-07 stream loss) | deny-matrix `SELF-*` cases, `TestLossOfSafetyProofEndsStreamAndBlocksNewDispatch` (P1.11/P1.12 retain SELF-01-13 at authorizer and adapter level) |
 | RESTORE-03 (quarantined allow grants nothing), restore quarantine, stale generations | deny-matrix `RESTORE-*`, `C2R-Q03` |

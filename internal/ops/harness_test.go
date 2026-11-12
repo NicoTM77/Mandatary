@@ -162,7 +162,7 @@ func (s *spy) InspectConfig(ctx context.Context, t docker.TargetIdentity) (docke
 func (s *spy) Logs(ctx context.Context, t docker.TargetIdentity, o docker.LogOptions) (docker.LogStream, error) {
 	s.record(call{Method: "Logs", Target: t, Tail: o.Tail})
 	s.enter("Logs", ctx)
-	st, err := s.MockBackend.Logs(ctx, t, o)
+	st, err := s.MockBackend.Logs(s.delegateCtx(ctx), t, o)
 	if err == nil && s.wrapLogs != nil {
 		st = s.wrapLogs(st)
 	}

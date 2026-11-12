@@ -14,6 +14,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -375,10 +376,10 @@ func (s *Service) dispatch(ctx context.Context, lease *authz.Lease) (Result, err
 		if dec.LogOptions == nil {
 			return Result{}, ErrInvalidRequest
 		}
-		// The open call runs under the lease context only: a revocation reaches it,
-		// the caller leaving does not (the SDK adapter reads a canceled operational
-		// context as a fault of the whole endpoint).
-		inner, err := backend.Logs(lease.Context(), dec.Target, *dec.LogOptions)
+		inner, expired, err := s.openLogs(lease, backend, dec)
+		if expired != nil { // the open outlived its deadline: the lease was released to end it
+			return Result{}, docker.SanitizeError(expired)
+		}
 		if err != nil {
 			return Result{}, s.failure(ctx, lease, err)
 		}
@@ -438,7 +439,55 @@ func copyInt(p *int) *int {
 	return &v
 }
 
-// dispatchContext bounds one-shot operations: the daemon's stop timeout plus a
+// openLogs runs the Logs open call under the lease context only (a revocation or a
+// release reaches it, the caller leaving does not: the SDK adapter reads a canceled
+// operational context as a fault of the whole endpoint) and bounds it with the
+// dispatch deadline. The deadline ends only the OPEN: a watcher releases the lease
+// if the open has not finished when it fires, and the watcher is retired the moment
+// the open returns, so a handed-off stream (whose context is the lease) is never
+// ended by it. A stream that finishes opening only after the deadline fired is
+// closed. The deadline's error is returned separately: the released lease would
+// otherwise make the failure look like a revocation.
+func (s *Service) openLogs(lease *authz.Lease, backend docker.DockerBackend, dec authz.Decision) (stream docker.LogStream, expired error, err error) {
+	dctx, dcancel := s.dispatchContext(context.WithoutCancel(lease.Context()), dec)
+	var (
+		mu       sync.Mutex
+		finished bool
+		fired    error
+	)
+	stop := make(chan struct{})
+	watcherDone := make(chan struct{})
+	go func() {
+		defer close(watcherDone)
+		select {
+		case <-dctx.Done():
+			mu.Lock()
+			if !finished {
+				fired = dctx.Err()
+				lease.Release() // cancels the lease context the open call runs under
+			}
+			mu.Unlock()
+		case <-stop:
+		}
+	}()
+	inner, err := backend.Logs(lease.Context(), dec.Target, *dec.LogOptions)
+	mu.Lock()
+	finished = true
+	why := fired
+	mu.Unlock()
+	close(stop)
+	dcancel()
+	<-watcherDone
+	if why != nil {
+		if err == nil {
+			_ = inner.Close()
+		}
+		return nil, why, nil
+	}
+	return inner, nil, err
+}
+
+// dispatchContext bounds one-shot operations and the Logs open call: the daemon's stop timeout plus a
 // fixed grace for stop and restart, the operation timeout otherwise.
 func (s *Service) dispatchContext(parent context.Context, dec authz.Decision) (context.Context, context.CancelFunc) {
 	d := s.operationTimeout

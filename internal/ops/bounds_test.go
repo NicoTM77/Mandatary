@@ -111,9 +111,9 @@ func TestPolicyStopTimeoutCapIsEnforced(t *testing.T) {
 	}
 }
 
-// P113-BOUND-03: every one-shot dispatch runs under a bounded context: the
-// operation timeout, or the daemon stop timeout plus a fixed grace for stop and
-// restart. Logs are exempt because the stream context is the lease, not a deadline.
+// P113-BOUND-03: every one-shot dispatch and the Logs open call run under a bounded
+// context: the operation timeout, or the daemon stop timeout plus a fixed grace for
+// stop and restart. A handed-off stream is not bound by it (its context is the lease).
 func TestOneShotDispatchIsBoundedByDeadline(t *testing.T) {
 	e := newEnv(t, recordDeadlines())
 	seven := 7
@@ -145,15 +145,16 @@ func TestOneShotDispatchIsBoundedByDeadline(t *testing.T) {
 			t.Fatalf("step %d %s: deadlines %v, want last = %v", i, s.op, got, s.want)
 		}
 	}
-	// Logs open under the lease context, with no deadline requested.
+	// The Logs open call is bounded by the operation timeout too (it ends only the
+	// open: see TestHandedOffStreamSurvivesTheOpenDeadline).
 	r := req(botCreds(), "edge-proxy", docker.OpLogs)
 	res, err := e.svc.Execute(t.Context(), r)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer func() { _ = res.Logs.Close() }()
-	if got := e.deadlines(); len(got) != len(steps) {
-		t.Fatalf("logs requested a dispatch deadline: %v", got)
+	if got := e.deadlines(); len(got) != len(steps)+1 || got[len(steps)] != ops.DefaultOperationTimeout {
+		t.Fatalf("logs open deadlines = %v, want a final %v", got, ops.DefaultOperationTimeout)
 	}
 }
 
