@@ -221,9 +221,9 @@ func TestRealRevocationInTheAcquisitionWindowStillCancelsPeers(t *testing.T) {
 	}
 }
 
-// P113-CANCEL-04: once admitted, the lease and any in-flight work stay bound to the
-// caller's lifetime: ending the request releases the lease and ends the stream, and
-// an in-flight one-shot call is canceled.
+// P113-CANCEL-04: an open log stream stays bound to the caller's lifetime: ending the
+// request releases its lease and ends the stream. (One-shot calls and the Logs open
+// call are deliberately NOT bound: see P113-CANCEL-06.)
 func TestAdmittedLeaseStaysBoundToTheCallerLifetime(t *testing.T) {
 	t.Run("stream-ends-on-cancel", func(t *testing.T) {
 		e := newEnv(t)
@@ -252,33 +252,6 @@ func TestAdmittedLeaseStaysBoundToTheCallerLifetime(t *testing.T) {
 		case <-res.Logs.Done():
 			t.Fatal("stream ended while its request context was live")
 		default:
-		}
-	})
-	t.Run("in-flight-one-shot", func(t *testing.T) {
-		e := newEnv(t)
-		reqCtx, cancel := context.WithCancel(t.Context())
-		entered := make(chan struct{}, 1)
-		e.spy.beforeOperation = func(_ string, ctx context.Context) {
-			entered <- struct{}{}
-			<-ctx.Done() // a slow daemon: answers only when its context ends
-		}
-		done := make(chan error, 1)
-		go func() {
-			_, err := e.svc.Execute(reqCtx, req(botCreds(), "edge-proxy", docker.OpStart))
-			done <- err
-		}()
-		<-entered
-		cancel()
-		select {
-		case err := <-done:
-			if !errors.Is(err, context.Canceled) {
-				t.Fatalf("in-flight Execute = %v, want context.Canceled", err)
-			}
-		case <-time.After(60 * time.Second):
-			t.Fatal("in-flight call never ended after the caller left")
-		}
-		if n := e.az.ActiveLeaseCount(); n != 0 {
-			t.Fatalf("leaked %d leases", n)
 		}
 	})
 }

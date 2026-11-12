@@ -299,10 +299,10 @@ func (s *Service) Execute(ctx context.Context, req Request) (Result, error) {
 // healthy sibling leases on the target, and the SDK adapter would invalidate the
 // endpoint's global safety proof. Acquisition is therefore bounded only by
 // AcquireTimeout (a real fault that fails closed), and the admitted lease is bound
-// to the caller's lifetime afterwards: when ctx ends the lease is released, which
-// cancels any in-flight call and ends a log stream. A caller that left during
-// acquisition gets its own context error, never an authorization denial, and the
-// lease it won is released before any backend operation.
+// to the caller's lifetime only once a log stream is handed off (newLogStream). A
+// caller that left during acquisition gets its own context error, never an
+// authorization denial, and the lease it won is released before any backend
+// operation.
 func (s *Service) acquire(ctx context.Context, areq authz.AuthorizeRequest) (*authz.Lease, error) {
 	life, endLife := context.WithCancel(context.WithoutCancel(ctx))
 	var timedOut atomic.Bool
@@ -332,17 +332,24 @@ func (s *Service) acquire(ctx context.Context, areq authz.AuthorizeRequest) (*au
 		endLife()
 		return nil, docker.SanitizeError(cerr)
 	}
-	stop := context.AfterFunc(ctx, lease.Release)
-	context.AfterFunc(lease.Context(), func() {
-		stop()
-		endLife()
-	})
+	// The lease is deliberately NOT bound to the caller here: dispatch hands the
+	// backend lease.Context(), and a caller that leaves mid-call must not cancel it
+	// (see dispatch). Binding to the caller's lifetime happens only for an open log
+	// stream, after hand-off.
+	context.AfterFunc(lease.Context(), endLife)
 	return lease, nil
 }
 
 // dispatch runs the authorized operation. It reads ONLY the decision (immutable
 // TargetIdentity, normalized parameters), never the request, and never resolves a
 // name. The lease is released unless it is handed to a log stream.
+//
+// Every backend call (one-shot operations and the Logs open call) runs under the
+// lease context, which only a revocation, a release or the dispatch deadline can
+// cancel. The caller's cancellation is never forwarded to the backend: when the
+// caller has gone the call is allowed to finish (bounded by the dispatch deadline
+// and still cancellable by revocation), its outcome is withheld and the caller's
+// context error is returned.
 func (s *Service) dispatch(ctx context.Context, lease *authz.Lease) (Result, error) {
 	handedOff := false
 	defer func() {
@@ -368,9 +375,16 @@ func (s *Service) dispatch(ctx context.Context, lease *authz.Lease) (Result, err
 		if dec.LogOptions == nil {
 			return Result{}, ErrInvalidRequest
 		}
+		// The open call runs under the lease context only: a revocation reaches it,
+		// the caller leaving does not (the SDK adapter reads a canceled operational
+		// context as a fault of the whole endpoint).
 		inner, err := backend.Logs(lease.Context(), dec.Target, *dec.LogOptions)
 		if err != nil {
 			return Result{}, s.failure(ctx, lease, err)
+		}
+		if ctx.Err() != nil || lease.Context().Err() != nil { // gone or revoked while opening: withhold
+			_ = inner.Close()
+			return Result{}, s.failure(ctx, lease, nil)
 		}
 		res.Logs = s.newLogStream(ctx, lease, inner)
 		handedOff = true
@@ -406,8 +420,11 @@ func (s *Service) dispatch(ctx context.Context, lease *authz.Lease) (Result, err
 	if callErr != nil {
 		return Result{}, s.failure(ctx, lease, callErr)
 	}
-	// A read that completed after its authorization ended is withheld.
-	if (res.Status != nil || res.Config != nil) && (ctx.Err() != nil || lease.Context().Err() != nil) {
+	// The call ran under the lease context only, so the caller leaving never
+	// canceled it; its outcome is withheld and the caller's own context error is
+	// returned instead (the daemon may nevertheless have performed the operation).
+	// A read that completed after its authorization ended is withheld too.
+	if ctx.Err() != nil || ((res.Status != nil || res.Config != nil) && lease.Context().Err() != nil) {
 		return Result{}, s.failure(ctx, lease, nil)
 	}
 	return res, nil

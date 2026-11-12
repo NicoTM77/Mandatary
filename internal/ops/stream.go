@@ -45,6 +45,11 @@ func (s *Service) newLogStream(reqCtx context.Context, lease *authz.Lease, inner
 	// A transport read that ignores its context is still unblocked: ending the
 	// authorization closes the backend stream.
 	context.AfterFunc(lease.Context(), func() { _ = inner.Close() })
+	// From hand-off on the stream lives only as long as the request: the open call is
+	// over, so ending the request may now end the lease (an already-open stream being
+	// canceled is a local event for the backend).
+	unbind := context.AfterFunc(reqCtx, lease.Release)
+	context.AfterFunc(lease.Context(), func() { unbind() })
 	go st.watch(s.newTicker(s.interval))
 	return st
 }
