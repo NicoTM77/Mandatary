@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/NicoTM77/Mandatary/internal/api"
 	"github.com/NicoTM77/Mandatary/internal/auth"
 	"github.com/NicoTM77/Mandatary/internal/config"
 	"github.com/NicoTM77/Mandatary/internal/logging"
@@ -152,6 +153,10 @@ func run(ctx context.Context, getenv func(string) string, stdout io.Writer, serv
 	}
 	result := 0
 	logger.Info(logging.ServerStarted)
+	// Reserve /api and /mcp: nothing under them may fall through to the static site or
+	// the setup mux. The adapters need an executor (real Docker backend, endpoint
+	// registry), which is composed by later rows; until then both answer the common 404.
+	handler = api.Compose(nil, nil, handler)
 	if err := serve(developmentServerWith(logger, handler)); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		logger.Error(logging.ServerFailed, "stage", "listener")
 		result = 1

@@ -1,19 +1,24 @@
 #!/usr/bin/env bash
 set -euo pipefail
 # Prove the exact ordinary race gate fails on a deliberately incorrect security
-# expectation. Compilation/tool failures do not qualify as assertion evidence.
-log=$(mktemp "${TMPDIR:-/tmp}/mandatary-negative.XXXXXX")
-trap 'rm -f "$log"' EXIT
+# expectation, and fails ONLY for that reason. The gate is the unchanged ordinary
+# full race suite (`go test -race -timeout=20m -count=1 ./...`) with the structured
+# `-json` event stream added; scripts/negative-control-verify.mjs accepts the run
+# only when the intended exposed-route assertion is the sole failed test and the
+# sole failed package, and rejects any unrelated test/package failure (also inside
+# the security package), build/setup failure, race report, panic/timeout/abnormal
+# termination, clean run or exit status other than 1 (P1.13 owner observation O1).
+here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+work=$(mktemp -d "${TMPDIR:-/tmp}/mandatary-negative.XXXXXX")
+events=$work/events.jsonl
+errors=$work/stderr.log
+trap 'rm -f "$events" "$errors"; rmdir "$work"' EXIT
 set +e
-MANDATARY_NEGATIVE_FIXTURE=exposed-route go test -race -timeout=20m -count=1 ./... > "$log" 2>&1
+MANDATARY_NEGATIVE_FIXTURE=exposed-route go test -race -timeout=20m -count=1 -json ./... > "$events" 2> "$errors"
 status=$?
 set -e
-cat "$log"
-[[ $status == 1 ]] || { printf 'Negative control must fail with exit 1, got %s\n' "$status" >&2; exit 1; }
-grep -q 'SECURITY_ROUTE_EXPOSURE: unavailable route returned 200' "$log"
-grep -q '^FAIL[[:space:]]*github.com/NicoTM77/Mandatary/tests/security' "$log"
-if grep -Eq 'build failed|setup failed|DATA RACE' "$log"; then
-  printf 'Negative control failed for an unrelated reason\n' >&2
-  exit 1
+if [[ -s "$errors" ]]; then
+  printf '%s\n' '--- go test stderr ---'
+  cat "$errors"
 fi
-printf 'Negative control observed: ordinary race gate rejected exposed-route fixture (exit 1).\n'
+node "$here/negative-control-verify.mjs" "$events" "$errors" "$status"

@@ -49,7 +49,8 @@ jobs:
         run: web/node_modules/.bin/playwright install --with-deps chromium
       - run: make browser-test GOFLAGS="-mod=readonly -p=4" GOMAXPROCS=4 GOMEMLIMIT=12GiB GOGC=100
   # The negative control re-runs the complete race suite against a deliberately
-  # wrong security expectation (scripts/negative-control.sh, unchanged). It runs on
+  # wrong security expectation (scripts/negative-control.sh; it accepts only the
+  # intended exposed-route failure, see scripts/negative-control-verify.mjs). It runs on
   # its own runner per pinned Go version, in parallel with Baseline and without
   # depending on it, so neither serial full-suite run exhausts the other's budget.
   negative-control:

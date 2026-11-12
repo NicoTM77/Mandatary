@@ -29,7 +29,7 @@ test: versions sqlc
 check: build sqlc
 	$(MAKE) generate-check
 	$(MAKE) password-check
-	test -z "$$(gofmt -l cmd internal web/*.go tests/security)"
+	test -z "$$(gofmt -l cmd internal web/*.go tests/security tests/adapters)"
 	go vet ./...
 	npm --prefix web run typecheck
 	npm --prefix web run lint

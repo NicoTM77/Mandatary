@@ -1,0 +1,405 @@
+{
+  "absent": [
+    "exec",
+    "container list/discovery",
+    "access requests",
+    "raw Docker paths, queries or bodies",
+    "image/volume/network operations",
+    "MCP prompts and resources",
+    "MCP sessions",
+    "MCP server-initiated requests"
+  ],
+  "contract_version": "1.0.0",
+  "errors": {
+    "codes": [
+      {
+        "code": "unauthenticated",
+        "message": "authentication required",
+        "status": 401
+      },
+      {
+        "code": "forbidden",
+        "message": "operation not permitted",
+        "status": 403
+      },
+      {
+        "code": "invalid_request",
+        "message": "invalid request",
+        "status": 400
+      },
+      {
+        "code": "not_found",
+        "message": "not found",
+        "status": 404
+      },
+      {
+        "code": "method_not_allowed",
+        "message": "method not allowed",
+        "status": 405
+      },
+      {
+        "code": "payload_too_large",
+        "message": "request body too large",
+        "status": 413
+      },
+      {
+        "code": "unsupported_media",
+        "message": "unsupported content type",
+        "status": 415
+      },
+      {
+        "code": "too_many_streams",
+        "message": "too many concurrent streams",
+        "status": 429
+      },
+      {
+        "code": "canceled",
+        "message": "request canceled",
+        "status": 499
+      },
+      {
+        "code": "internal",
+        "message": "internal error",
+        "status": 500
+      },
+      {
+        "code": "backend_failed",
+        "message": "backend operation failed",
+        "status": 502
+      },
+      {
+        "code": "backend_unavailable",
+        "message": "backend unavailable",
+        "status": 503
+      },
+      {
+        "code": "timeout",
+        "message": "operation timed out",
+        "status": 504
+      }
+    ],
+    "forbidden_reasons": [
+      "default_deny",
+      "restore_quarantined",
+      "safety_unverified",
+      "endpoint_inactive",
+      "parameter_cap_exceeded",
+      "authorization_ended",
+      "forbidden_origin"
+    ],
+    "mcp_mapping": "a tool failure is a CallToolResult with isError=true whose structuredContent is the same error object; HTTP-level failures (401, 403 origin, 404, 405, 413, 415) are HTTP responses",
+    "shape": "{\"error\":{\"code\":string,\"status\":int,\"message\":string,\"reason\"?:string}}"
+  },
+  "limits": {
+    "max_container_bytes": 255,
+    "max_endpoint_bytes": 64,
+    "max_mcp_body_bytes": 65536,
+    "max_rest_body_bytes": 4096
+  },
+  "mcp": {
+    "auth": "bearer-agent-token on every HTTP request, before the JSON-RPC body is parsed",
+    "methods": [
+      "POST"
+    ],
+    "path": "/mcp",
+    "stateless": true,
+    "transport": "streamable-http"
+  },
+  "rest_base_path": "/api/v1",
+  "routes": [
+    {
+      "auth": "none",
+      "method": "GET",
+      "operation": null,
+      "path": "/api/v1/readyz",
+      "response": "ReadyResult {ready: bool, version: string}; 200 ready, 503 not ready"
+    },
+    {
+      "auth": "bearer-agent-token",
+      "method": "GET",
+      "operation": "container:inspect_status",
+      "path": "/api/v1/endpoints/{endpoint}/containers/{container}/status",
+      "response": "docker.InspectStatus"
+    },
+    {
+      "auth": "bearer-agent-token",
+      "method": "GET",
+      "operation": "container:inspect_config",
+      "path": "/api/v1/endpoints/{endpoint}/containers/{container}/config",
+      "response": "docker.InspectConfig"
+    },
+    {
+      "auth": "bearer-agent-token",
+      "method": "GET",
+      "operation": "container:logs",
+      "path": "/api/v1/endpoints/{endpoint}/containers/{container}/logs",
+      "query": [
+        "tail",
+        "stdout",
+        "stderr",
+        "timestamps",
+        "since",
+        "until",
+        "follow"
+      ],
+      "response": "LogsResult (follow=true: application/x-ndjson, REST only)"
+    },
+    {
+      "auth": "bearer-agent-token",
+      "method": "POST",
+      "operation": "container:start",
+      "path": "/api/v1/endpoints/{endpoint}/containers/{container}/start",
+      "response": "ActionResult"
+    },
+    {
+      "auth": "bearer-agent-token",
+      "body": {
+        "content_type": "application/json",
+        "fields": [
+          "timeout_seconds"
+        ],
+        "optional": true
+      },
+      "method": "POST",
+      "operation": "container:stop",
+      "path": "/api/v1/endpoints/{endpoint}/containers/{container}/stop",
+      "response": "ActionResult"
+    },
+    {
+      "auth": "bearer-agent-token",
+      "body": {
+        "content_type": "application/json",
+        "fields": [
+          "timeout_seconds"
+        ],
+        "optional": true
+      },
+      "method": "POST",
+      "operation": "container:restart",
+      "path": "/api/v1/endpoints/{endpoint}/containers/{container}/restart",
+      "response": "ActionResult"
+    }
+  ],
+  "tools": [
+    {
+      "destructive": false,
+      "idempotent": true,
+      "input_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "container": {
+            "description": "Container name or full 64-character container ID.",
+            "maxLength": 255,
+            "minLength": 1,
+            "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.-]*$",
+            "type": "string"
+          },
+          "endpoint": {
+            "description": "Endpoint UUID or its configured slug (Phase 1: \"local\").",
+            "maxLength": 64,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "endpoint",
+          "container"
+        ],
+        "type": "object"
+      },
+      "name": "container_status",
+      "operation": "container:inspect_status",
+      "read_only": true
+    },
+    {
+      "destructive": false,
+      "idempotent": true,
+      "input_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "container": {
+            "description": "Container name or full 64-character container ID.",
+            "maxLength": 255,
+            "minLength": 1,
+            "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.-]*$",
+            "type": "string"
+          },
+          "endpoint": {
+            "description": "Endpoint UUID or its configured slug (Phase 1: \"local\").",
+            "maxLength": 64,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "endpoint",
+          "container"
+        ],
+        "type": "object"
+      },
+      "name": "container_config",
+      "operation": "container:inspect_config",
+      "read_only": true
+    },
+    {
+      "destructive": false,
+      "idempotent": true,
+      "input_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "container": {
+            "description": "Container name or full 64-character container ID.",
+            "maxLength": 255,
+            "minLength": 1,
+            "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.-]*$",
+            "type": "string"
+          },
+          "endpoint": {
+            "description": "Endpoint UUID or its configured slug (Phase 1: \"local\").",
+            "maxLength": 64,
+            "minLength": 1,
+            "type": "string"
+          },
+          "since": {
+            "description": "RFC 3339 lower bound.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "stderr": {
+            "description": "Include stderr (default true).",
+            "type": "boolean"
+          },
+          "stdout": {
+            "description": "Include stdout (default true).",
+            "type": "boolean"
+          },
+          "tail": {
+            "description": "Number of most recent lines (default 10000; a policy may cap it lower).",
+            "maximum": 10000,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "timestamps": {
+            "description": "Prefix each line with its timestamp.",
+            "type": "boolean"
+          },
+          "until": {
+            "description": "RFC 3339 upper bound.",
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "endpoint",
+          "container"
+        ],
+        "type": "object"
+      },
+      "name": "container_logs",
+      "operation": "container:logs",
+      "read_only": true
+    },
+    {
+      "destructive": false,
+      "idempotent": true,
+      "input_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "container": {
+            "description": "Container name or full 64-character container ID.",
+            "maxLength": 255,
+            "minLength": 1,
+            "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.-]*$",
+            "type": "string"
+          },
+          "endpoint": {
+            "description": "Endpoint UUID or its configured slug (Phase 1: \"local\").",
+            "maxLength": 64,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "endpoint",
+          "container"
+        ],
+        "type": "object"
+      },
+      "name": "container_start",
+      "operation": "container:start",
+      "read_only": false
+    },
+    {
+      "destructive": true,
+      "idempotent": true,
+      "input_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "container": {
+            "description": "Container name or full 64-character container ID.",
+            "maxLength": 255,
+            "minLength": 1,
+            "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.-]*$",
+            "type": "string"
+          },
+          "endpoint": {
+            "description": "Endpoint UUID or its configured slug (Phase 1: \"local\").",
+            "maxLength": 64,
+            "minLength": 1,
+            "type": "string"
+          },
+          "timeout_seconds": {
+            "description": "Seconds to wait before the container is killed (default 10).",
+            "maximum": 300,
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "endpoint",
+          "container"
+        ],
+        "type": "object"
+      },
+      "name": "container_stop",
+      "operation": "container:stop",
+      "read_only": false
+    },
+    {
+      "destructive": true,
+      "idempotent": false,
+      "input_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "container": {
+            "description": "Container name or full 64-character container ID.",
+            "maxLength": 255,
+            "minLength": 1,
+            "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_.-]*$",
+            "type": "string"
+          },
+          "endpoint": {
+            "description": "Endpoint UUID or its configured slug (Phase 1: \"local\").",
+            "maxLength": 64,
+            "minLength": 1,
+            "type": "string"
+          },
+          "timeout_seconds": {
+            "description": "Seconds to wait before the container is killed (default 10).",
+            "maximum": 300,
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "endpoint",
+          "container"
+        ],
+        "type": "object"
+      },
+      "name": "container_restart",
+      "operation": "container:restart",
+      "read_only": false
+    }
+  ]
+}
