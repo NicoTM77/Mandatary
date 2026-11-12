@@ -115,7 +115,7 @@ func TestValidAgentTokenFormat(t *testing.T) {
 func TestIssuedCredentialRedactsEveryFormattingPath(t *testing.T) { // credential exposure
 	secret := "mdt_" + strings.Repeat("Z", 43)
 	c := IssuedCredential{Credential: CredentialView{ID: "cid"}, secret: []byte(secret)}
-	for _, out := range []string{fmt.Sprintf("%v", c), fmt.Sprintf("%+v", c), fmt.Sprintf("%#v", c), fmt.Sprintf("%s", c), fmt.Sprintf("%v", &c), fmt.Sprintf("%+v", &c), fmt.Sprintf("%#v", &c), fmt.Sprint(c), fmt.Sprintf("%q", c), fmt.Sprintf("%x", c)} {
+	for _, out := range []string{fmt.Sprintf("%v", c), fmt.Sprintf("%+v", c), fmt.Sprintf("%#v", c), fmt.Sprintf("[%s]", c), fmt.Sprintf("%v", &c), fmt.Sprintf("%+v", &c), fmt.Sprintf("%#v", &c), fmt.Sprint(c), fmt.Sprintf("%q", c), fmt.Sprintf("%x", c)} {
 		if strings.Contains(out, secret) || strings.Contains(out, "ZZZZ") {
 			t.Fatalf("formatting leaked the token: %s", out)
 		}

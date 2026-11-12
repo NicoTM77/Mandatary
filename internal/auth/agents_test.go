@@ -230,14 +230,13 @@ func TestGroupMembershipIsExplicitIdempotentAndNotified(t *testing.T) {
 		t.Fatal("re-add did not reactivate")
 	}
 	// Invalid requests change nothing.
-	before := e.snapshot()
 	e.group("other")
 	e.exec(`UPDATE groups SET state='disabled' WHERE name='other'`)
 	var disabled string
 	if err := e.db.QueryRow(`SELECT id FROM groups WHERE name='other'`).Scan(&disabled); err != nil {
 		t.Fatal(err)
 	}
-	before = e.snapshot()
+	before := e.snapshot()
 	for name, fn := range map[string]func() error{
 		"unknown kind":    func() error { return e.a.AddMember(ctx, e.secret, group, MemberKind("admin"), user) },
 		"empty kind":      func() error { return e.a.AddMember(ctx, e.secret, group, "", user) },
