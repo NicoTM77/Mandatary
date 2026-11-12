@@ -102,10 +102,12 @@ func (st *LogStream) terminalErr() error {
 	if st.consumerClosed.Load() {
 		return ErrStreamClosed
 	}
+	// The request ending is observed synchronously: its AfterFunc releases the
+	// lease a moment later.
+	if cerr := st.reqCtx.Err(); cerr != nil {
+		return docker.SanitizeError(cerr)
+	}
 	if st.lease.Context().Err() != nil {
-		if cerr := st.reqCtx.Err(); cerr != nil {
-			return docker.SanitizeError(cerr)
-		}
 		return ErrStreamRevoked
 	}
 	return nil

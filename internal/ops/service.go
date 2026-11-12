@@ -14,6 +14,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"sync/atomic"
 	"time"
 
 	"github.com/NicoTM77/Mandatary/internal/authz"
@@ -50,6 +51,9 @@ const (
 	MaxRevalidateInterval     = 30 * time.Second
 	DefaultRevalidateTimeout  = 10 * time.Second
 	MaxRevalidateTimeout      = time.Minute
+	DefaultAcquireTimeout     = 10 * time.Second
+	MinAcquireTimeout         = time.Millisecond
+	MaxAcquireTimeout         = time.Minute
 	DefaultOperationTimeout   = 30 * time.Second
 	MaxOperationTimeout       = 10 * time.Minute
 	DefaultStopGrace          = 15 * time.Second
@@ -80,6 +84,11 @@ type Config struct {
 	// RevalidateTimeout bounds one revalidation pass; a pass that cannot finish
 	// fails closed and ends the stream. Default 10s.
 	RevalidateTimeout time.Duration
+	// AcquireTimeout bounds one whole lease acquisition (authorization plus the
+	// revalidation under the registered lease). Acquisition runs detached from the
+	// caller's cancellation, so this is its only bound; expiry is a real fault and
+	// fails closed. Default 10s.
+	AcquireTimeout time.Duration
 	// OperationTimeout bounds inspect and start dispatches. Default 30s.
 	OperationTimeout time.Duration
 	// StopGrace is added to the daemon stop timeout to bound stop and restart
@@ -141,6 +150,7 @@ type Service struct {
 	az                *authz.Authorizer
 	interval          time.Duration
 	revalidateTimeout time.Duration
+	acquireTimeout    time.Duration
 	operationTimeout  time.Duration
 	stopGrace         time.Duration
 	newTicker         func(time.Duration) Ticker
@@ -162,12 +172,13 @@ func New(cfg Config) (*Service, error) {
 		}
 		return v, true
 	}
-	var ok [4]bool
+	var ok [5]bool
 	s := &Service{az: cfg.Authorizer, newTicker: cfg.NewTicker, withTimeout: cfg.WithTimeout, afterAuthorize: cfg.AfterAuthorize}
 	s.interval, ok[0] = pick(cfg.RevalidateInterval, DefaultRevalidateInterval, MinRevalidateInterval, MaxRevalidateInterval)
 	s.revalidateTimeout, ok[1] = pick(cfg.RevalidateTimeout, DefaultRevalidateTimeout, time.Millisecond, MaxRevalidateTimeout)
 	s.operationTimeout, ok[2] = pick(cfg.OperationTimeout, DefaultOperationTimeout, time.Millisecond, MaxOperationTimeout)
 	s.stopGrace, ok[3] = pick(cfg.StopGrace, DefaultStopGrace, time.Millisecond, MaxStopGrace)
+	s.acquireTimeout, ok[4] = pick(cfg.AcquireTimeout, DefaultAcquireTimeout, MinAcquireTimeout, MaxAcquireTimeout)
 	for _, good := range ok {
 		if !good {
 			return nil, ErrInvalidConfig
@@ -266,7 +277,7 @@ func (s *Service) Execute(ctx context.Context, req Request) (Result, error) {
 		return Result{}, err
 	}
 
-	lease, err := s.az.AcquireLease(ctx, authz.AuthorizeRequest{
+	lease, err := s.acquire(ctx, authz.AuthorizeRequest{
 		Principal:      req.Credentials,
 		EndpointID:     req.EndpointID,
 		TargetRef:      target,
@@ -279,6 +290,54 @@ func (s *Service) Execute(ctx context.Context, req Request) (Result, error) {
 		return Result{}, err
 	}
 	return s.dispatch(ctx, lease)
+}
+
+// acquire obtains the lease with the authorizer DETACHED from the caller's
+// cancellation. A caller whose request ends is a local event: if it reached
+// Authorize, backend.ResolveTarget or the revalidation under the freshly registered
+// lease, the authorizer would treat it as a fault, fail-close the same principal's
+// healthy sibling leases on the target, and the SDK adapter would invalidate the
+// endpoint's global safety proof. Acquisition is therefore bounded only by
+// AcquireTimeout (a real fault that fails closed), and the admitted lease is bound
+// to the caller's lifetime afterwards: when ctx ends the lease is released, which
+// cancels any in-flight call and ends a log stream. A caller that left during
+// acquisition gets its own context error, never an authorization denial, and the
+// lease it won is released before any backend operation.
+func (s *Service) acquire(ctx context.Context, areq authz.AuthorizeRequest) (*authz.Lease, error) {
+	life, endLife := context.WithCancel(context.WithoutCancel(ctx))
+	var timedOut atomic.Bool
+	bound := time.AfterFunc(s.acquireTimeout, func() {
+		timedOut.Store(true)
+		endLife()
+	})
+	lease, err := s.az.AcquireLease(life, areq)
+	inTime := bound.Stop() // false: the bound fired, so any lease won is already dead
+	switch {
+	case err != nil:
+		endLife()
+		if cerr := ctx.Err(); cerr != nil {
+			return nil, docker.SanitizeError(cerr)
+		}
+		if timedOut.Load() {
+			return nil, docker.SanitizeError(context.DeadlineExceeded)
+		}
+		return nil, err
+	case !inTime:
+		lease.Release()
+		endLife()
+		return nil, docker.SanitizeError(context.DeadlineExceeded)
+	}
+	if cerr := ctx.Err(); cerr != nil {
+		lease.Release()
+		endLife()
+		return nil, docker.SanitizeError(cerr)
+	}
+	stop := context.AfterFunc(ctx, lease.Release)
+	context.AfterFunc(lease.Context(), func() {
+		stop()
+		endLife()
+	})
+	return lease, nil
 }
 
 // dispatch runs the authorized operation. It reads ONLY the decision (immutable
@@ -300,7 +359,7 @@ func (s *Service) dispatch(ctx context.Context, lease *authz.Lease) (Result, err
 	if err != nil {
 		return Result{}, err
 	}
-	if lease.Context().Err() != nil { // revoked between admission and dispatch
+	if ctx.Err() != nil || lease.Context().Err() != nil { // gone or revoked between admission and dispatch
 		return Result{}, s.failure(ctx, lease, nil)
 	}
 	res := Result{Target: dec.Target, ContainerName: dec.ContainerName, Operation: dec.Operation}
@@ -348,7 +407,7 @@ func (s *Service) dispatch(ctx context.Context, lease *authz.Lease) (Result, err
 		return Result{}, s.failure(ctx, lease, callErr)
 	}
 	// A read that completed after its authorization ended is withheld.
-	if (res.Status != nil || res.Config != nil) && lease.Context().Err() != nil {
+	if (res.Status != nil || res.Config != nil) && (ctx.Err() != nil || lease.Context().Err() != nil) {
 		return Result{}, s.failure(ctx, lease, nil)
 	}
 	return res, nil

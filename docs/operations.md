@@ -107,8 +107,32 @@ call's context; an inspect result that completes after that is **withheld**.
   (default 30 s) otherwise. An already-expired bound dispatches nothing. Logs are
   exempt: the stream's context is the lease.
 * Configuration is validated fail-closed (`RevalidateInterval` 10 ms-30 s default
-  1 s, `RevalidateTimeout` default 10 s, `OperationTimeout` up to 10 min,
-  `StopGrace` up to 5 min).
+  1 s, `RevalidateTimeout` default 10 s, `AcquireTimeout` 1 ms-1 min default 10 s,
+  `OperationTimeout` up to 10 min, `StopGrace` up to 5 min).
+
+## Caller cancellation
+
+A caller leaving is a local event; it must never be mistaken for a fault of the
+shared authorization or backend state.
+
+* **Acquisition is detached.** `Execute` runs the whole lease acquisition
+  (authorization, `ResolveTarget` by name, then the revalidation by immutable ID under
+  the registered lease) on a context that carries the caller's values but not its
+  cancellation, bounded by `AcquireTimeout`. The caller's cancellation therefore never
+  reaches the authorizer or the backend: it cannot fail-close the same principal's
+  sibling streams and in-flight operations on the target, and it cannot make the SDK
+  adapter invalidate its global safety proof (P1.11 L4, reviewer F1/F2).
+* **The result is the caller's own.** A caller that left during acquisition gets its
+  context error (`context.Canceled`/`DeadlineExceeded`), never a 403, and the lease it
+  won is released before any backend operation. Expiry of `AcquireTimeout` is a real
+  fault: it fails closed with `context.DeadlineExceeded`.
+* **Real denials are unaffected.** A revocation or shared fault in the acquisition
+  window still denies the call and still cancels the authorizer's matching leases;
+  only the pure caller-cancellation classification is removed.
+* **After admission the lease is bound to the caller.** When the request context ends
+  the lease is released: an in-flight one-shot call is canceled and its result
+  withheld, and a log stream ends, with the request's context error as its terminal
+  error.
 
 ## Cancellable logs: termination contract
 
@@ -181,6 +205,7 @@ Tests run with the container-free mock only. "Fixture IDs" follow the C2 checkpo
 | C2 O1 session revocation terminates follow streams (real revocation, not only token) | `TestOpsFollowStreamEndsOnEveryRealSessionRevocationPath` (real `Logout`, saved-code recovery entry, protective TOTP report; push and pull), MFA-reset issuance inside the bootstrap test |
 | Active log termination on token / session / policy revocation or expiry | `TestFollowStreamTerminatesOnEveryRevocationOrExpiryCause` (24 causes, human and agent principals, push and pull detection: 76 subtests), `TestStreamActivityNeverRefreshesClocksAndEndsExactlyAtExpiry` |
 | Pending follow read bounded by deterministic context cancellation (no sleeps) | `TestPendingFollowReadIsBoundedByContextCancellation`, `TestRevocationClosesTransportThatIgnoresContext`, `TestStreamRevalidateIsSynchronous` |
+| Caller cancellation never cancels another lease or reaches the backend; real revocation in the same window still does (reviewer RP-01 regression + adverse control); acquisition bounded | `TestCanceledExecuteNeverCancelsSiblingLeasesOrBackendSafety`, `TestCallerCancellationNeverReachesBackendResolveTarget`, `TestRealRevocationInTheAcquisitionWindowStillCancelsPeers`, `TestAdmittedLeaseStaysBoundToTheCallerLifetime`, `TestAcquisitionIsBoundedByAcquireTimeout` |
 | Revocation isolation; healthy streams survive | `TestRevocationIsolationBetweenStreams`, `TestHealthyStreamSurvivesTicksAndNoopNotifications`, `TestNotifyAuthorityChangeIsNotKilledByRequestContext` |
 | Stop/restart bounds and dispatch deadline | `TestStopAndRestartForwardOnlyNormalizedBoundedTimeouts`, `TestPolicyStopTimeoutCapIsEnforced`, `TestOneShotDispatchIsBoundedByDeadline`, `TestDispatchDeadlineFiringReleasesInFlightOperation` |
 | In-flight revocation cancels the call and withholds data; concurrency under `-race` | `TestRevocationDuringInFlightOperationCancelsItAndWithholdsData`, `TestConcurrentExecuteAndRevocation` |
@@ -201,6 +226,14 @@ real-Docker behavior.
   concurrent-stream cap per principal; C1 O1 (self-before-auth precedence leaves an
   unauthenticated name oracle on protected names) is mitigated by the credential-shape
   check for anonymous requests only.
-* P1.11 L2/L4: a pure caller cancellation during `ResolveTarget` may still be
-  classified by the SDK adapter as a global safety invalidation; `Execute` returns
-  early on an already-canceled context so a canceled caller never reaches the backend.
+* P1.11 L2/L4 (closed at the `Execute` seam, still open inside the adapter): the SDK
+  adapter's `ResolveTarget` invalidates the endpoint's global safety proof on *any*
+  error, including a pure caller cancellation. `Execute` never hands the caller's
+  cancellation to the authorizer or the backend (see "Caller cancellation" above), so
+  through this service a canceled request cannot cause it. A direct caller of
+  `Authorizer.Authorize`/`AcquireLease` with a cancellable context (for example a
+  future adapter bypassing `Execute`) still can; that adapter behavior belongs to the
+  docker adapter (P1.12) and is carried, not changed here.
+* A caller that cancels during acquisition still waits for the acquisition to finish
+  or for `AcquireTimeout` (default 10 s): acquisition is detached from its context by
+  design, so the wait is bounded but not interruptible.

@@ -326,6 +326,9 @@ func TestConfigValidation(t *testing.T) {
 		{Authorizer: e.az, OperationTimeout: 11 * time.Minute},
 		{Authorizer: e.az, StopGrace: -1},
 		{Authorizer: e.az, StopGrace: time.Hour},
+		{Authorizer: e.az, AcquireTimeout: -1},
+		{Authorizer: e.az, AcquireTimeout: time.Nanosecond},
+		{Authorizer: e.az, AcquireTimeout: ops.MaxAcquireTimeout + time.Second},
 	}
 	for i, c := range bad {
 		if s, err := ops.New(c); !errors.Is(err, ops.ErrInvalidConfig) || s != nil {

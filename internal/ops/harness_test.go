@@ -68,6 +68,12 @@ type spy struct {
 
 	// afterResolve runs after a ResolveTarget has returned (rename races).
 	afterResolve func(ref string)
+	// resolveBlock runs inside ResolveTarget before it delegates (slow daemon).
+	resolveBlock func(ctx context.Context, ref string)
+	// resolveCtxErr records, per ResolveTarget, the context error the BACKEND
+	// observed after the afterResolve hook ran (a caller cancellation that leaked
+	// into the backend call shows up here).
+	resolveCtxErr []error
 	// beforeOperation runs before the operational call is delegated; blocking
 	// here models a slow daemon.
 	beforeOperation func(method string, ctx context.Context)
@@ -123,10 +129,16 @@ func (s *spy) enter(method string, ctx context.Context) {
 
 func (s *spy) ResolveTarget(ctx context.Context, ref string) (docker.ContainerSummary, error) {
 	s.record(call{Method: "ResolveTarget", Ref: ref})
+	if s.resolveBlock != nil {
+		s.resolveBlock(ctx, ref)
+	}
 	sum, err := s.MockBackend.ResolveTarget(ctx, ref)
 	if s.afterResolve != nil {
 		s.afterResolve(ref)
 	}
+	s.mu.Lock()
+	s.resolveCtxErr = append(s.resolveCtxErr, ctx.Err())
+	s.mu.Unlock()
 	return sum, err
 }
 
@@ -224,6 +236,7 @@ type env struct {
 type envOption func(*envConfig)
 
 type envConfig struct {
+	acquireTimeout time.Duration
 	withTimeout    func(*env) func(context.Context, time.Duration) (context.Context, context.CancelFunc)
 	afterAuthorize func(*env) func()
 	interval       time.Duration
@@ -286,6 +299,9 @@ func newEnv(t *testing.T, opts ...envOption) *env {
 	}}
 	if cfg.interval != 0 {
 		scfg.RevalidateInterval = cfg.interval
+	}
+	if cfg.acquireTimeout != 0 {
+		scfg.AcquireTimeout = cfg.acquireTimeout
 	}
 	if cfg.withTimeout != nil {
 		scfg.WithTimeout = cfg.withTimeout(e)
