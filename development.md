@@ -147,6 +147,15 @@ versions with locked Node/npm. Baseline and Security checks are required evidenc
 not permission to merge; Nico controls merge and independent native review is
 required for the exact head.
 
+The negative control runs as its own job per pinned Go version (`Negative control
+(Go 1.27.4)` and `(Go 1.26.11)`), on separate runners in parallel with Baseline and
+independent of it, so the positive and negative full-suite runs no longer share one
+30-minute job. The Security check depends on every Baseline and negative-control job
+and fails (not skips) unless all of them succeeded, so a failing negative control
+blocks through the already-required Security check without any repository-setting
+change. Branch protection is not altered by this file; making the two new check
+names directly required is an owner setting.
+
 `tests/security/surface_test.go` rejects unimplemented product/raw-Docker paths.
 Its negative control injects `/` (a genuinely public static route) into that
 must-be-404 matrix; the unchanged race command must fail. CI invokes the control

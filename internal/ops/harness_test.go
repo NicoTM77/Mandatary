@@ -241,7 +241,11 @@ func newEnv(t *testing.T, opts ...envOption) *env {
 	if err != nil {
 		t.Fatal(err)
 	}
-	repo, err := store.Open(context.Background(), store.Options{DataDir: dir, MasterKey: mk, OwnerUID: os.Geteuid(), OwnerGID: os.Getegid()})
+	// Opening a fresh store runs every migration, which dominates a test's cost under
+	// the race detector. Each environment starts from a byte copy of one pristine,
+	// cleanly closed store created once per process.
+	copyPristineStore(t, dir)
+	repo, err := store.Open(context.Background(), store.Options{DataDir: dir, MasterKey: mk, OwnerUID: os.Geteuid(), OwnerGID: os.Getegid(), ExistingOnly: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -295,6 +299,68 @@ func newEnv(t *testing.T, opts ...envOption) *env {
 	}
 	e.seedStandard()
 	return e
+}
+
+var (
+	pristineOnce sync.Once
+	pristineDir  string
+	pristineErr  error
+)
+
+// TestMain owns the pristine store's lifetime.
+func TestMain(m *testing.M) {
+	code := m.Run()
+	if pristineDir != "" {
+		_ = os.RemoveAll(pristineDir)
+	}
+	os.Exit(code)
+}
+
+func copyPristineStore(t *testing.T, dst string) {
+	t.Helper()
+	pristineOnce.Do(func() {
+		root, err := os.MkdirTemp("", "ops-pristine-")
+		if err != nil {
+			pristineErr = err
+			return
+		}
+		pristineDir = root
+		data := filepath.Join(root, "data")
+		mk, err := store.LoadMasterKey(strings.Repeat("11", 32), "")
+		if err != nil {
+			pristineErr = err
+			return
+		}
+		repo, err := store.Open(context.Background(), store.Options{DataDir: data, MasterKey: mk, OwnerUID: os.Geteuid(), OwnerGID: os.Getegid()})
+		if err != nil {
+			pristineErr = err
+			return
+		}
+		pristineErr = repo.Close()
+	})
+	if pristineErr != nil {
+		t.Fatalf("pristine store: %v", pristineErr)
+	}
+	src := filepath.Join(pristineDir, "data")
+	if err := os.MkdirAll(dst, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	entries, err := os.ReadDir(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, ent := range entries {
+		if !ent.Type().IsRegular() {
+			t.Fatalf("unexpected non-regular entry %q in the pristine store", ent.Name())
+		}
+		b, err := os.ReadFile(filepath.Join(src, ent.Name()))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err = os.WriteFile(filepath.Join(dst, ent.Name()), b, 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
 }
 
 func (e *env) exec(q string, args ...any) {
