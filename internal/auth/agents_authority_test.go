@@ -58,6 +58,7 @@ func (e *adminEnv) insertSession(id string, secret []byte, assurance, methods in
 }
 
 func TestOnlyTheSingleActiveAdministratorMayAdminister(t *testing.T) { // acceptance: privilege escalation
+	t.Parallel() // each test owns its repository, clock and sessions
 	deny := func(t *testing.T, e *adminEnv, secret []byte, agent string) {
 		t.Helper()
 		before := e.snapshot()
@@ -148,19 +149,34 @@ func TestOnlyTheSingleActiveAdministratorMayAdminister(t *testing.T) { // accept
 			deny(t, e, secret, agent)
 		})
 	}
-	t.Run("password preauth capability", func(t *testing.T) {
-		e := newAdminEnv(t)
-		agent := e.agentOwnedBy("bot", e.person("owner"))
-		e.group("grp")
-		r, err := e.s.PasswordLogin(t.Context(), "synthetic-user", []byte(sessionTestPassword), sessionTestIP)
-		if err != nil {
-			t.Fatal(err)
+}
+
+func TestPasswordPreauthCapabilityCannotAdminister(t *testing.T) {
+	// Serial: a real password login, admitted one at a time per process.
+	e := newAdminEnv(t)
+	agent := e.agentOwnedBy("bot", e.person("owner"))
+	e.group("grp")
+	r, err := e.s.PasswordLogin(t.Context(), "synthetic-user", []byte(sessionTestPassword), sessionTestIP)
+	if err != nil {
+		t.Fatal(err)
+	}
+	before := e.snapshot()
+	mutations, reads := e.adminCalls(r.Session.Secret(), agent)
+	for name, call := range mutations {
+		if err := call(); !errors.Is(err, ErrDenied) {
+			t.Errorf("%s: want ErrDenied, got %v", name, err)
 		}
-		deny(t, e, r.Session.Secret(), agent)
-	})
+	}
+	for name, call := range reads {
+		if err := call(); !errors.Is(err, ErrDenied) {
+			t.Errorf("%s: want ErrDenied, got %v", name, err)
+		}
+	}
+	e.mustNoChange("password-only capability", before)
 }
 
 func TestMutationsNeedFreshAAL2EvidenceButReadsDoNot(t *testing.T) { // TD §4.3: >15 minutes since authentication => re-verify
+	// Serial: real step-up does password work, admitted one at a time per process.
 	e := newAdminEnv(t)
 	agent := e.agentOwnedBy("bot", e.person("owner"))
 	e.group("grp")
@@ -203,6 +219,7 @@ func TestMutationsNeedFreshAAL2EvidenceButReadsDoNot(t *testing.T) { // TD §4.3
 }
 
 func TestIssueRefusesAnAgentOutsideTheCurrentGenerations(t *testing.T) {
+	t.Parallel() // each test owns its repository, clock and sessions
 	for name, mutation := range map[string]string{
 		"credential generation": `UPDATE agents SET credential_generation=2`,
 		"authority generation":  `UPDATE agents SET authority_generation=2`,
@@ -222,6 +239,7 @@ func TestIssueRefusesAnAgentOutsideTheCurrentGenerations(t *testing.T) {
 }
 
 func TestMultiplePolicyAdministratorsStayUnavailable(t *testing.T) { // acceptance: multiple policy administrators unavailable
+	t.Parallel() // each test owns its repository, clock and sessions
 	e := newAdminEnv(t)
 	user := e.person("second")
 	// No administrative operation creates, grants or moves a role...

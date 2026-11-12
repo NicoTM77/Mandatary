@@ -15,6 +15,7 @@ import (
 // P1.10 test escapes it. A renamed or deleted test fails here instead of leaving an
 // acceptance claim that points at nothing.
 func TestAgentCredentialCrosswalkNamesResolve(t *testing.T) {
+	t.Parallel() // each test owns its repository, clock and sessions
 	doc, err := os.ReadFile(filepath.Join("..", "..", "docs", "agent-credentials.md"))
 	if err != nil {
 		t.Fatal(err)
@@ -62,6 +63,7 @@ func TestAgentCredentialCrosswalkNamesResolve(t *testing.T) {
 }
 
 func TestNonExpiringTokensDieWithTheCredentialGenerationAndRevocation(t *testing.T) { // RESTORE-01: "including non-expiring tokens"
+	t.Parallel() // each test owns its repository, clock and sessions
 	settings := AdminSettings{DefaultTTL: time.Hour, MaxTTL: time.Hour, DefaultOverlap: time.Minute, MaxOverlap: time.Hour, AllowNonExpiring: true}
 	for name, retire := range map[string]func(e *adminEnv, agent, credential string){
 		"revocation":            func(e *adminEnv, agent, c string) { _ = e.a.RevokeCredential(e.t.Context(), e.secret, agent, c) },
@@ -86,6 +88,7 @@ func TestNonExpiringTokensDieWithTheCredentialGenerationAndRevocation(t *testing
 }
 
 func TestAgentTokensNeverAuthenticateTheSetupSurface(t *testing.T) { // N63B4-SCOPE-MACHINE: no bearer reaches bootstrap/recovery routes
+	t.Parallel() // each test owns its repository, clock and sessions
 	e := newSetupEnv(t)
 	e.ensure()
 	_ = e.reveal(PurposeInitialSetup, "") // a retrieved generation: the surface exists, so only authentication can refuse

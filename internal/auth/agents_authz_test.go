@@ -61,6 +61,7 @@ func (h *authzHarness) authorize(token []byte) error {
 }
 
 func TestOwningAnAgentGrantsNothingEndToEnd(t *testing.T) { // acceptance: no inherited owner grant
+	t.Parallel() // each test owns its repository, clock and sessions
 	h := newAuthzHarness(t)
 	ctx := t.Context()
 	owner, group := h.person("owner"), h.group("owners")
@@ -112,6 +113,7 @@ func TestOwningAnAgentGrantsNothingEndToEnd(t *testing.T) { // acceptance: no in
 // authorizer: a fresh Authorize returns 401, and a lease acquired while the token
 // was good is revalidated to failure (the active-stream termination primitive).
 func TestRetiredTokensAreRejectedByTheSharedAuthorizerAndLeases(t *testing.T) { // acceptance: every applicable adapter
+	t.Parallel() // each test owns its repository, clock and sessions
 	type scenario struct {
 		name   string
 		retire func(h *authzHarness, agent string, credential string)
@@ -190,6 +192,7 @@ func TestRetiredTokensAreRejectedByTheSharedAuthorizerAndLeases(t *testing.T) { 
 }
 
 func TestAdministrativeRevocationTerminatesActiveLeasesBeforeReturning(t *testing.T) { // C2: token revocation immediately invalidates acceptance
+	t.Parallel() // each test owns its repository, clock and sessions
 	for name, act := range map[string]func(h *authzHarness, agent, cred string) error{
 		"revoke credential": func(h *authzHarness, agent, cred string) error {
 			return h.a.RevokeCredential(h.t.Context(), h.secret, agent, cred)
@@ -226,6 +229,7 @@ func TestAdministrativeRevocationTerminatesActiveLeasesBeforeReturning(t *testin
 }
 
 func TestRotationOverlapKeepsTheOldTokensLeaseUntilTheBoundary(t *testing.T) {
+	t.Parallel() // each test owns its repository, clock and sessions
 	h := newAuthzHarness(t)
 	agent := h.agentOwnedBy("bot", h.person("owner"))
 	_, oldToken := h.issue(agent, CredentialRequest{})
@@ -262,6 +266,7 @@ func TestRotationOverlapKeepsTheOldTokensLeaseUntilTheBoundary(t *testing.T) {
 }
 
 func TestAgentTokensNeverAuthenticateAdministration(t *testing.T) { // N63B4-SCOPE-MACHINE at the service boundary
+	t.Parallel() // each test owns its repository, clock and sessions
 	h := newAuthzHarness(t)
 	agent := h.agentOwnedBy("bot", "u")
 	_, token := h.issue(agent, CredentialRequest{})

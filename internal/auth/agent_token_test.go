@@ -34,6 +34,7 @@ func decodeAgentToken(t *testing.T, token []byte) []byte {
 }
 
 func TestAgentTokenCarries256RandomBitsInCanonicalBase62(t *testing.T) { // TD ยง3.2, N63B4-RANDOM-EVIDENCE
+	t.Parallel() // each test owns its repository, clock and sessions
 	// Known vectors pin the encoding at both ends of the 256-bit range.
 	one := make([]byte, 32)
 	one[31] = 1
@@ -72,6 +73,7 @@ func TestAgentTokenCarries256RandomBitsInCanonicalBase62(t *testing.T) { // TD ย
 }
 
 func TestAgentTokenRandomnessFailureNeverIssues(t *testing.T) { // RANDOM-EVIDENCE: no fallback generator
+	t.Parallel() // each test owns its repository, clock and sessions
 	for name, source := range map[string]*bytes.Reader{"empty": bytes.NewReader(nil), "short": bytes.NewReader(make([]byte, 31)), "all zero": bytes.NewReader(make([]byte, 32))} {
 		if token, err := newAgentToken(source); err == nil || token != nil {
 			t.Fatalf("%s source issued %q", name, token)
@@ -87,6 +89,7 @@ type erroringReader struct{}
 func (erroringReader) Read([]byte) (int, error) { return 0, errors.New("boom") }
 
 func TestValidAgentTokenFormat(t *testing.T) {
+	t.Parallel() // each test owns its repository, clock and sessions
 	good := "mdt_" + strings.Repeat("a", 43)
 	if !ValidAgentTokenFormat(good) {
 		t.Fatal("canonical token rejected")
@@ -113,6 +116,7 @@ func TestValidAgentTokenFormat(t *testing.T) {
 }
 
 func TestIssuedCredentialRedactsEveryFormattingPath(t *testing.T) { // credential exposure
+	t.Parallel() // each test owns its repository, clock and sessions
 	secret := "mdt_" + strings.Repeat("Z", 43)
 	c := IssuedCredential{Credential: CredentialView{ID: "cid"}, secret: []byte(secret)}
 	for _, out := range []string{fmt.Sprintf("%v", c), fmt.Sprintf("%+v", c), fmt.Sprintf("%#v", c), fmt.Sprintf("[%s]", c), fmt.Sprintf("%v", &c), fmt.Sprintf("%+v", &c), fmt.Sprintf("%#v", &c), fmt.Sprint(c), fmt.Sprintf("%q", c), fmt.Sprintf("%x", c)} {
@@ -158,6 +162,7 @@ func TestIssuedCredentialRedactsEveryFormattingPath(t *testing.T) { // credentia
 // at-most-two-live-credentials rule count a credential the verifier rejects (or
 // the reverse).
 func TestCredentialStatusMatchesTheSharedVerifierOverTheStateMatrix(t *testing.T) { // C2 parity
+	t.Parallel() // each test owns its repository, clock and sessions
 	const issued = int64(2000000000)
 	type row struct {
 		name   string

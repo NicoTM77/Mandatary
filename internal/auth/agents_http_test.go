@@ -119,6 +119,7 @@ func (h *adminHTTP) mustCreate(path, body string, status int) map[string]any {
 const adminBase = "/api/v1/admin"
 
 func TestAdministrativeRouteInventoryIsExactAndExplicit(t *testing.T) { // default deny, no role route
+	t.Parallel() // each test owns its repository, clock and sessions
 	h := newAdminHTTP(t)
 	want := map[string]RoutePolicy{
 		"GET " + adminBase + "/users":                                           {Require: RequireSession},
@@ -175,6 +176,7 @@ func TestAdministrativeRouteInventoryIsExactAndExplicit(t *testing.T) { // defau
 }
 
 func TestAdministrationOverHTTPEndToEndRevealsTheTokenOnce(t *testing.T) {
+	t.Parallel() // each test owns its repository, clock and sessions
 	h := newAdminHTTP(t)
 	user := h.mustCreate(adminBase+"/users", `{"username":"owner.user"}`, http.StatusCreated)["user"].(map[string]any)
 	group := h.mustCreate(adminBase+"/groups", `{"name":"team"}`, http.StatusCreated)["group"].(map[string]any)
@@ -243,6 +245,7 @@ func TestAdministrationOverHTTPEndToEndRevealsTheTokenOnce(t *testing.T) {
 }
 
 func TestAdministrativeRoutesNeedTheBrowserBoundary(t *testing.T) { // CSRF, Origin, cookie, content type, step-up
+	t.Parallel() // each test owns its repository, clock and sessions
 	h := newAdminHTTP(t)
 	agent := h.agentOwnedBy("bot", h.person("owner"))
 	mutations := []adminReq{
@@ -294,6 +297,7 @@ func TestAdministrativeRoutesNeedTheBrowserBoundary(t *testing.T) { // CSRF, Ori
 }
 
 func TestAdministrativeMutationsOverHTTPRequireFreshAAL2(t *testing.T) { // every sensitive mutation: negative + step-up positive
+	// Serial: real step-up does password work, admitted one at a time per process.
 	h := newAdminHTTP(t)
 	agent := h.agentOwnedBy("bot", h.person("owner"))
 	group := h.group("grp")
@@ -340,6 +344,7 @@ func TestAdministrativeMutationsOverHTTPRequireFreshAAL2(t *testing.T) { // ever
 }
 
 func TestOrdinaryUsersAndOwnersCannotAdministerOverHTTP(t *testing.T) { // privilege escalation
+	t.Parallel() // each test owns its repository, clock and sessions
 	h := newAdminHTTP(t)
 	agent := h.agentOwnedBy("bot", "u")                                       // the signed-in human OWNS the agent
 	h.exec(`UPDATE administrative_roles SET state='disabled' WHERE id='adm'`) // ...but is not the administrator
@@ -362,6 +367,7 @@ func TestOrdinaryUsersAndOwnersCannotAdministerOverHTTP(t *testing.T) { // privi
 }
 
 func TestAdministrativeBodiesAreStrictAndMassAssignmentIsRejected(t *testing.T) {
+	t.Parallel() // each test owns its repository, clock and sessions
 	h := newAdminHTTP(t)
 	owner := h.person("owner")
 	agent := h.agentOwnedBy("bot", owner)
@@ -426,6 +432,7 @@ func TestAdministrativeBodiesAreStrictAndMassAssignmentIsRejected(t *testing.T) 
 }
 
 func TestRotationOverlapFieldSemanticsOverHTTP(t *testing.T) {
+	t.Parallel() // each test owns its repository, clock and sessions
 	h := newAdminHTTP(t)
 	agent := h.agentOwnedBy("bot", h.person("owner"))
 	_, first := h.issue(agent, CredentialRequest{})
@@ -460,6 +467,7 @@ func TestRotationOverlapFieldSemanticsOverHTTP(t *testing.T) {
 }
 
 func TestAdministrativeErrorsAreFixedCodesThatNeverEchoInput(t *testing.T) {
+	t.Parallel() // each test owns its repository, clock and sessions
 	h := newAdminHTTP(t)
 	canary := "CANARY!4711-mdt_" + strings.Repeat("Q", 43)
 	owner := h.person("owner")
@@ -494,6 +502,7 @@ func TestAdministrativeErrorsAreFixedCodesThatNeverEchoInput(t *testing.T) {
 }
 
 func TestIssuedTokenNeverReachesLogsOrErrorBodies(t *testing.T) { // P1.04 canary extension, every level and format
+	t.Parallel() // each test owns its repository, clock and sessions
 	for _, format := range []string{"json", "text"} {
 		for _, level := range []slog.Level{slog.LevelDebug, slog.LevelInfo, slog.LevelWarn, slog.LevelError} {
 			t.Run(format+"/"+level.String(), func(t *testing.T) {
@@ -536,6 +545,7 @@ func TestIssuedTokenNeverReachesLogsOrErrorBodies(t *testing.T) { // P1.04 canar
 }
 
 func TestAgentCredentialRoutesNeverAcceptAgentTokens(t *testing.T) { // N63B4-SCOPE-MACHINE, TOKEN-NOT-PRESENCE
+	t.Parallel() // each test owns its repository, clock and sessions
 	h := newAdminHTTP(t)
 	agent := h.agentOwnedBy("bot", "u")
 	_, token := h.issue(agent, CredentialRequest{})

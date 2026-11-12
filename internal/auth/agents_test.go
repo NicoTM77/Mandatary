@@ -20,6 +20,7 @@ import (
 // identity/credential tables are byte-identical afterwards.
 
 func TestAdminConstructionRejectsUnsafeSettings(t *testing.T) {
+	t.Parallel() // each test owns its repository, clock and sessions
 	e := newSessionEnv(t)
 	ok := DefaultAdminSettings()
 	if _, err := NewAdmin(e.l, ok, nil); err != nil {
@@ -54,6 +55,7 @@ func TestAdminConstructionRejectsUnsafeSettings(t *testing.T) {
 }
 
 func TestAgentOwnershipIsExactlyOneUserXORGroup(t *testing.T) { // acceptance: owner constraint, invalid ownership
+	t.Parallel() // each test owns its repository, clock and sessions
 	e := newAdminEnv(t)
 	ctx := t.Context()
 	user, group := e.person("owner-user"), e.group("owner-group")
@@ -130,6 +132,7 @@ func TestAgentOwnershipIsExactlyOneUserXORGroup(t *testing.T) { // acceptance: o
 }
 
 func TestAdministrativeIdentityCreationIsInertUntilExplicitlyGranted(t *testing.T) {
+	t.Parallel() // each test owns its repository, clock and sessions
 	e := newAdminEnv(t)
 	ctx := t.Context()
 	u, err := e.a.CreateUser(ctx, e.secret, "bob.builder")
@@ -180,6 +183,7 @@ func TestAdministrativeIdentityCreationIsInertUntilExplicitlyGranted(t *testing.
 }
 
 func TestGroupMembershipIsExplicitIdempotentAndNotified(t *testing.T) {
+	t.Parallel() // each test owns its repository, clock and sessions
 	e := newAdminEnv(t)
 	ctx := t.Context()
 	user, group := e.person("member"), e.group("team")
@@ -266,6 +270,7 @@ func TestGroupMembershipIsExplicitIdempotentAndNotified(t *testing.T) {
 }
 
 func TestIssuedTokenIsShownOnceAndOnlyItsHashIsPersisted(t *testing.T) { // acceptance: 256-bit tokens shown once, hash-only persistence
+	t.Parallel() // each test owns its repository, clock and sessions
 	e := newAdminEnv(t)
 	agent := e.agentOwnedBy("bot", e.person("owner"))
 	issued, token := e.issue(agent, CredentialRequest{})
@@ -340,6 +345,7 @@ func TestIssuedTokenIsShownOnceAndOnlyItsHashIsPersisted(t *testing.T) { // acce
 }
 
 func TestCredentialExpiryBoundaryIsExact(t *testing.T) { // acceptance: expired token rejected, deterministic boundary
+	t.Parallel() // each test owns its repository, clock and sessions
 	e := newAdminEnvWith(t, AdminSettings{DefaultTTL: time.Hour, MaxTTL: 2 * time.Hour, DefaultOverlap: 10 * time.Minute, MaxOverlap: time.Hour})
 	agent := e.agentOwnedBy("bot", e.person("owner"))
 	issued, token := e.issue(agent, CredentialRequest{TTL: 3600 * time.Second})
@@ -365,6 +371,7 @@ func TestCredentialExpiryBoundaryIsExact(t *testing.T) { // acceptance: expired 
 }
 
 func TestOverlapWindowBoundaryIsDeterministic(t *testing.T) { // acceptance: overlap rotation, boundary tests
+	t.Parallel() // each test owns its repository, clock and sessions
 	for _, overlap := range []time.Duration{time.Second, 2 * time.Second, 59 * time.Second, 10 * time.Minute, time.Hour} {
 		t.Run(overlap.String(), func(t *testing.T) {
 			e := newAdminEnvWith(t, AdminSettings{DefaultTTL: 4 * time.Hour, MaxTTL: 4 * time.Hour, DefaultOverlap: time.Minute, MaxOverlap: 2 * time.Hour})
@@ -405,6 +412,7 @@ func TestOverlapWindowBoundaryIsDeterministic(t *testing.T) { // acceptance: ove
 }
 
 func TestRotationWithoutOverlapAndDefaultOverlap(t *testing.T) {
+	t.Parallel() // each test owns its repository, clock and sessions
 	e := newAdminEnvWith(t, AdminSettings{DefaultTTL: time.Hour, MaxTTL: time.Hour, DefaultOverlap: 7 * time.Minute, MaxOverlap: 30 * time.Minute})
 	agent := e.agentOwnedBy("bot", e.person("owner"))
 	_, first := e.issue(agent, CredentialRequest{})
@@ -448,6 +456,7 @@ func TestRotationWithoutOverlapAndDefaultOverlap(t *testing.T) {
 }
 
 func TestRotatingAgainRevokesTheCredentialStillOverlapping(t *testing.T) { // at most two live credentials
+	t.Parallel() // each test owns its repository, clock and sessions
 	e := newAdminEnv(t)
 	agent := e.agentOwnedBy("bot", e.person("owner"))
 	_, a := e.issue(agent, CredentialRequest{})
@@ -478,6 +487,7 @@ func TestRotatingAgainRevokesTheCredentialStillOverlapping(t *testing.T) { // at
 }
 
 func TestRotateAndIssueRulesForLiveCredentials(t *testing.T) {
+	t.Parallel() // each test owns its repository, clock and sessions
 	e := newAdminEnv(t)
 	agent := e.agentOwnedBy("bot", e.person("owner"))
 	ctx := t.Context()
@@ -506,6 +516,7 @@ func TestRotateAndIssueRulesForLiveCredentials(t *testing.T) {
 }
 
 func TestRevocationIsImmediateIdempotentAndAgentScoped(t *testing.T) { // acceptance: revoked token rejected
+	t.Parallel() // each test owns its repository, clock and sessions
 	e := newAdminEnv(t)
 	owner := e.person("owner")
 	a1, a2 := e.agentOwnedBy("one", owner), e.agentOwnedBy("two", owner)
@@ -553,6 +564,7 @@ func TestRevocationIsImmediateIdempotentAndAgentScoped(t *testing.T) { // accept
 }
 
 func TestRevokedAndRotatedOutCredentialsCannotBeRevived(t *testing.T) {
+	t.Parallel() // each test owns its repository, clock and sessions
 	e := newAdminEnv(t)
 	agent := e.agentOwnedBy("bot", e.person("owner"))
 	first, oldToken := e.issue(agent, CredentialRequest{})
@@ -595,6 +607,7 @@ func TestRevokedAndRotatedOutCredentialsCannotBeRevived(t *testing.T) {
 }
 
 func TestDisablingAnAgentRevokesEveryCredentialAndBlocksReissue(t *testing.T) {
+	t.Parallel() // each test owns its repository, clock and sessions
 	e := newAdminEnv(t)
 	agent := e.agentOwnedBy("bot", e.person("owner"))
 	_, a := e.issue(agent, CredentialRequest{})
@@ -631,6 +644,7 @@ func TestDisablingAnAgentRevokesEveryCredentialAndBlocksReissue(t *testing.T) {
 }
 
 func TestOldGenerationAndQuarantineRejectEveryCredentialAndAdministration(t *testing.T) { // acceptance: old generation token rejected
+	t.Parallel() // each test owns its repository, clock and sessions
 	e := newAdminEnv(t)
 	agent := e.agentOwnedBy("bot", e.person("owner"))
 	_, token := e.issue(agent, CredentialRequest{})
@@ -652,6 +666,7 @@ func TestOldGenerationAndQuarantineRejectEveryCredentialAndAdministration(t *tes
 }
 
 func TestRestoreQuarantineDeniesAdministrationAndAcceptance(t *testing.T) { // RESTORE-01/-11 substrate
+	t.Parallel() // each test owns its repository, clock and sessions
 	e := newAdminEnv(t)
 	agent := e.agentOwnedBy("bot", e.person("owner"))
 	_, token := e.issue(agent, CredentialRequest{})
@@ -687,6 +702,7 @@ func TestRestoreQuarantineDeniesAdministrationAndAcceptance(t *testing.T) { // R
 }
 
 func TestTokenLifetimePolicy(t *testing.T) { // TD §3.2: expiry by default, max TTL, approved non-expiring
+	t.Parallel() // each test owns its repository, clock and sessions
 	e := newAdminEnv(t)
 	agent := e.agentOwnedBy("bot", e.person("owner"))
 	ctx := t.Context()
@@ -739,6 +755,7 @@ func TestTokenLifetimePolicy(t *testing.T) { // TD §3.2: expiry by default, max
 }
 
 func TestRandomnessFailureIssuesNoCredential(t *testing.T) { // N63B4-RANDOM-EVIDENCE
+	t.Parallel() // each test owns its repository, clock and sessions
 	e := newAdminEnv(t)
 	agent := e.agentOwnedBy("bot", e.person("owner"))
 	e.a.random = erroringReader{}
@@ -764,6 +781,7 @@ func TestRandomnessFailureIssuesNoCredential(t *testing.T) { // N63B4-RANDOM-EVI
 }
 
 func TestStorageFailureNeverReturnsATokenOrChangesState(t *testing.T) {
+	t.Parallel() // each test owns its repository, clock and sessions
 	e := newAdminEnv(t)
 	agent := e.agentOwnedBy("bot", e.person("owner"))
 	before := e.snapshot()
@@ -779,6 +797,7 @@ func TestStorageFailureNeverReturnsATokenOrChangesState(t *testing.T) {
 }
 
 func TestNotificationFailureDoesNotUndoARevocationButIsReported(t *testing.T) {
+	t.Parallel() // each test owns its repository, clock and sessions
 	e := newAdminEnv(t)
 	agent := e.agentOwnedBy("bot", e.person("owner"))
 	c, token := e.issue(agent, CredentialRequest{})
@@ -796,6 +815,7 @@ func TestNotificationFailureDoesNotUndoARevocationButIsReported(t *testing.T) {
 }
 
 func TestConcurrentFirstIssueYieldsExactlyOneLiveCredential(t *testing.T) {
+	t.Parallel() // each test owns its repository, clock and sessions
 	e := newAdminEnv(t)
 	agent := e.agentOwnedBy("bot", e.person("owner"))
 	var wg sync.WaitGroup
@@ -828,6 +848,7 @@ func TestConcurrentFirstIssueYieldsExactlyOneLiveCredential(t *testing.T) {
 }
 
 func TestConcurrentRotationsNeverExceedTwoLiveCredentials(t *testing.T) {
+	t.Parallel() // each test owns its repository, clock and sessions
 	e := newAdminEnv(t)
 	agent := e.agentOwnedBy("bot", e.person("owner"))
 	e.issue(agent, CredentialRequest{})
@@ -854,6 +875,7 @@ func TestConcurrentRotationsNeverExceedTwoLiveCredentials(t *testing.T) {
 }
 
 func TestAdministrativeViewsAreSecretFreeAndComplete(t *testing.T) {
+	t.Parallel() // each test owns its repository, clock and sessions
 	e := newAdminEnv(t)
 	ctx := t.Context()
 	owner, group := e.person("owner"), e.group("team")

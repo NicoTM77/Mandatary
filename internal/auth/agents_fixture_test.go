@@ -3,6 +3,7 @@ package auth
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"crypto/sha256"
 	"database/sql"
 	"errors"
@@ -51,9 +52,33 @@ func newAdminEnvWith(t *testing.T, settings AdminSettings) *adminEnv {
 		t.Fatal(err)
 	}
 	ae.a = a
-	issued := e.aal2TOTP(id, en)
-	ae.secret, ae.sessID = issued.Secret(), issued.Info.ID
+	ae.secret, ae.sessID = ae.aal2Session(id)
 	return ae
+}
+
+// aal2Session stores the same normal AAL2 password+TOTP session row that
+// Sessions.LoginTOTP issues (same columns, evidence bits, lifetimes and bound
+// authenticators) WITHOUT password work. Password verification is admitted one
+// operation at a time per process by design, so fixtures that logged in for real
+// could not run in parallel; the tests that exercise a real login or step-up
+// (TestMutationsNeedFreshAAL2EvidenceButReadsDoNot and its HTTP twin) use the real
+// service and stay serial.
+func (e *adminEnv) aal2Session(totpID string) ([]byte, string) {
+	e.t.Helper()
+	secret := make([]byte, 32)
+	if _, err := rand.Read(secret); err != nil {
+		e.t.Fatal(err)
+	}
+	const id = "admin-aal2"
+	now := e.clock.Now().Unix()
+	sum := sha256.Sum256(secret)
+	cfg := DefaultSessionSettings()
+	e.exec(`INSERT INTO sessions(id,user_id,secret_hash,purpose,achieved_assurance,methods,phishing_resistant,authenticated_at,created_at,expires_at,last_activity_at,idle_timeout_seconds,credential_generation,session_generation,state) VALUES(?,'u',?,'normal',2,?,0,?,?,?,?,?,1,1,'active')`,
+		id, sum[:], evidencePassword|evidenceTOTP, now, now, now+int64(cfg.Absolute/time.Second), now, int64(cfg.Idle/time.Second))
+	for _, a := range []string{"pwd", totpID} {
+		e.exec(`INSERT INTO session_authenticators(session_id,authenticator_id,user_id) VALUES(?,?,'u')`, id, a)
+	}
+	return secret, id
 }
 
 func (e *adminEnv) notify(ctx context.Context) error {
