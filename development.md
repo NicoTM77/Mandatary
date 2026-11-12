@@ -172,6 +172,14 @@ P1.12 adds the `internal/docker` intermediary package (`DockerBackend`, official
 `moby/client` adapter, container-free `MockBackend`, `SELF-01`–`SELF-13`
 self-protection state machine, and inspect/log/error sanitizers) without exposing
 HTTP/MCP routes; see the [Docker backend reference](docs/docker-backend.md).
+P1.13 adds the shared operation execution service `internal/ops` (`Service.Execute`
+for the six approved permission keys, revalidated cancellable `LogStream`s, and
+`Service.NotifyAuthorityChange`) over the P1.11 authorizer and the P1.12 backend,
+plus the additive `Authorizer.BackendFor`. It exposes no HTTP/MCP route, accepts no
+raw Docker path or query, and dispatches only on the immutable authorized container
+ID; see the [operation service reference](docs/operations.md) for the zero-call
+spy contract, bounds, stream termination (including the C2 O1 session-revocation
+disposition) and test map.
 P1.11 adds the shared `internal/authz` selector evaluator and default-deny
 authorizer (`Authorizer`, `MatchSelector`, parameter cap enforcement, lease
 invalidation, `SELF-01`–`SELF-13` service-level gates, and `C1` substrate
