@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -244,6 +245,66 @@ func TestAdministrationOverHTTPEndToEndRevealsTheTokenOnce(t *testing.T) {
 	}
 }
 
+// wrongCSRF returns a token with the same length and alphabet (base64url) as the
+// original that is guaranteed to differ from it: the first character is replaced
+// by one that is not the original's first character. The earlier construction
+// ("A" + original[1:]) equalled the real token whenever it began with "A"
+// (about one run in 64), turning the negative case into a positive one.
+func wrongCSRF(original string) string {
+	if original == "" {
+		return "A"
+	}
+	first := byte('A')
+	if original != "" && original[0] == 'A' {
+		first = 'B'
+	}
+	return string(first) + original[1:]
+}
+
+func TestWrongCSRFFixtureAlwaysDiffersFromTheOriginal(t *testing.T) { // P1.13 owner observation O1
+	t.Parallel()
+	// Deterministic search for real tokens with and without the retired construction's
+	// "A" prefix (the search is bounded; both kinds occur within the first few hundred).
+	var withA, withoutA string
+	for i := 0; i < 10000 && (withA == "" || withoutA == ""); i++ {
+		tok := csrfToken([]byte("fixture-secret"), "session-"+strconv.Itoa(i))
+		if strings.HasPrefix(tok, "A") {
+			withA = tok
+		} else {
+			withoutA = tok
+		}
+	}
+	if withA == "" || withoutA == "" {
+		t.Fatal("fixture search found no real token with and without an A prefix")
+	}
+	for name, original := range map[string]string{
+		"real token starting with A":    withA,
+		"real token starting otherwise": withoutA,
+		"all A boundary":                strings.Repeat("A", 43),
+		"B prefix":                      "B" + strings.Repeat("A", 42),
+		"alphabet extremes":             "_" + strings.Repeat("-", 42),
+		"digit prefix":                  "0" + strings.Repeat("9", 42),
+	} {
+		wrong := wrongCSRF(original)
+		if wrong == original {
+			t.Errorf("%s: wrong CSRF equals the original", name)
+		}
+		if len(wrong) != len(original) {
+			t.Errorf("%s: wrong CSRF length %d != %d", name, len(wrong), len(original))
+		}
+		if wrong[1:] != original[1:] {
+			t.Errorf("%s: wrong CSRF changed more than the first character", name)
+		}
+		if strings.Trim(wrong, "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_") != "" {
+			t.Errorf("%s: wrong CSRF is not base64url", name)
+		}
+	}
+	// The retired construction really collided for an A-prefixed token.
+	if "A"+withA[1:] != withA {
+		t.Fatal("expected the retired construction to collide for an A-prefixed token")
+	}
+}
+
 func TestAdministrativeRoutesNeedTheBrowserBoundary(t *testing.T) { // CSRF, Origin, cookie, content type, step-up
 	t.Parallel() // each test owns its repository, clock and sessions
 	h := newAdminHTTP(t)
@@ -260,7 +321,10 @@ func TestAdministrativeRoutesNeedTheBrowserBoundary(t *testing.T) { // CSRF, Ori
 		{method: http.MethodPost, path: adminBase + "/agents/" + agent + "/credentials/c/revoke"},
 	}
 	reads := []string{adminBase + "/users", adminBase + "/groups", adminBase + "/agents"}
-	empty, wrong := "", "A"+h.csrf[1:]
+	empty, wrong := "", wrongCSRF(h.csrf)
+	if wrong == h.csrf || len(wrong) != len(h.csrf) {
+		t.Fatal("the wrong-CSRF fixture must differ from the real token and keep its length")
+	}
 	before := h.snapshot()
 	for _, m := range mutations {
 		label := m.method + " " + m.path
