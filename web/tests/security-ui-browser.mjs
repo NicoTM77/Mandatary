@@ -30,7 +30,8 @@ const PASSWORD = 'a unique synthetic public phrase';
 const WRONG_PASSWORD = 'definitely not the right one';
 
 const browser = await launchEngine();
-const observed = { blocked: [], console: [], errors: [], requests: [], responses: [] };
+const WEBKIT_SELECT_NOTE = "Refused to apply a stylesheet because its hash, its nonce, or 'unsafe-inline' does not appear in the style-src directive of the Content Security Policy.";
+const observed = { blocked: [], console: [], errors: [], requests: [], responses: [], selectNotes: [] };
 const pending = [];
 const canaries = new Set();
 
@@ -45,7 +46,24 @@ async function newContext() {
   context.on('request', (request) => pending.push(request.allHeaders().then((headers) => observed.requests.push({ method: request.method(), url: request.url(), headers }))));
   context.on('response', (response) => pending.push(response.allHeaders().then((headers) => observed.responses.push({ url: response.url(), status: response.status(), headers }))));
   context.on('page', (page) => {
-    page.on('console', (message) => observed.console.push({ type: message.type(), text: message.text() }));
+    page.on('console', (message) => {
+      const entry = { type: message.type(), text: message.text() };
+      // Playwright's WebKit (27.2) reports this style-src note for ANY native <select>, with no application code
+      // involved (reproduced on a bare page under the product CSP; Chromium and Firefox report nothing; C3
+      // observation O3; docs/ui/p1.17-policy-management-ux-contract.md §9.3). The CSP itself is asserted unchanged
+      // below and nothing is relaxed: only this exact message, only on WebKit, and only while the page really
+      // contains a native <select>, is counted apart; anything else still fails the run.
+      if (engineName === 'webkit' && entry.type === 'error' && entry.text === WEBKIT_SELECT_NOTE) {
+        pending.push(
+          page
+            .evaluate(() => document.querySelector('select') !== null)
+            .catch(() => false)
+            .then((hasSelect) => (hasSelect ? observed.selectNotes.push(entry.text) : observed.console.push(entry))),
+        );
+        return;
+      }
+      observed.console.push(entry);
+    });
     page.on('pageerror', (error) => observed.errors.push(error.name));
   });
   return context;
@@ -786,6 +804,7 @@ async function policyFlows() {
   await openPolicy(page, 'Agents', 'Agents');
   const agents = (await apiAs(context, await sessionCookie(context), { method: 'GET', path: '/api/v1/admin/policy/agents' })).json.agents;
   assert.equal(agents.find((a) => a.name === 'browser-bot').state, 'disabled', 'the owner’s disabling cascaded to its agent');
+  await openMenu(page); // a phone-sized viewport collapses the navigation behind the Menu button
   await page.getByRole('link', { name: 'Agent tokens' }).first().waitFor();
   await step('policy pages').scan(page, [PASSWORD, seed]);
   assert.ok(audits.length >= 5);
@@ -843,7 +862,7 @@ try {
   else if (scenario === 'denial-matrix') await denialMatrix();
   else if (scenario === 'policy-flows') await policyFlows();
   else throw new Error(`unknown scenario ${scenario}`);
-  console.log(JSON.stringify({ scenario, scheme, engine: engineName, browser: browser.version(), requests: observed.requests.length, blockedEgress: 0, secretsInConsole: 0 }));
+  console.log(JSON.stringify({ scenario, scheme, engine: engineName, browser: browser.version(), requests: observed.requests.length, blockedEgress: 0, secretsInConsole: 0, webkitSelectNotes: observed.selectNotes.length }));
 } catch (error) {
   // Diagnostics for a failed run: what the page showed and what it asked, never a secret-bearing value
   // (every credential in this suite is synthetic and the server never echoes one).
