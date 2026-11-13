@@ -217,6 +217,7 @@ func (f *fakeTicker) Settle() bool { return f.Tick() }
 
 type env struct {
 	t     *testing.T
+	dir   string // data directory of the file-backed store (reopened by restart tests)
 	repo  *store.Repository
 	db    *sql.DB
 	clock *fixtures.Clock
@@ -240,7 +241,11 @@ type envConfig struct {
 	withTimeout    func(*env) func(context.Context, time.Duration) (context.Context, context.CancelFunc)
 	afterAuthorize func(*env) func()
 	interval       time.Duration
+	usage          ops.UsageRecorder
 }
+
+// withUsage installs the usage recorder (P1.15); nil keeps accounting off.
+func withUsage(r ops.UsageRecorder) envOption { return func(c *envConfig) { c.usage = r } }
 
 func newEnv(t *testing.T, opts ...envOption) *env {
 	t.Helper()
@@ -280,7 +285,7 @@ func newEnv(t *testing.T, opts ...envOption) *env {
 	if err = mock.VerifySelf(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	e := &env{t: t, repo: repo, db: raw, clock: fixtures.NewClock(), mock: mock, spy: &spy{MockBackend: mock}}
+	e := &env{t: t, dir: dir, repo: repo, db: raw, clock: fixtures.NewClock(), mock: mock, spy: &spy{MockBackend: mock}}
 	e.exec(`UPDATE installation_control SET credential_generation=1,session_generation=1,authority_generation=1,restore_generation=1,restore_quarantined=0 WHERE singleton=1`)
 	e.exec(`UPDATE endpoints SET id=?,state='active',authority_generation=1 WHERE slug='local'`, string(localEP))
 
@@ -297,6 +302,7 @@ func newEnv(t *testing.T, opts ...envOption) *env {
 		e.mu.Unlock()
 		return f
 	}}
+	scfg.Usage = cfg.usage
 	if cfg.interval != 0 {
 		scfg.RevalidateInterval = cfg.interval
 	}

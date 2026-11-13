@@ -43,7 +43,7 @@ func TestServiceSurfaceHasNoUnsupportedOrRawForwardingEntryPoint(t *testing.T) {
 		methods = append(methods, svc.Method(i).Name)
 	}
 	sort.Strings(methods)
-	if want := []string{"Execute", "NotifyAuthorityChange"}; !reflect.DeepEqual(methods, want) {
+	if want := []string{"Execute", "NotifyAuthorityChange", "UsageFailures"}; !reflect.DeepEqual(methods, want) {
 		t.Fatalf("Service exported methods %v, want %v", methods, want)
 	}
 	var fields []string

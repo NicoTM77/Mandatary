@@ -1,0 +1,1425 @@
+{
+ "schema": "mandatary.usage-fixture",
+ "version": 1,
+ "description": "P1.15 exact-count fixture (TD 9.1). A predetermined allowed/denied/error sequence through ops.Service.Execute against the in-memory Docker mock and a real file-backed SQLite store. Principals are alice (human, AAL2 session, all six operations on selector edge), bot (alice's agent, all six operations on edge; fixture setup adds an explicit DENY of restart and a logs tail cap of 8), bob (human, no grant) and anonymous (no credential). Outcome 'none' means the attempt is deliberately NOT counted. 'client' is the result the caller sees; it may differ from the accounted outcome (execution evidence decides): S12 the caller left but the daemon executed (allowed), S24 the authorization ended mid-call (denied); a log stream is counted once at its open (S13, S13b a terminal backend failure after open, S13c the request ending) and its open failing or timing out is an error (S14b, S14c); S15b authority lost between admission and dispatch is denied.",
+ "setup": {
+  "retention_hours": 48,
+  "recent_event_limit": 1000,
+  "bot_restart_explicit_deny": true,
+  "bot_logs_tail_cap": 8
+ },
+ "phases": {
+  "sequence": [
+   {
+    "id": "S01",
+    "at": "2030-01-01T10:05:00Z",
+    "who": "alice",
+    "op": "container:logs",
+    "target": "edge-proxy",
+    "client": "ok",
+    "outcome": "allowed",
+    "selector": "edge"
+   },
+   {
+    "id": "S02",
+    "at": "2030-01-01T10:10:00Z",
+    "who": "alice",
+    "op": "container:logs",
+    "target": "edge-proxy",
+    "client": "ok",
+    "outcome": "allowed",
+    "selector": "edge"
+   },
+   {
+    "id": "S03",
+    "at": "2030-01-01T10:15:00Z",
+    "who": "alice",
+    "op": "container:inspect_status",
+    "target": "edge-proxy",
+    "client": "ok",
+    "outcome": "allowed",
+    "selector": "edge"
+   },
+   {
+    "id": "S04",
+    "at": "2030-01-01T10:20:00Z",
+    "who": "bot",
+    "op": "container:inspect_status",
+    "target": "edge-proxy",
+    "client": "ok",
+    "outcome": "allowed",
+    "selector": "edge"
+   },
+   {
+    "id": "S05",
+    "at": "2030-01-01T10:25:00Z",
+    "who": "bot",
+    "op": "container:inspect_status",
+    "target": "edge-proxy",
+    "fault": "backend_failed",
+    "client": "backend_failed",
+    "outcome": "error",
+    "selector": "edge"
+   },
+   {
+    "id": "S06",
+    "at": "2030-01-01T10:30:00Z",
+    "who": "bob",
+    "op": "container:inspect_status",
+    "target": "edge-proxy",
+    "client": "forbidden",
+    "outcome": "denied",
+    "selector": ""
+   },
+   {
+    "id": "S07",
+    "at": "2030-01-01T10:35:00Z",
+    "who": "bob",
+    "op": "container:inspect_status",
+    "target": "edge-proxy",
+    "client": "forbidden",
+    "outcome": "denied",
+    "selector": ""
+   },
+   {
+    "id": "S08",
+    "at": "2030-01-01T10:40:00Z",
+    "who": "bot",
+    "op": "container:restart",
+    "target": "edge-proxy",
+    "client": "forbidden",
+    "outcome": "denied",
+    "selector": "edge"
+   },
+   {
+    "id": "S09",
+    "at": "2030-01-01T10:45:00Z",
+    "who": "bot",
+    "op": "container:logs",
+    "target": "edge-proxy",
+    "tail": 10,
+    "client": "forbidden",
+    "outcome": "denied",
+    "selector": "edge"
+   },
+   {
+    "id": "S10",
+    "at": "2030-01-01T10:50:00Z",
+    "who": "bot",
+    "op": "container:logs",
+    "target": "edge-proxy",
+    "tail": 5,
+    "client": "ok",
+    "outcome": "allowed",
+    "selector": "edge"
+   },
+   {
+    "id": "S11",
+    "at": "2030-01-01T10:55:00Z",
+    "who": "alice",
+    "op": "container:stop",
+    "target": "edge-proxy",
+    "fault": "target_vanishes",
+    "client": "not_found",
+    "outcome": "error",
+    "selector": "edge"
+   },
+   {
+    "id": "S12",
+    "at": "2030-01-01T11:05:00Z",
+    "who": "alice",
+    "op": "container:start",
+    "target": "edge-proxy",
+    "fault": "caller_leaves_mid_call",
+    "client": "canceled",
+    "outcome": "allowed",
+    "selector": "edge"
+   },
+   {
+    "id": "S13",
+    "at": "2030-01-01T11:10:00Z",
+    "who": "alice",
+    "op": "container:logs",
+    "target": "edge-proxy",
+    "follow": true,
+    "client": "ok",
+    "outcome": "allowed",
+    "selector": "edge"
+   },
+   {
+    "id": "S13b",
+    "at": "2030-01-01T11:11:00Z",
+    "who": "alice",
+    "op": "container:logs",
+    "target": "edge-proxy",
+    "follow": true,
+    "fault": "stream_backend_failure",
+    "client": "ok",
+    "outcome": "allowed",
+    "selector": "edge"
+   },
+   {
+    "id": "S13c",
+    "at": "2030-01-01T11:12:00Z",
+    "who": "alice",
+    "op": "container:logs",
+    "target": "edge-proxy",
+    "follow": true,
+    "fault": "stream_request_cancel",
+    "client": "ok",
+    "outcome": "allowed",
+    "selector": "edge"
+   },
+   {
+    "id": "S14",
+    "at": "2030-01-01T11:15:00Z",
+    "who": "alice",
+    "op": "container:inspect_config",
+    "target": "edge-proxy",
+    "fault": "deadline_fires",
+    "client": "deadline",
+    "outcome": "error",
+    "selector": "edge"
+   },
+   {
+    "id": "S14b",
+    "at": "2030-01-01T11:16:00Z",
+    "who": "alice",
+    "op": "container:logs",
+    "target": "edge-proxy",
+    "fault": "backend_failed",
+    "client": "backend_failed",
+    "outcome": "error",
+    "selector": "edge"
+   },
+   {
+    "id": "S14c",
+    "at": "2030-01-01T11:17:00Z",
+    "who": "alice",
+    "op": "container:logs",
+    "target": "edge-proxy",
+    "follow": true,
+    "fault": "deadline_fires",
+    "client": "deadline",
+    "outcome": "error",
+    "selector": "edge"
+   },
+   {
+    "id": "S15",
+    "at": "2030-01-01T11:20:00Z",
+    "who": "alice",
+    "op": "container:restart",
+    "target": "edge-proxy",
+    "client": "ok",
+    "outcome": "allowed",
+    "selector": "edge"
+   },
+   {
+    "id": "S15b",
+    "at": "2030-01-01T11:21:00Z",
+    "who": "alice",
+    "op": "container:inspect_status",
+    "target": "edge-proxy",
+    "fault": "authority_lost_before_dispatch",
+    "client": "denied",
+    "outcome": "denied",
+    "selector": "edge"
+   },
+   {
+    "id": "S16",
+    "at": "2030-01-01T11:25:00Z",
+    "who": "alice",
+    "op": "container:inspect_status",
+    "target": "no-such-container",
+    "client": "forbidden",
+    "outcome": "denied",
+    "selector": ""
+   },
+   {
+    "id": "S17",
+    "at": "2030-01-01T11:30:00Z",
+    "who": "alice",
+    "op": "container:exec",
+    "target": "edge-proxy",
+    "client": "invalid",
+    "outcome": "none"
+   },
+   {
+    "id": "S18",
+    "at": "2030-01-01T11:31:00Z",
+    "who": "alice",
+    "op": "container:inspect_status",
+    "target": "../etc/passwd",
+    "client": "invalid",
+    "outcome": "none"
+   },
+   {
+    "id": "S19",
+    "at": "2030-01-01T11:32:00Z",
+    "who": "anonymous",
+    "op": "container:inspect_status",
+    "target": "edge-proxy",
+    "client": "unauthenticated",
+    "outcome": "none"
+   },
+   {
+    "id": "S20",
+    "at": "2030-01-01T11:33:00Z",
+    "who": "alice",
+    "op": "container:inspect_status",
+    "target": "mandatary-self",
+    "client": "forbidden",
+    "outcome": "none"
+   },
+   {
+    "id": "S21",
+    "at": "2030-01-02T23:30:00Z",
+    "who": "alice",
+    "op": "container:inspect_status",
+    "target": "edge-proxy",
+    "client": "ok",
+    "outcome": "allowed",
+    "selector": "edge"
+   },
+   {
+    "id": "S22",
+    "at": "2030-01-02T23:45:00Z",
+    "who": "bob",
+    "op": "container:inspect_config",
+    "target": "edge-proxy",
+    "client": "forbidden",
+    "outcome": "denied",
+    "selector": ""
+   },
+   {
+    "id": "S23",
+    "at": "2030-01-03T00:15:00Z",
+    "who": "alice",
+    "op": "container:inspect_status",
+    "target": "edge-proxy",
+    "client": "ok",
+    "outcome": "allowed",
+    "selector": "edge"
+   },
+   {
+    "id": "S24",
+    "at": "2030-01-03T00:40:00Z",
+    "who": "bot",
+    "op": "container:start",
+    "target": "edge-proxy",
+    "fault": "revoke_mid_call",
+    "client": "denied",
+    "outcome": "denied",
+    "selector": "edge"
+   }
+  ],
+  "after_restart": [
+   {
+    "id": "R01",
+    "at": "2030-01-03T01:05:00Z",
+    "who": "alice",
+    "op": "container:inspect_status",
+    "target": "edge-proxy",
+    "client": "ok",
+    "outcome": "allowed",
+    "selector": "edge"
+   },
+   {
+    "id": "R02",
+    "at": "2030-01-03T01:06:00Z",
+    "who": "alice",
+    "op": "container:inspect_status",
+    "target": "edge-proxy",
+    "client": "ok",
+    "outcome": "allowed",
+    "selector": "edge"
+   },
+   {
+    "id": "R03",
+    "at": "2030-01-03T01:07:00Z",
+    "who": "bob",
+    "op": "container:inspect_status",
+    "target": "edge-proxy",
+    "client": "forbidden",
+    "outcome": "denied",
+    "selector": ""
+   },
+   {
+    "id": "R04",
+    "at": "2030-01-03T01:08:00Z",
+    "who": "bot",
+    "op": "container:inspect_status",
+    "target": "edge-proxy",
+    "client": "unauthenticated",
+    "outcome": "none"
+   }
+  ],
+  "concurrent": {
+   "at": "2030-01-03T02:10:00Z",
+   "workers": 8,
+   "iterations": 5,
+   "per_iteration": [
+    {
+     "who": "alice",
+     "op": "container:inspect_status",
+     "target": "edge-proxy",
+     "outcome": "allowed"
+    },
+    {
+     "who": "bob",
+     "op": "container:inspect_status",
+     "target": "edge-proxy",
+     "outcome": "denied"
+    }
+   ]
+  },
+  "after_service_change": [
+   {
+    "id": "N01",
+    "at": "2030-01-04T01:00:00Z",
+    "who": "alice",
+    "op": "container:inspect_status",
+    "target": "edge-proxy",
+    "client": "ok",
+    "outcome": "allowed",
+    "selector": "edge"
+   },
+   {
+    "id": "N02",
+    "at": "2030-01-04T01:01:00Z",
+    "who": "bob",
+    "op": "container:inspect_status",
+    "target": "edge-proxy",
+    "client": "forbidden",
+    "outcome": "denied",
+    "selector": ""
+   }
+  ]
+ },
+ "checkpoints": {
+  "after_sequence": {
+   "hourly": [
+    {
+     "window": "2030-01-01T10:00:00Z",
+     "user": "alice",
+     "agent": "",
+     "selector": "edge",
+     "operation": "container:inspect_status",
+     "allowed": 1,
+     "denied": 0,
+     "error": 0
+    },
+    {
+     "window": "2030-01-01T10:00:00Z",
+     "user": "alice",
+     "agent": "",
+     "selector": "edge",
+     "operation": "container:logs",
+     "allowed": 2,
+     "denied": 0,
+     "error": 0
+    },
+    {
+     "window": "2030-01-01T10:00:00Z",
+     "user": "alice",
+     "agent": "",
+     "selector": "edge",
+     "operation": "container:stop",
+     "allowed": 0,
+     "denied": 0,
+     "error": 1
+    },
+    {
+     "window": "2030-01-01T10:00:00Z",
+     "user": "alice",
+     "agent": "bot",
+     "selector": "edge",
+     "operation": "container:inspect_status",
+     "allowed": 1,
+     "denied": 0,
+     "error": 1
+    },
+    {
+     "window": "2030-01-01T10:00:00Z",
+     "user": "alice",
+     "agent": "bot",
+     "selector": "edge",
+     "operation": "container:logs",
+     "allowed": 1,
+     "denied": 1,
+     "error": 0
+    },
+    {
+     "window": "2030-01-01T10:00:00Z",
+     "user": "alice",
+     "agent": "bot",
+     "selector": "edge",
+     "operation": "container:restart",
+     "allowed": 0,
+     "denied": 1,
+     "error": 0
+    },
+    {
+     "window": "2030-01-01T10:00:00Z",
+     "user": "bob",
+     "agent": "",
+     "selector": "",
+     "operation": "container:inspect_status",
+     "allowed": 0,
+     "denied": 2,
+     "error": 0
+    },
+    {
+     "window": "2030-01-01T11:00:00Z",
+     "user": "alice",
+     "agent": "",
+     "selector": "",
+     "operation": "container:inspect_status",
+     "allowed": 0,
+     "denied": 1,
+     "error": 0
+    },
+    {
+     "window": "2030-01-01T11:00:00Z",
+     "user": "alice",
+     "agent": "",
+     "selector": "edge",
+     "operation": "container:inspect_config",
+     "allowed": 0,
+     "denied": 0,
+     "error": 1
+    },
+    {
+     "window": "2030-01-01T11:00:00Z",
+     "user": "alice",
+     "agent": "",
+     "selector": "edge",
+     "operation": "container:inspect_status",
+     "allowed": 0,
+     "denied": 1,
+     "error": 0
+    },
+    {
+     "window": "2030-01-01T11:00:00Z",
+     "user": "alice",
+     "agent": "",
+     "selector": "edge",
+     "operation": "container:logs",
+     "allowed": 3,
+     "denied": 0,
+     "error": 2
+    },
+    {
+     "window": "2030-01-01T11:00:00Z",
+     "user": "alice",
+     "agent": "",
+     "selector": "edge",
+     "operation": "container:restart",
+     "allowed": 1,
+     "denied": 0,
+     "error": 0
+    },
+    {
+     "window": "2030-01-01T11:00:00Z",
+     "user": "alice",
+     "agent": "",
+     "selector": "edge",
+     "operation": "container:start",
+     "allowed": 1,
+     "denied": 0,
+     "error": 0
+    },
+    {
+     "window": "2030-01-02T23:00:00Z",
+     "user": "alice",
+     "agent": "",
+     "selector": "edge",
+     "operation": "container:inspect_status",
+     "allowed": 1,
+     "denied": 0,
+     "error": 0
+    },
+    {
+     "window": "2030-01-02T23:00:00Z",
+     "user": "bob",
+     "agent": "",
+     "selector": "",
+     "operation": "container:inspect_config",
+     "allowed": 0,
+     "denied": 1,
+     "error": 0
+    },
+    {
+     "window": "2030-01-03T00:00:00Z",
+     "user": "alice",
+     "agent": "",
+     "selector": "edge",
+     "operation": "container:inspect_status",
+     "allowed": 1,
+     "denied": 0,
+     "error": 0
+    },
+    {
+     "window": "2030-01-03T00:00:00Z",
+     "user": "alice",
+     "agent": "bot",
+     "selector": "edge",
+     "operation": "container:start",
+     "allowed": 0,
+     "denied": 1,
+     "error": 0
+    }
+   ],
+   "daily": [
+    {
+     "window": "2030-01-01T00:00:00Z",
+     "user": "alice",
+     "agent": "",
+     "selector": "",
+     "operation": "container:inspect_status",
+     "allowed": 0,
+     "denied": 1,
+     "error": 0
+    },
+    {
+     "window": "2030-01-01T00:00:00Z",
+     "user": "alice",
+     "agent": "",
+     "selector": "edge",
+     "operation": "container:inspect_config",
+     "allowed": 0,
+     "denied": 0,
+     "error": 1
+    },
+    {
+     "window": "2030-01-01T00:00:00Z",
+     "user": "alice",
+     "agent": "",
+     "selector": "edge",
+     "operation": "container:inspect_status",
+     "allowed": 1,
+     "denied": 1,
+     "error": 0
+    },
+    {
+     "window": "2030-01-01T00:00:00Z",
+     "user": "alice",
+     "agent": "",
+     "selector": "edge",
+     "operation": "container:logs",
+     "allowed": 5,
+     "denied": 0,
+     "error": 2
+    },
+    {
+     "window": "2030-01-01T00:00:00Z",
+     "user": "alice",
+     "agent": "",
+     "selector": "edge",
+     "operation": "container:restart",
+     "allowed": 1,
+     "denied": 0,
+     "error": 0
+    },
+    {
+     "window": "2030-01-01T00:00:00Z",
+     "user": "alice",
+     "agent": "",
+     "selector": "edge",
+     "operation": "container:start",
+     "allowed": 1,
+     "denied": 0,
+     "error": 0
+    },
+    {
+     "window": "2030-01-01T00:00:00Z",
+     "user": "alice",
+     "agent": "",
+     "selector": "edge",
+     "operation": "container:stop",
+     "allowed": 0,
+     "denied": 0,
+     "error": 1
+    },
+    {
+     "window": "2030-01-01T00:00:00Z",
+     "user": "alice",
+     "agent": "bot",
+     "selector": "edge",
+     "operation": "container:inspect_status",
+     "allowed": 1,
+     "denied": 0,
+     "error": 1
+    },
+    {
+     "window": "2030-01-01T00:00:00Z",
+     "user": "alice",
+     "agent": "bot",
+     "selector": "edge",
+     "operation": "container:logs",
+     "allowed": 1,
+     "denied": 1,
+     "error": 0
+    },
+    {
+     "window": "2030-01-01T00:00:00Z",
+     "user": "alice",
+     "agent": "bot",
+     "selector": "edge",
+     "operation": "container:restart",
+     "allowed": 0,
+     "denied": 1,
+     "error": 0
+    },
+    {
+     "window": "2030-01-01T00:00:00Z",
+     "user": "bob",
+     "agent": "",
+     "selector": "",
+     "operation": "container:inspect_status",
+     "allowed": 0,
+     "denied": 2,
+     "error": 0
+    },
+    {
+     "window": "2030-01-02T00:00:00Z",
+     "user": "alice",
+     "agent": "",
+     "selector": "edge",
+     "operation": "container:inspect_status",
+     "allowed": 1,
+     "denied": 0,
+     "error": 0
+    },
+    {
+     "window": "2030-01-02T00:00:00Z",
+     "user": "bob",
+     "agent": "",
+     "selector": "",
+     "operation": "container:inspect_config",
+     "allowed": 0,
+     "denied": 1,
+     "error": 0
+    },
+    {
+     "window": "2030-01-03T00:00:00Z",
+     "user": "alice",
+     "agent": "",
+     "selector": "edge",
+     "operation": "container:inspect_status",
+     "allowed": 1,
+     "denied": 0,
+     "error": 0
+    },
+    {
+     "window": "2030-01-03T00:00:00Z",
+     "user": "alice",
+     "agent": "bot",
+     "selector": "edge",
+     "operation": "container:start",
+     "allowed": 0,
+     "denied": 1,
+     "error": 0
+    }
+   ],
+   "recent_events": 25
+  },
+  "after_restart_and_concurrent": {
+   "hourly": [
+    {
+     "window": "2030-01-01T10:00:00Z",
+     "user": "alice",
+     "agent": "",
+     "selector": "edge",
+     "operation": "container:inspect_status",
+     "allowed": 1,
+     "denied": 0,
+     "error": 0
+    },
+    {
+     "window": "2030-01-01T10:00:00Z",
+     "user": "alice",
+     "agent": "",
+     "selector": "edge",
+     "operation": "container:logs",
+     "allowed": 2,
+     "denied": 0,
+     "error": 0
+    },
+    {
+     "window": "2030-01-01T10:00:00Z",
+     "user": "alice",
+     "agent": "",
+     "selector": "edge",
+     "operation": "container:stop",
+     "allowed": 0,
+     "denied": 0,
+     "error": 1
+    },
+    {
+     "window": "2030-01-01T10:00:00Z",
+     "user": "alice",
+     "agent": "bot",
+     "selector": "edge",
+     "operation": "container:inspect_status",
+     "allowed": 1,
+     "denied": 0,
+     "error": 1
+    },
+    {
+     "window": "2030-01-01T10:00:00Z",
+     "user": "alice",
+     "agent": "bot",
+     "selector": "edge",
+     "operation": "container:logs",
+     "allowed": 1,
+     "denied": 1,
+     "error": 0
+    },
+    {
+     "window": "2030-01-01T10:00:00Z",
+     "user": "alice",
+     "agent": "bot",
+     "selector": "edge",
+     "operation": "container:restart",
+     "allowed": 0,
+     "denied": 1,
+     "error": 0
+    },
+    {
+     "window": "2030-01-01T10:00:00Z",
+     "user": "bob",
+     "agent": "",
+     "selector": "",
+     "operation": "container:inspect_status",
+     "allowed": 0,
+     "denied": 2,
+     "error": 0
+    },
+    {
+     "window": "2030-01-01T11:00:00Z",
+     "user": "alice",
+     "agent": "",
+     "selector": "",
+     "operation": "container:inspect_status",
+     "allowed": 0,
+     "denied": 1,
+     "error": 0
+    },
+    {
+     "window": "2030-01-01T11:00:00Z",
+     "user": "alice",
+     "agent": "",
+     "selector": "edge",
+     "operation": "container:inspect_config",
+     "allowed": 0,
+     "denied": 0,
+     "error": 1
+    },
+    {
+     "window": "2030-01-01T11:00:00Z",
+     "user": "alice",
+     "agent": "",
+     "selector": "edge",
+     "operation": "container:inspect_status",
+     "allowed": 0,
+     "denied": 1,
+     "error": 0
+    },
+    {
+     "window": "2030-01-01T11:00:00Z",
+     "user": "alice",
+     "agent": "",
+     "selector": "edge",
+     "operation": "container:logs",
+     "allowed": 3,
+     "denied": 0,
+     "error": 2
+    },
+    {
+     "window": "2030-01-01T11:00:00Z",
+     "user": "alice",
+     "agent": "",
+     "selector": "edge",
+     "operation": "container:restart",
+     "allowed": 1,
+     "denied": 0,
+     "error": 0
+    },
+    {
+     "window": "2030-01-01T11:00:00Z",
+     "user": "alice",
+     "agent": "",
+     "selector": "edge",
+     "operation": "container:start",
+     "allowed": 1,
+     "denied": 0,
+     "error": 0
+    },
+    {
+     "window": "2030-01-02T23:00:00Z",
+     "user": "alice",
+     "agent": "",
+     "selector": "edge",
+     "operation": "container:inspect_status",
+     "allowed": 1,
+     "denied": 0,
+     "error": 0
+    },
+    {
+     "window": "2030-01-02T23:00:00Z",
+     "user": "bob",
+     "agent": "",
+     "selector": "",
+     "operation": "container:inspect_config",
+     "allowed": 0,
+     "denied": 1,
+     "error": 0
+    },
+    {
+     "window": "2030-01-03T00:00:00Z",
+     "user": "alice",
+     "agent": "",
+     "selector": "edge",
+     "operation": "container:inspect_status",
+     "allowed": 1,
+     "denied": 0,
+     "error": 0
+    },
+    {
+     "window": "2030-01-03T00:00:00Z",
+     "user": "alice",
+     "agent": "bot",
+     "selector": "edge",
+     "operation": "container:start",
+     "allowed": 0,
+     "denied": 1,
+     "error": 0
+    },
+    {
+     "window": "2030-01-03T01:00:00Z",
+     "user": "alice",
+     "agent": "",
+     "selector": "edge",
+     "operation": "container:inspect_status",
+     "allowed": 2,
+     "denied": 0,
+     "error": 0
+    },
+    {
+     "window": "2030-01-03T01:00:00Z",
+     "user": "bob",
+     "agent": "",
+     "selector": "",
+     "operation": "container:inspect_status",
+     "allowed": 0,
+     "denied": 1,
+     "error": 0
+    },
+    {
+     "window": "2030-01-03T02:00:00Z",
+     "user": "alice",
+     "agent": "",
+     "selector": "edge",
+     "operation": "container:inspect_status",
+     "allowed": 40,
+     "denied": 0,
+     "error": 0
+    },
+    {
+     "window": "2030-01-03T02:00:00Z",
+     "user": "bob",
+     "agent": "",
+     "selector": "",
+     "operation": "container:inspect_status",
+     "allowed": 0,
+     "denied": 40,
+     "error": 0
+    }
+   ],
+   "daily": [
+    {
+     "window": "2030-01-01T00:00:00Z",
+     "user": "alice",
+     "agent": "",
+     "selector": "",
+     "operation": "container:inspect_status",
+     "allowed": 0,
+     "denied": 1,
+     "error": 0
+    },
+    {
+     "window": "2030-01-01T00:00:00Z",
+     "user": "alice",
+     "agent": "",
+     "selector": "edge",
+     "operation": "container:inspect_config",
+     "allowed": 0,
+     "denied": 0,
+     "error": 1
+    },
+    {
+     "window": "2030-01-01T00:00:00Z",
+     "user": "alice",
+     "agent": "",
+     "selector": "edge",
+     "operation": "container:inspect_status",
+     "allowed": 1,
+     "denied": 1,
+     "error": 0
+    },
+    {
+     "window": "2030-01-01T00:00:00Z",
+     "user": "alice",
+     "agent": "",
+     "selector": "edge",
+     "operation": "container:logs",
+     "allowed": 5,
+     "denied": 0,
+     "error": 2
+    },
+    {
+     "window": "2030-01-01T00:00:00Z",
+     "user": "alice",
+     "agent": "",
+     "selector": "edge",
+     "operation": "container:restart",
+     "allowed": 1,
+     "denied": 0,
+     "error": 0
+    },
+    {
+     "window": "2030-01-01T00:00:00Z",
+     "user": "alice",
+     "agent": "",
+     "selector": "edge",
+     "operation": "container:start",
+     "allowed": 1,
+     "denied": 0,
+     "error": 0
+    },
+    {
+     "window": "2030-01-01T00:00:00Z",
+     "user": "alice",
+     "agent": "",
+     "selector": "edge",
+     "operation": "container:stop",
+     "allowed": 0,
+     "denied": 0,
+     "error": 1
+    },
+    {
+     "window": "2030-01-01T00:00:00Z",
+     "user": "alice",
+     "agent": "bot",
+     "selector": "edge",
+     "operation": "container:inspect_status",
+     "allowed": 1,
+     "denied": 0,
+     "error": 1
+    },
+    {
+     "window": "2030-01-01T00:00:00Z",
+     "user": "alice",
+     "agent": "bot",
+     "selector": "edge",
+     "operation": "container:logs",
+     "allowed": 1,
+     "denied": 1,
+     "error": 0
+    },
+    {
+     "window": "2030-01-01T00:00:00Z",
+     "user": "alice",
+     "agent": "bot",
+     "selector": "edge",
+     "operation": "container:restart",
+     "allowed": 0,
+     "denied": 1,
+     "error": 0
+    },
+    {
+     "window": "2030-01-01T00:00:00Z",
+     "user": "bob",
+     "agent": "",
+     "selector": "",
+     "operation": "container:inspect_status",
+     "allowed": 0,
+     "denied": 2,
+     "error": 0
+    },
+    {
+     "window": "2030-01-02T00:00:00Z",
+     "user": "alice",
+     "agent": "",
+     "selector": "edge",
+     "operation": "container:inspect_status",
+     "allowed": 1,
+     "denied": 0,
+     "error": 0
+    },
+    {
+     "window": "2030-01-02T00:00:00Z",
+     "user": "bob",
+     "agent": "",
+     "selector": "",
+     "operation": "container:inspect_config",
+     "allowed": 0,
+     "denied": 1,
+     "error": 0
+    },
+    {
+     "window": "2030-01-03T00:00:00Z",
+     "user": "alice",
+     "agent": "",
+     "selector": "edge",
+     "operation": "container:inspect_status",
+     "allowed": 43,
+     "denied": 0,
+     "error": 0
+    },
+    {
+     "window": "2030-01-03T00:00:00Z",
+     "user": "alice",
+     "agent": "bot",
+     "selector": "edge",
+     "operation": "container:start",
+     "allowed": 0,
+     "denied": 1,
+     "error": 0
+    },
+    {
+     "window": "2030-01-03T00:00:00Z",
+     "user": "bob",
+     "agent": "",
+     "selector": "",
+     "operation": "container:inspect_status",
+     "allowed": 0,
+     "denied": 41,
+     "error": 0
+    }
+   ],
+   "recent_events": 108
+  },
+  "after_retention": {
+   "now": "2030-01-04T00:30:00Z",
+   "removed": {
+    "hourly": 13,
+    "daily": 11,
+    "recent_events": 21
+   },
+   "hourly": [
+    {
+     "window": "2030-01-02T23:00:00Z",
+     "user": "alice",
+     "agent": "",
+     "selector": "edge",
+     "operation": "container:inspect_status",
+     "allowed": 1,
+     "denied": 0,
+     "error": 0
+    },
+    {
+     "window": "2030-01-02T23:00:00Z",
+     "user": "bob",
+     "agent": "",
+     "selector": "",
+     "operation": "container:inspect_config",
+     "allowed": 0,
+     "denied": 1,
+     "error": 0
+    },
+    {
+     "window": "2030-01-03T00:00:00Z",
+     "user": "alice",
+     "agent": "",
+     "selector": "edge",
+     "operation": "container:inspect_status",
+     "allowed": 1,
+     "denied": 0,
+     "error": 0
+    },
+    {
+     "window": "2030-01-03T00:00:00Z",
+     "user": "alice",
+     "agent": "bot",
+     "selector": "edge",
+     "operation": "container:start",
+     "allowed": 0,
+     "denied": 1,
+     "error": 0
+    },
+    {
+     "window": "2030-01-03T01:00:00Z",
+     "user": "alice",
+     "agent": "",
+     "selector": "edge",
+     "operation": "container:inspect_status",
+     "allowed": 2,
+     "denied": 0,
+     "error": 0
+    },
+    {
+     "window": "2030-01-03T01:00:00Z",
+     "user": "bob",
+     "agent": "",
+     "selector": "",
+     "operation": "container:inspect_status",
+     "allowed": 0,
+     "denied": 1,
+     "error": 0
+    },
+    {
+     "window": "2030-01-03T02:00:00Z",
+     "user": "alice",
+     "agent": "",
+     "selector": "edge",
+     "operation": "container:inspect_status",
+     "allowed": 40,
+     "denied": 0,
+     "error": 0
+    },
+    {
+     "window": "2030-01-03T02:00:00Z",
+     "user": "bob",
+     "agent": "",
+     "selector": "",
+     "operation": "container:inspect_status",
+     "allowed": 0,
+     "denied": 40,
+     "error": 0
+    }
+   ],
+   "daily": [
+    {
+     "window": "2030-01-02T00:00:00Z",
+     "user": "alice",
+     "agent": "",
+     "selector": "edge",
+     "operation": "container:inspect_status",
+     "allowed": 1,
+     "denied": 0,
+     "error": 0
+    },
+    {
+     "window": "2030-01-02T00:00:00Z",
+     "user": "bob",
+     "agent": "",
+     "selector": "",
+     "operation": "container:inspect_config",
+     "allowed": 0,
+     "denied": 1,
+     "error": 0
+    },
+    {
+     "window": "2030-01-03T00:00:00Z",
+     "user": "alice",
+     "agent": "",
+     "selector": "edge",
+     "operation": "container:inspect_status",
+     "allowed": 43,
+     "denied": 0,
+     "error": 0
+    },
+    {
+     "window": "2030-01-03T00:00:00Z",
+     "user": "alice",
+     "agent": "bot",
+     "selector": "edge",
+     "operation": "container:start",
+     "allowed": 0,
+     "denied": 1,
+     "error": 0
+    },
+    {
+     "window": "2030-01-03T00:00:00Z",
+     "user": "bob",
+     "agent": "",
+     "selector": "",
+     "operation": "container:inspect_status",
+     "allowed": 0,
+     "denied": 41,
+     "error": 0
+    }
+   ],
+   "recent_events": 87
+  },
+  "after_service_change": {
+   "hourly": [
+    {
+     "window": "2030-01-02T23:00:00Z",
+     "user": "alice",
+     "agent": "",
+     "selector": "edge",
+     "operation": "container:inspect_status",
+     "allowed": 1,
+     "denied": 0,
+     "error": 0
+    },
+    {
+     "window": "2030-01-02T23:00:00Z",
+     "user": "bob",
+     "agent": "",
+     "selector": "",
+     "operation": "container:inspect_config",
+     "allowed": 0,
+     "denied": 1,
+     "error": 0
+    },
+    {
+     "window": "2030-01-03T00:00:00Z",
+     "user": "alice",
+     "agent": "",
+     "selector": "edge",
+     "operation": "container:inspect_status",
+     "allowed": 1,
+     "denied": 0,
+     "error": 0
+    },
+    {
+     "window": "2030-01-03T00:00:00Z",
+     "user": "alice",
+     "agent": "bot",
+     "selector": "edge",
+     "operation": "container:start",
+     "allowed": 0,
+     "denied": 1,
+     "error": 0
+    },
+    {
+     "window": "2030-01-03T01:00:00Z",
+     "user": "alice",
+     "agent": "",
+     "selector": "edge",
+     "operation": "container:inspect_status",
+     "allowed": 2,
+     "denied": 0,
+     "error": 0
+    },
+    {
+     "window": "2030-01-03T01:00:00Z",
+     "user": "bob",
+     "agent": "",
+     "selector": "",
+     "operation": "container:inspect_status",
+     "allowed": 0,
+     "denied": 1,
+     "error": 0
+    },
+    {
+     "window": "2030-01-03T02:00:00Z",
+     "user": "alice",
+     "agent": "",
+     "selector": "edge",
+     "operation": "container:inspect_status",
+     "allowed": 40,
+     "denied": 0,
+     "error": 0
+    },
+    {
+     "window": "2030-01-03T02:00:00Z",
+     "user": "bob",
+     "agent": "",
+     "selector": "",
+     "operation": "container:inspect_status",
+     "allowed": 0,
+     "denied": 40,
+     "error": 0
+    },
+    {
+     "window": "2030-01-04T01:00:00Z",
+     "user": "alice",
+     "agent": "",
+     "selector": "edge",
+     "operation": "container:inspect_status",
+     "allowed": 1,
+     "denied": 0,
+     "error": 0
+    },
+    {
+     "window": "2030-01-04T01:00:00Z",
+     "user": "bob",
+     "agent": "",
+     "selector": "",
+     "operation": "container:inspect_status",
+     "allowed": 0,
+     "denied": 1,
+     "error": 0
+    }
+   ],
+   "daily": [
+    {
+     "window": "2030-01-02T00:00:00Z",
+     "user": "alice",
+     "agent": "",
+     "selector": "edge",
+     "operation": "container:inspect_status",
+     "allowed": 1,
+     "denied": 0,
+     "error": 0
+    },
+    {
+     "window": "2030-01-02T00:00:00Z",
+     "user": "bob",
+     "agent": "",
+     "selector": "",
+     "operation": "container:inspect_config",
+     "allowed": 0,
+     "denied": 1,
+     "error": 0
+    },
+    {
+     "window": "2030-01-03T00:00:00Z",
+     "user": "alice",
+     "agent": "",
+     "selector": "edge",
+     "operation": "container:inspect_status",
+     "allowed": 43,
+     "denied": 0,
+     "error": 0
+    },
+    {
+     "window": "2030-01-03T00:00:00Z",
+     "user": "alice",
+     "agent": "bot",
+     "selector": "edge",
+     "operation": "container:start",
+     "allowed": 0,
+     "denied": 1,
+     "error": 0
+    },
+    {
+     "window": "2030-01-03T00:00:00Z",
+     "user": "bob",
+     "agent": "",
+     "selector": "",
+     "operation": "container:inspect_status",
+     "allowed": 0,
+     "denied": 41,
+     "error": 0
+    },
+    {
+     "window": "2030-01-04T00:00:00Z",
+     "user": "alice",
+     "agent": "",
+     "selector": "edge",
+     "operation": "container:inspect_status",
+     "allowed": 1,
+     "denied": 0,
+     "error": 0
+    },
+    {
+     "window": "2030-01-04T00:00:00Z",
+     "user": "bob",
+     "agent": "",
+     "selector": "",
+     "operation": "container:inspect_status",
+     "allowed": 0,
+     "denied": 1,
+     "error": 0
+    }
+   ],
+   "recent_events": 89
+  }
+ }
+}

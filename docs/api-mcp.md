@@ -58,9 +58,16 @@ can only come from the path. Docker options (`all`, `force`, `signal`, `v`,
 `GET …/logs?follow=true` streams `application/x-ndjson`: one metadata line,
 one `{"stream","text"}` line per frame, and exactly one terminal line,
 `{"end":"eof"}` or `{"error":{…}}`. The stream holds an authorizer lease
-(P1.13): revocation, expiry, quarantine, a policy change or loss of the safety
-proof ends it with `{"error":{"code":"forbidden","reason":"authorization_ended"}}`
-and no later frame. Revocation is *pushed* when the code that changes authority
+(P1.13). Every authority-ending cause (revocation, expiry, quarantine, a policy
+change) ends it with
+`{"error":{"code":"forbidden","reason":"authorization_ended"}}` and no later
+frame. Loss of the safety proof ends it with reason `safety_unverified` when the
+backend transport reports the loss first (`docker.ErrUnverified`); if the
+stream's own revalidation observes the lost proof first, the lease ends the
+stream and the reason is `authorization_ended`, so a client must treat both as
+"authorization ended, do not retry blindly". `tests/adapters`
+(`TestFollowStreamEndsOnEveryRevocationOrExpiryCauseOverREST`) asserts the reason
+per cause. Revocation is *pushed* when the code that changes authority
 calls `ops.Service.NotifyAuthorityChange` (the `notify` hook of `auth.Admin`);
 independently, every stream revalidates on its own interval (pull path), so a
 change made without a push (for example a human-session revocation, P1.13 review
@@ -103,7 +110,7 @@ Shape (REST body and MCP `structuredContent`):
 | `unauthenticated` | 401 | Missing/malformed/unknown/expired/revoked/rotated-out/disabled/stale-generation credential, or a non-agent credential. Carries `WWW-Authenticate: Bearer`. |
 | `forbidden` | 403 | `reason`: `default_deny`, `restore_quarantined`, `safety_unverified`, `endpoint_inactive`, `parameter_cap_exceeded`, `authorization_ended`, `forbidden_origin`. |
 | `invalid_request` | 400 | Schema violation; also an invalid identifier. |
-| `not_found` | 404 | Unknown route or tool. A missing *container* is `403 default_deny`, never `404`. |
+| `not_found` | 404 | Unknown route or tool. A container that is missing *before authorization* is `403 default_deny` (protected, missing and ungranted targets are indistinguishable). A target that disappears *after* authorization, at dispatch (`docker.ErrTargetNotFound`), is `404 not_found` for that already-authorized caller; usage accounting counts it as an **error**, not a denial. |
 | `method_not_allowed` | 405 | Known route, wrong method. |
 | `payload_too_large` / `unsupported_media` | 413 / 415 | Body bounds / content type. |
 | `too_many_streams` | 429 | Follow stream cap. |
@@ -179,4 +186,5 @@ claim.
 | N63B4-SCOPE-MACHINE, N63B4-TOKEN-NOT-PRESENCE, N63B4-SESSION-COOKIE-CSRF (adapter side: no cookie, no CORS, no state-changing GET, Origin refused) | `TestAgentBearerNeverMintsCookiesSessionsOrAssuranceAndHumanCredentialsAreNotAgentCredentials`, `TestBrowserBoundaryNoCookiesNoCORSNoStateChangingGETAndBearerNeverMintsASession`, `TestBrowserBoundaryOriginIsRefusedAndNoCORSIsEverOffered` |
 | N63B4-DOC-FACTOR-INVENTORY, PWD-ROUTE-PARITY, OOB/WALLET/RESTRICTED-UNSUPPORTED, SCOPE-FEDERATION, RECOVERY-NO-SESSION (no human-authentication, factor, recovery, setup, federation or access-request route or tool exists on the machine surface) | `TestAdapterNamespacesExposeNoHumanAuthenticationFactorRecoverySetupFederationOrAccessRequestSurface` |
 | Versioned contract pinned | `TestContractFixtureIsCurrentAndExact` |
+| P1.15 usage accounting is identical over REST and MCP (shared service; see [usage-accounting.md](usage-accounting.md)) | `TestUsageIsAccountedIdenticallyOverRESTAndMCP` |
 | Concurrency under `-race` with racing revocation | `TestConcurrentRequestsOverBothTransportsAndRevocationAreRaceFree` |

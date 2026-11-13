@@ -62,7 +62,18 @@ const (
 
 	// notifyTimeout bounds one whole NotifyAuthorityChange sweep.
 	notifyTimeout = 30 * time.Second
+	// usageTimeout bounds one accounting write. Accounting is detached from the
+	// caller's cancellation (a caller that left still has its outcome counted).
+	usageTimeout = 10 * time.Second
 )
+
+// UsageRecorder persists one accounted outcome (TD 9.1). It must be safe for
+// concurrent use, must account the event exactly once or return an error, and must
+// not retain anything beyond the event's attribution tuple and outcome.
+// store.UsageLedger is the persistent implementation.
+type UsageRecorder interface {
+	RecordUsage(ctx context.Context, e domain.UsageEvent) error
+}
 
 // Ticker abstracts the stream revalidation clock so tests drive it deterministically.
 type Ticker interface {
@@ -102,6 +113,12 @@ type Config struct {
 	NewTicker      func(time.Duration) Ticker
 	WithTimeout    func(context.Context, time.Duration) (context.Context, context.CancelFunc)
 	AfterAuthorize func()
+	// Usage persists the accounted outcome of every request (P1.15). Nil disables
+	// accounting; the composition root of a real deployment must supply one, because
+	// this service is the single accounting point for REST, MCP and the Operations UI.
+	// A recorder failure never changes the operation's outcome: it is counted by
+	// UsageFailures and logged without detail.
+	Usage UsageRecorder
 }
 
 // Request is one operation request. It carries no raw Docker path, query, method
@@ -157,6 +174,8 @@ type Service struct {
 	newTicker         func(time.Duration) Ticker
 	withTimeout       func(context.Context, time.Duration) (context.Context, context.CancelFunc)
 	afterAuthorize    func()
+	usage             UsageRecorder
+	usageFailures     atomic.Uint64
 }
 
 // New constructs a Service, validating configuration fail-closed.
@@ -174,7 +193,7 @@ func New(cfg Config) (*Service, error) {
 		return v, true
 	}
 	var ok [5]bool
-	s := &Service{az: cfg.Authorizer, newTicker: cfg.NewTicker, withTimeout: cfg.WithTimeout, afterAuthorize: cfg.AfterAuthorize}
+	s := &Service{az: cfg.Authorizer, newTicker: cfg.NewTicker, withTimeout: cfg.WithTimeout, afterAuthorize: cfg.AfterAuthorize, usage: cfg.Usage}
 	s.interval, ok[0] = pick(cfg.RevalidateInterval, DefaultRevalidateInterval, MinRevalidateInterval, MaxRevalidateInterval)
 	s.revalidateTimeout, ok[1] = pick(cfg.RevalidateTimeout, DefaultRevalidateTimeout, time.Millisecond, MaxRevalidateTimeout)
 	s.operationTimeout, ok[2] = pick(cfg.OperationTimeout, DefaultOperationTimeout, time.Millisecond, MaxOperationTimeout)
@@ -278,7 +297,7 @@ func (s *Service) Execute(ctx context.Context, req Request) (Result, error) {
 		return Result{}, err
 	}
 
-	lease, err := s.acquire(ctx, authz.AuthorizeRequest{
+	lease, denial, err := s.acquire(ctx, authz.AuthorizeRequest{
 		Principal:      req.Credentials,
 		EndpointID:     req.EndpointID,
 		TargetRef:      target,
@@ -288,9 +307,61 @@ func (s *Service) Execute(ctx context.Context, req Request) (Result, error) {
 		RestartOptions: req.Restart,
 	})
 	if err != nil {
+		// The authorizer's own refusal of a verified principal is a denied outcome even
+		// when the caller left meanwhile (the returned error is then the caller's own).
+		// A 401, a refusal before authentication and a fault with no decision carry no
+		// attribution and are not counted.
+		if a, ok := authz.AttributionOf(denial); ok {
+			s.account(ctx, a, domain.UsageDenied)
+		}
 		return Result{}, err
 	}
 	return s.dispatch(ctx, lease)
+}
+
+// account records one outcome (TD 9.1). It is called exactly once per Execute that
+// reached a classified end, never from the stream (a log stream is counted when its
+// backend open call returns, so frames, closing, revalidation, revocation and a
+// terminal failure are never events). It runs detached from the caller's
+// cancellation, is bounded by usageTimeout, and can never change the operation's
+// result: a failure is counted and logged WITHOUT any detail (no identifier, error
+// text or payload).
+func (s *Service) account(ctx context.Context, a authz.Attribution, outcome domain.UsageOutcome) {
+	if s.usage == nil {
+		return
+	}
+	actx, cancel := context.WithTimeout(context.WithoutCancel(ctx), usageTimeout)
+	defer cancel()
+	if err := s.usage.RecordUsage(actx, a.Event(outcome)); err != nil {
+		s.usageFailures.Add(1)
+		slog.Warn("usage accounting failed", "outcome", string(outcome), "operation", string(a.Operation))
+	}
+}
+
+// UsageFailures reports how many outcomes could not be accounted since the service
+// was created (a recorder error). Those outcomes are lost, never replayed or invented.
+func (s *Service) UsageFailures() uint64 {
+	if s == nil {
+		return 0
+	}
+	return s.usageFailures.Load()
+}
+
+// authorityEnded reports whether the lease's authorization ended (revocation, expiry,
+// policy or safety change, rebinding). A lease is never bound to the caller before
+// hand-off, so its end is the authorizer's, not the caller's.
+func authorityEnded(lease *authz.Lease) bool { return lease.Context().Err() != nil }
+
+// failedCallOutcome classifies a backend call (or Logs open) that returned an error.
+// If the authorization had ended when it did, the call was cut off by the authorizer
+// (the lease context is the call's context): DENIED, no Docker fault is evidenced. Any
+// other failure (a backend error, ErrTargetNotFound at dispatch, the dispatch deadline
+// firing, a caller leaving is irrelevant: it never reaches the call) is an ERROR.
+func (s *Service) failedCallOutcome(lease *authz.Lease) domain.UsageOutcome {
+	if authorityEnded(lease) {
+		return domain.UsageDenied
+	}
+	return domain.UsageError
 }
 
 // acquire obtains the lease with the authorizer DETACHED from the caller's
@@ -304,41 +375,49 @@ func (s *Service) Execute(ctx context.Context, req Request) (Result, error) {
 // caller that left during acquisition gets its own context error, never an
 // authorization denial, and the lease it won is released before any backend
 // operation.
-func (s *Service) acquire(ctx context.Context, areq authz.AuthorizeRequest) (*authz.Lease, error) {
+//
+// The second result (denial) is the authorizer's own refusal, nil unless the
+// authorizer refused and the bound did not fire: it equals the returned error unless
+// the caller left, when the returned error is the caller's and the denial is kept only
+// so a real refusal of a verified principal can still be accounted.
+func (s *Service) acquire(ctx context.Context, areq authz.AuthorizeRequest) (lease *authz.Lease, denial, err error) {
 	life, endLife := context.WithCancel(context.WithoutCancel(ctx))
 	var timedOut atomic.Bool
 	bound := time.AfterFunc(s.acquireTimeout, func() {
 		timedOut.Store(true)
 		endLife()
 	})
-	lease, err := s.az.AcquireLease(life, areq)
+	lease, err = s.az.AcquireLease(life, areq)
 	inTime := bound.Stop() // false: the bound fired, so any lease won is already dead
 	switch {
 	case err != nil:
 		endLife()
 		if cerr := ctx.Err(); cerr != nil {
-			return nil, docker.SanitizeError(cerr)
+			if timedOut.Load() { // the bound fired: a fault with no decision
+				return nil, nil, docker.SanitizeError(cerr)
+			}
+			return nil, err, docker.SanitizeError(cerr)
 		}
 		if timedOut.Load() {
-			return nil, docker.SanitizeError(context.DeadlineExceeded)
+			return nil, nil, docker.SanitizeError(context.DeadlineExceeded)
 		}
-		return nil, err
+		return nil, err, err
 	case !inTime:
 		lease.Release()
 		endLife()
-		return nil, docker.SanitizeError(context.DeadlineExceeded)
+		return nil, nil, docker.SanitizeError(context.DeadlineExceeded)
 	}
 	if cerr := ctx.Err(); cerr != nil {
 		lease.Release()
 		endLife()
-		return nil, docker.SanitizeError(cerr)
+		return nil, nil, docker.SanitizeError(cerr)
 	}
 	// The lease is deliberately NOT bound to the caller here: dispatch hands the
 	// backend lease.Context(), and a caller that leaves mid-call must not cancel it
 	// (see dispatch). Binding to the caller's lifetime happens only for an open log
 	// stream, after hand-off.
 	context.AfterFunc(lease.Context(), endLife)
-	return lease, nil
+	return lease, nil, nil
 }
 
 // dispatch runs the authorized operation. It reads ONLY the decision (immutable
@@ -360,14 +439,19 @@ func (s *Service) dispatch(ctx context.Context, lease *authz.Lease) (Result, err
 	}()
 
 	dec := lease.Decision
+	attr := dec.Attribution()
 	if s.afterAuthorize != nil {
 		s.afterAuthorize()
 	}
 	backend, err := s.az.BackendFor(dec)
-	if err != nil {
+	if err != nil { // the authorizer refuses the stale decision: zero backend calls, denied
+		s.account(ctx, attr, domain.UsageDenied)
 		return Result{}, err
 	}
-	if ctx.Err() != nil || lease.Context().Err() != nil { // gone or revoked between admission and dispatch
+	if ctx.Err() != nil || authorityEnded(lease) { // gone or revoked between admission and dispatch
+		if authorityEnded(lease) { // refused before any backend call: denied, not an error
+			s.account(ctx, attr, domain.UsageDenied)
+		} // else only the caller left: no decision against it, no backend evidence, no event
 		return Result{}, s.failure(ctx, lease, nil)
 	}
 	res := Result{Target: dec.Target, ContainerName: dec.ContainerName, Operation: dec.Operation}
@@ -378,12 +462,18 @@ func (s *Service) dispatch(ctx context.Context, lease *authz.Lease) (Result, err
 		}
 		inner, expired, err := s.openLogs(lease, backend, dec)
 		if expired != nil { // the open outlived its deadline: the lease was released to end it
+			s.account(ctx, attr, domain.UsageError)
 			return Result{}, docker.SanitizeError(expired)
 		}
 		if err != nil {
+			s.account(ctx, attr, s.failedCallOutcome(lease))
 			return Result{}, s.failure(ctx, lease, err)
 		}
-		if ctx.Err() != nil || lease.Context().Err() != nil { // gone or revoked while opening: withhold
+		// THE accounting point of a log stream: the backend open call returned success.
+		// Nothing after this (withholding, frames, end, close, revalidation, revocation,
+		// a terminal failure) is counted again.
+		s.account(ctx, attr, domain.UsageAllowed)
+		if ctx.Err() != nil || authorityEnded(lease) { // gone or revoked while opening: withhold
 			_ = inner.Close()
 			return Result{}, s.failure(ctx, lease, nil)
 		}
@@ -394,7 +484,7 @@ func (s *Service) dispatch(ctx context.Context, lease *authz.Lease) (Result, err
 
 	dctx, cancel := s.dispatchContext(lease.Context(), dec)
 	defer cancel()
-	if err := dctx.Err(); err != nil {
+	if err := dctx.Err(); err != nil { // an already-expired bound dispatches nothing: no evidence, no event
 		return Result{}, s.failure(ctx, lease, err)
 	}
 	var callErr error
@@ -419,8 +509,13 @@ func (s *Service) dispatch(ctx context.Context, lease *authz.Lease) (Result, err
 		return Result{}, ErrInvalidRequest
 	}
 	if callErr != nil {
+		s.account(ctx, attr, s.failedCallOutcome(lease))
 		return Result{}, s.failure(ctx, lease, callErr)
 	}
+	// THE accounting point of a one-shot operation: the backend call returned success.
+	// Withholding the result below (caller left, authorization ended) does not undo
+	// that the daemon executed it.
+	s.account(ctx, attr, domain.UsageAllowed)
 	// The call ran under the lease context only, so the caller leaving never
 	// canceled it; its outcome is withheld and the caller's own context error is
 	// returned instead (the daemon may nevertheless have performed the operation).

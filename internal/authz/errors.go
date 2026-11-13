@@ -49,6 +49,13 @@ const (
 type DenialError struct {
 	Base   Error
 	Reason DenialReason
+	// attr is the usage attribution of a denial of a verified principal (see
+	// AttributionOf). It is unexported and never formatted.
+	attr *Attribution
+	// fault marks a fail-closed 403 whose cause is a storage fault, not a policy
+	// decision: it is never attributed (attribute leaves it alone), so a fault is
+	// never accounted as a denial. Unexported and never formatted.
+	fault bool
 }
 
 func (e *DenialError) Error() string {
