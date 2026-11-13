@@ -91,6 +91,18 @@ func startSetup(ctx context.Context, logger *slog.Logger, c config.Config, repo 
 	mux := http.NewServeMux()
 	mux.Handle(auth.SetupPathPrefix, adapter.Handler())
 	mux.Handle("/", static)
+	// Account routes exist only when the Lifecycle exists (they need the password
+	// and factor services, which are built from the notice settings). Without it
+	// nothing is half-mounted: the paths fall through to the static 404/405.
+	if lifecycle != nil {
+		browser, ok := accountBrowser(lifecycle)
+		if !ok {
+			return nil, noop, false
+		}
+		for _, path := range auth.AccountPaths() {
+			mux.Handle(path, browser)
+		}
+	}
 	background, cancel := context.WithCancel(ctx)
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -108,6 +120,21 @@ func startSetup(ctx context.Context, logger *slog.Logger, c config.Config, repo 
 		}
 	}()
 	return mux, func() { cancel(); wg.Wait() }, true
+}
+
+// accountBrowser builds the session service and the browser boundary carrying the
+// slice-1 account routes (login, session, logout). WebAuthn is not configured in
+// this build, so no security-key login or enrolment path exists (slice 2).
+func accountBrowser(lifecycle *auth.Lifecycle) (*auth.Browser, bool) {
+	sessions, err := auth.NewSessions(lifecycle, nil, auth.DefaultSessionSettings())
+	if err != nil {
+		return nil, false
+	}
+	browser := auth.NewBrowser(sessions)
+	if err := auth.RegisterAccountRoutes(browser, sessions); err != nil {
+		return nil, false
+	}
+	return browser, true
 }
 
 // maintainOnce performs protected cleanup of expired generations/sessions/files

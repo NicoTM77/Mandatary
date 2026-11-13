@@ -131,7 +131,7 @@ export type LoginMethod = 'totp' | 'webauthn';
 export type LoginFactorState =
   | Phase
   | { kind: 'webauthn_waiting' }
-  | { kind: 'rejected'; reason: 'denied' | 'webauthn_cancelled' | 'webauthn_unsupported' | CommonReason }
+  | { kind: 'rejected'; reason: 'denied' | 'password_only_refused' | 'webauthn_cancelled' | 'webauthn_unsupported' | CommonReason }
   /** The 5-minute preauth capability ended. Start again from the password step. */
   | { kind: 'expired' };
 

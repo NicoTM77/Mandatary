@@ -12,7 +12,10 @@ import (
 // This is a static-surface regression, not evidence of future authorization.
 // Injecting the public index into this denied-route fixture MUST fail the suite.
 func TestUnavailableProductRoutes(t *testing.T) {
-	paths := []string{"/api/v1/containers", "/mcp", "/setup", "/login", "/containers/json", "/v1.44/containers/json"}
+	// /setup and /login left this list deliberately (P1.16.3, D-ROUTE-1): they are
+	// exact application-document routes that serve the static shell. Their
+	// closed-by-default API surface is asserted where the API is mounted.
+	paths := []string{"/api/v1/containers", "/mcp", "/setup/exchange", "/login/totp", "/setup/", "/login/", "/containers/json", "/v1.44/containers/json"}
 	if os.Getenv("MANDATARY_NEGATIVE_FIXTURE") == "exposed-route" {
 		paths = append(paths, "/")
 	}

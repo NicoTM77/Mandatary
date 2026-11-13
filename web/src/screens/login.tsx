@@ -52,12 +52,15 @@ export function LoginPassword({ state, onSubmit, recoveryHref }: LoginPasswordPr
 
 // ───────────────────────── second factor ─────────────────────────
 
-function factorRejection(reason: 'denied' | 'webauthn_cancelled' | 'webauthn_unsupported' | 'rate_limited' | 'unavailable' | 'invalid_request', method: LoginMethod): Rejection {
+function factorRejection(reason: 'denied' | 'password_only_refused' | 'webauthn_cancelled' | 'webauthn_unsupported' | 'rate_limited' | 'unavailable' | 'invalid_request', method: LoginMethod): Rejection {
   switch (reason) {
     case 'denied':
       return method === 'totp'
         ? { title: 'That code wasn’t accepted', body: 'Enter the current code from your authenticator app. Each code works once, so wait for the next one if you just used it.' }
         : { title: 'That security key wasn’t accepted', body: 'Try again, or use another sign-in method if your account has one.' };
+    case 'password_only_refused':
+      // The page offered it because the server listed it, but the server re-checks policy on the call itself.
+      return { title: 'Password-only sign-in isn’t available', body: 'This account must verify with a second factor. Use your authenticator code, or start again.' };
     case 'webauthn_cancelled':
       return { title: 'The security key request ended', body: 'It was cancelled or timed out. Try again and follow your browser’s prompt.' };
     case 'webauthn_unsupported':

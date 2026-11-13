@@ -1,6 +1,9 @@
 import { lazy, Suspense } from 'react';
+import { LoginContainer } from './containers/LoginContainer';
+import { SessionHome } from './containers/SessionHome';
+import { SetupContainer } from './containers/SetupContainer';
 import { ThemeProvider } from './theme';
-import { ThemeToggle } from './ui';
+import { Alert, CenteredFrame } from './ui';
 
 // The synthetic state gallery is a design-review tool, not product surface. It is imported only
 // when Vite's DEV flag is true, so the production bundle contains neither the gallery nor its
@@ -12,20 +15,51 @@ function galleryView(): string | null {
   return new URLSearchParams(globalThis.location?.search ?? '').get('synthetic');
 }
 
-function Skeleton() {
-  return (
-    <div className="min-h-screen px-4 py-12 sm:px-8">
-      <main id="main-content" className="mx-auto max-w-2xl space-y-6">
-        <h1 className="text-4xl font-semibold tracking-tight">Mandatary</h1>
-        <p>Development skeleton — authentication and container operations are not available.</p>
-        <p className="text-muted">This build serves embedded static assets only. It does not connect to Docker or store credentials.</p>
-        <ThemeToggle />
-      </main>
-    </div>
-  );
+export type AppRoute = 'home' | 'setup' | 'login' | 'unknown';
+
+/**
+ * The server serves this shell only at the exact document routes `/`, `/setup` and `/login` (D-ROUTE-1);
+ * the path picks the view. There is no client-side router: moving between views is a full page
+ * navigation, which discards every in-memory token and field with the old page.
+ */
+export function routeFor(pathname: string): AppRoute {
+  switch (pathname) {
+    case '/':
+      return 'home';
+    case '/setup':
+      return 'setup';
+    case '/login':
+      return 'login';
+    default:
+      return 'unknown';
+  }
 }
 
-export function App() {
+function View({ path }: { path: string }) {
+  switch (routeFor(path)) {
+    case 'setup':
+      return <SetupContainer />;
+    case 'login':
+      return <LoginContainer />;
+    case 'home':
+      return <SessionHome />;
+    case 'unknown':
+      return (
+        <CenteredFrame>
+          <h1 className="sr-only">Mandatary</h1>
+          <Alert tone="info" role="none" title="Nothing is here">
+            This address isn’t part of Mandatary.{' '}
+            <a href="/login" className="font-medium text-accent-text underline underline-offset-2">
+              Go to sign in
+            </a>
+            .
+          </Alert>
+        </CenteredFrame>
+      );
+  }
+}
+
+export function App({ path = globalThis.location?.pathname ?? '/' }: { path?: string }) {
   const view = galleryView();
   return (
     <ThemeProvider>
@@ -34,7 +68,7 @@ export function App() {
           <Gallery view={view} />
         </Suspense>
       ) : (
-        <Skeleton />
+        <View path={path} />
       )}
     </ThemeProvider>
   );
