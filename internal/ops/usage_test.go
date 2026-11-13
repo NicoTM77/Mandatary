@@ -7,6 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -468,6 +469,97 @@ func TestCallerGoneBetweenAdmissionAndDispatchIsNotCountedButARevocationIs(t *te
 			})
 		}
 	}
+}
+
+// A revocation or an explicit DENY that lands AFTER Authorize allowed the request but
+// BEFORE the revalidation under the registered lease (AcquireLease resolves the target by
+// its immutable ID there) is a refusal of a verified principal: one DENIED event for the
+// decision's tuple, zero backend calls, for every key and for human and agent alike. The
+// same change committed before the request is counted by the Authorize path
+// (TestPolicyDenialsAreCountedDeniedWithTheDecidingSelector): no window may lose it.
+func TestRefusalDuringLeaseAcquisitionIsCountedDenied(t *testing.T) {
+	type change struct {
+		name  string
+		who   string
+		apply func(e *env, op docker.Operation)
+		creds func() authz.PrincipalCredentials
+		want  func(op docker.Operation) domain.UsageEvent
+	}
+	changes := []change{
+		{"agent credential revoked", "agent",
+			func(e *env, _ docker.Operation) { revokeCredential(e) }, botCreds,
+			func(op docker.Operation) domain.UsageEvent { return botEvt(op, domain.UsageDenied) }},
+		{"explicit DENY committed for the agent", "agent",
+			func(e *env, op docker.Operation) { e.policy("agent_id", botID, selEdge, "DENY", op, nil, nil) }, botCreds,
+			func(op docker.Operation) domain.UsageEvent { return botEvt(op, domain.UsageDenied) }},
+		{"explicit DENY committed for the human", "human",
+			func(e *env, op docker.Operation) { e.policy("user_id", aliceID, selEdge, "DENY", op, nil, nil) }, aliceCreds,
+			func(op docker.Operation) domain.UsageEvent { return aliceEvt(op, domain.UsageDenied) }},
+	}
+	for _, op := range ops.Operations() {
+		for _, c := range changes {
+			t.Run(string(op)+"/"+c.name, func(t *testing.T) {
+				u := &usageSpy{}
+				e := newEnv(t, withUsage(u))
+				var fired atomic.Int32
+				e.spy.resolveBlock = func(_ context.Context, ref string) {
+					if ref == string(edgeID) && fired.Add(1) == 1 {
+						c.apply(e, op)
+					}
+				}
+				res, err := e.svc.Execute(t.Context(), req(c.creds(), "edge-proxy", op))
+				closeLogs(res)
+				if fired.Load() == 0 {
+					t.Fatal("the hook never fired: no immutable-ID resolution during acquisition")
+				}
+				if !isDenial(err) {
+					t.Fatalf("Execute = %v, want a 403 denial", err)
+				}
+				if n := len(e.spy.operationalCalls()); n != 0 {
+					t.Fatalf("a refused acquisition made %d operational calls", n)
+				}
+				wantEvents(t, u, c.want(op))
+			})
+		}
+	}
+}
+
+// The refusal inside the acquisition window is still a refusal of a verified principal
+// when the caller leaves during it: counted denied once, the caller gets its own error.
+// A bound that fires (AcquireTimeout) stays a fault with no decision: not counted, even
+// when the lease acquisition itself was refused in the same window.
+func TestRefusalDuringLeaseAcquisitionWithCallerGoneOrBoundFired(t *testing.T) {
+	t.Run("caller leaves: counted once", func(t *testing.T) {
+		u := &usageSpy{}
+		e := newEnv(t, withUsage(u))
+		ctx, cancel := context.WithCancel(t.Context())
+		var fired atomic.Int32
+		e.spy.resolveBlock = func(_ context.Context, ref string) {
+			if ref == string(edgeID) && fired.Add(1) == 1 {
+				revokeCredential(e)
+				cancel() // the caller leaves in the same window
+			}
+		}
+		_, err := e.svc.Execute(ctx, req(botCreds(), "edge-proxy", docker.OpStart))
+		if fired.Load() == 0 || err == nil || isDenial(err) {
+			t.Fatalf("fired=%d Execute = %v, want the caller's own context error", fired.Load(), err)
+		}
+		wantEvents(t, u, botEvt(docker.OpStart, domain.UsageDenied))
+	})
+	t.Run("bound fired: not counted", func(t *testing.T) {
+		u := &usageSpy{}
+		e := newEnv(t, withUsage(u), func(c *envConfig) { c.acquireTimeout = ops.MinAcquireTimeout })
+		e.spy.resolveBlock = func(ctx context.Context, ref string) {
+			if ref == string(edgeID) {
+				revokeCredential(e)
+				<-ctx.Done() // only the acquisition bound ends this
+			}
+		}
+		if _, err := e.svc.Execute(t.Context(), req(botCreds(), "edge-proxy", docker.OpStart)); err == nil {
+			t.Fatal("Execute against a hung backend succeeded")
+		}
+		wantEvents(t, u)
+	})
 }
 
 // An acquisition that outlives AcquireTimeout is a fault with no decision: not counted.

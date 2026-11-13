@@ -813,11 +813,17 @@ func (a *Authorizer) validateDecisionOnce(ctx context.Context, dec Decision) (re
 }
 
 // AcquireLease authorizes req and registers a cancellable Lease for long-lived operations.
+//
+// Every 403 refusal after Authorize allowed the request (registration-time staleness,
+// the revalidation under the registered lease, the final staleness check) is a refusal
+// of a VERIFIED principal for a known decision, so it carries that decision's
+// attribution exactly like Authorize's own late refusals (usage accounting, TD 9.1).
 func (a *Authorizer) AcquireLease(ctx context.Context, req AuthorizeRequest) (*Lease, error) {
 	dec, err := a.Authorize(ctx, req)
 	if err != nil {
 		return nil, err
 	}
+	attr := dec.Attribution()
 
 	leaseCtx, cancel := context.WithCancel(ctx)
 	id := a.nextLeaseID.Add(1)
@@ -833,7 +839,7 @@ func (a *Authorizer) AcquireLease(ctx context.Context, req AuthorizeRequest) (*L
 	if ctx.Err() != nil || dec.PolicyEpoch != a.policyEpoch || !a.validBindingLocked(dec) {
 		a.mu.Unlock()
 		cancel()
-		return nil, newForbidden(ReasonDecisionStale)
+		return nil, attribute(newForbidden(ReasonDecisionStale), &attr)
 	}
 	a.leases[id] = lease
 	a.mu.Unlock()
@@ -842,7 +848,7 @@ func (a *Authorizer) AcquireLease(ctx context.Context, req AuthorizeRequest) (*L
 	// between Authorize and map insertion immediately cancels the lease.
 	if err := lease.Revalidate(ctx); err != nil {
 		lease.Release()
-		return nil, err
+		return nil, attribute(err, &attr)
 	}
 
 	a.mu.RLock()
@@ -852,7 +858,7 @@ func (a *Authorizer) AcquireLease(ctx context.Context, req AuthorizeRequest) (*L
 	a.mu.RUnlock()
 	if stale {
 		lease.Release()
-		return nil, newForbidden(ReasonDecisionStale)
+		return nil, attribute(newForbidden(ReasonDecisionStale), &attr)
 	}
 	return lease, nil
 }

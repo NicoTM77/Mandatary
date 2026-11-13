@@ -80,7 +80,9 @@ success, and a returned 403 is not necessarily a denial.
 | Backend call failed and the authorization had ended (in-flight revocation cut the call) | **denied** | the lease context is the call's context; no Docker fault is evidenced |
 | Authority lost between admission and dispatch (`BackendFor` refuses, lease already ended): zero backend calls | **denied** | the authorizer refused it |
 | Authorizer refused a **verified** principal: explicit deny, default deny, parameter cap, missing target, invalid parameters, stale decision, endpoint inactive (post-authentication) | **denied** | attributed to the deciding selector, or none |
+| ...landing **during lease acquisition**, after Authorize allowed it: a revocation, an explicit DENY or any stale-decision refusal at registration, at the revalidation under the registered lease, or at the final staleness check (`AcquireLease`) | **denied** | attributed to the decision's tuple (the allow that decided); zero backend calls |
 | ...while the caller left during acquisition | **denied** | the authorizer's refusal is real; the caller still receives its own cancellation |
+| ...but the `AcquireTimeout` bound fired in the same window | *nothing* | the bound makes it a fault with no decision, even if a refusal was also produced |
 | Invalid input (unsupported key, malformed endpoint/target/options), anonymous/ambiguous credentials, **any 401** | *nothing* | no verified principal, no decision, no backend |
 | Self/peer-protected target, unverified safety proof, restore quarantine, endpoint without a backend (all refused **before** authentication) | *nothing* | nobody is authenticated; attributing them would require verifying credentials after a self-protection refusal, which the precedence order forbids |
 | Caller left before dispatch, only the caller (no decision, no evidence) | *nothing* | |
@@ -199,6 +201,7 @@ Run `go test -race -count=1 ./...`. Names are real declarations
 | Target disappearing after authorization | `TestTargetDisappearingAfterAuthorizationIsABackendErrorNotADenial` |
 | Authority lost before dispatch; caller gone before dispatch | `TestAuthorityLostBeforeDispatchIsDeniedNotAnError`, `TestCallerGoneBetweenAdmissionAndDispatchIsNotCountedButARevocationIs` |
 | Caller cancellation during a call that succeeds / fails; during acquisition; acquisition timeout | `TestCallerLeavingMidCallIsCountedFromTheBackendEvidence`, `TestCallerLeavingDuringAcquisitionCountsOnlyARealDenial`, `TestAcquisitionTimeoutIsNotCounted` |
+| Revocation / explicit DENY during lease acquisition, every key, human and agent; caller gone; bound fired | `TestRefusalDuringLeaseAcquisitionIsCountedDenied`, `TestRefusalDuringLeaseAcquisitionWithCallerGoneOrBoundFired` |
 | In-flight revocation (cut off vs daemon completed), Logs open revoked | `TestInFlightRevocationIsDeniedWhenCutOffAndAllowedWhenTheDaemonCompleted`, `TestLogsOpenRevokedWhileOpeningFollowsTheBackendEvidence` |
 | Deadline expiry, pre-expired bound | `TestDeadlineExpiryIsAnErrorAndAPreExpiredBoundIsNotCounted` |
 | No double counting across stream open/close/revalidation/revocation/terminal failure | `TestStreamsAreCountedExactlyOnceAtOpen` |
