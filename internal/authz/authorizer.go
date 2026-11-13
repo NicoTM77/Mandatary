@@ -796,7 +796,9 @@ func (a *Authorizer) validateDecisionOnce(ctx context.Context, dec Decision) (re
 	}
 	if readErr != nil {
 		a.cancelMatchingLeases(dec)
-		return false, newForbidden(ReasonDecisionStale)
+		// Fail closed for the caller, but a storage fault is not a policy decision:
+		// it is never attributed or accounted as a denial.
+		return false, &DenialError{Base: ErrForbidden, Reason: ReasonDecisionStale, fault: true}
 	}
 	if validateErr != nil {
 		a.cancelMatchingLeases(dec)

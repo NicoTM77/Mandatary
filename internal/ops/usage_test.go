@@ -562,6 +562,36 @@ func TestRefusalDuringLeaseAcquisitionWithCallerGoneOrBoundFired(t *testing.T) {
 	})
 }
 
+// A storage fault in the acquisition window is not a policy refusal: the caller is
+// still refused fail-closed (403 decision_stale, no backend call), but nothing is
+// attributed, exactly like the same fault before Authorize (AttributionOf contract).
+func TestStorageFaultDuringLeaseAcquisitionIsNotCounted(t *testing.T) {
+	for _, op := range ops.Operations() {
+		t.Run(string(op), func(t *testing.T) {
+			u := &usageSpy{}
+			e := newEnv(t, withUsage(u))
+			var fired atomic.Int32
+			e.spy.resolveBlock = func(_ context.Context, ref string) {
+				if ref == string(edgeID) && fired.Add(1) == 1 {
+					_ = e.repo.Close() // the store fails inside the acquisition window
+				}
+			}
+			res, err := e.svc.Execute(t.Context(), req(botCreds(), "edge-proxy", op))
+			closeLogs(res)
+			if fired.Load() == 0 {
+				t.Fatal("the hook never fired: no immutable-ID resolution during acquisition")
+			}
+			if !isDenial(err) {
+				t.Fatalf("Execute = %v, want the fail-closed 403", err)
+			}
+			if n := len(e.spy.operationalCalls()); n != 0 {
+				t.Fatalf("a refused acquisition made %d operational calls", n)
+			}
+			wantEvents(t, u)
+		})
+	}
+}
+
 // An acquisition that outlives AcquireTimeout is a fault with no decision: not counted.
 func TestAcquisitionTimeoutIsNotCounted(t *testing.T) {
 	u := &usageSpy{}

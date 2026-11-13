@@ -66,7 +66,7 @@ func AttributionOf(err error) (Attribution, bool) {
 // non-denial) is returned unchanged.
 func attribute(err error, a *Attribution) error {
 	var de *DenialError
-	if a == nil || !errors.As(err, &de) || de == nil || de.Base != ErrForbidden {
+	if a == nil || !errors.As(err, &de) || de == nil || de.Base != ErrForbidden || de.fault {
 		return err
 	}
 	cp := *a
