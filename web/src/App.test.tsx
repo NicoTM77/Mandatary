@@ -13,12 +13,15 @@ test('identifies the skeleton without offering unimplemented product controls', 
 });
 
 test('switches between light and dark without storing credentials or fetching data', () => {
-  const { container } = render(<App />);
+  render(<App />);
+  // P1.16.1: the theme is now applied on <html> (scrollbars/controls follow it), not on <main>.
+  const root = document.documentElement;
   const button = screen.getByRole('button', { name: 'Use dark theme' });
-  expect(container.querySelector('main')?.getAttribute('data-theme')).toBe('light');
+  expect(root.getAttribute('data-theme')).toBe('light');
   fireEvent.click(button);
-  expect(container.querySelector('main')?.getAttribute('data-theme')).toBe('dark');
+  expect(root.getAttribute('data-theme')).toBe('dark');
   fireEvent.click(screen.getByRole('button', { name: 'Use light theme' }));
-  expect(container.querySelector('main')?.getAttribute('data-theme')).toBe('light');
+  expect(root.getAttribute('data-theme')).toBe('light');
   expect(localStorage.length).toBe(0);
+  expect(sessionStorage.length).toBe(0);
 });

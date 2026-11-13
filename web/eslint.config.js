@@ -19,7 +19,9 @@ export default [
     },
     plugins: { 'react-hooks': hooks },
     // TypeScript's noUnusedLocals/noUnusedParameters checks JSX references and
-    // type-only bindings correctly; ESLint's JS-only rule does not.
-    rules: { ...hooks.configs.recommended.rules, 'no-unused-vars': 'off' },
+    // type-only bindings correctly; ESLint's JS-only rule does not. The same holds for
+    // no-undef: tsc (strict, noEmit) already rejects undeclared identifiers, while the
+    // Babel TS-syntax parser reports every type/interface member as undefined.
+    rules: { ...hooks.configs.recommended.rules, 'no-unused-vars': 'off', 'no-undef': 'off' },
   },
 ];
