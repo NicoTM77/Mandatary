@@ -43,8 +43,8 @@ CREATE TABLE usage_stats_hourly (
     FOREIGN KEY (selector_id,endpoint_id) REFERENCES container_selectors(id,endpoint_id) ON DELETE RESTRICT
 ) STRICT;
 INSERT INTO usage_stats_hourly(id,bucket_start,user_id,agent_id,endpoint_id,selector_id,operation,allowed_count,denied_count,error_count)
-    SELECT id,bucket_start,user_id,agent_id,endpoint_id,selector_id,operation,allowed_count,denied_count,error_count FROM temp.usage_stats_hourly_old;
-DROP TABLE temp.usage_stats_hourly_old;
+    SELECT id,bucket_start,user_id,agent_id,endpoint_id,selector_id,operation,allowed_count,denied_count,error_count FROM usage_stats_hourly_old;
+DROP TABLE usage_stats_hourly_old;
 CREATE UNIQUE INDEX usage_hourly_tuple ON usage_stats_hourly(bucket_start,coalesce(user_id,''),coalesce(agent_id,''),endpoint_id,coalesce(selector_id,''),operation);
 
 CREATE TEMP TABLE usage_stats_daily_old AS SELECT id,bucket_start,user_id,agent_id,endpoint_id,selector_id,operation,allowed_count,denied_count,error_count FROM usage_stats_daily;
@@ -65,8 +65,8 @@ CREATE TABLE usage_stats_daily (
     FOREIGN KEY (selector_id,endpoint_id) REFERENCES container_selectors(id,endpoint_id) ON DELETE RESTRICT
 ) STRICT;
 INSERT INTO usage_stats_daily(id,bucket_start,user_id,agent_id,endpoint_id,selector_id,operation,allowed_count,denied_count,error_count)
-    SELECT id,bucket_start,user_id,agent_id,endpoint_id,selector_id,operation,allowed_count,denied_count,error_count FROM temp.usage_stats_daily_old;
-DROP TABLE temp.usage_stats_daily_old;
+    SELECT id,bucket_start,user_id,agent_id,endpoint_id,selector_id,operation,allowed_count,denied_count,error_count FROM usage_stats_daily_old;
+DROP TABLE usage_stats_daily_old;
 CREATE UNIQUE INDEX usage_daily_tuple ON usage_stats_daily(bucket_start,coalesce(user_id,''),coalesce(agent_id,''),endpoint_id,coalesce(selector_id,''),operation);
 
 CREATE TEMP TABLE usage_recent_events_old AS SELECT id,user_id,agent_id,endpoint_id,selector_id,operation,outcome,occurred_at,retain_until FROM usage_recent_events;
@@ -86,8 +86,8 @@ CREATE TABLE usage_recent_events (
     FOREIGN KEY (selector_id,endpoint_id) REFERENCES container_selectors(id,endpoint_id) ON DELETE RESTRICT
 ) STRICT;
 INSERT INTO usage_recent_events(id,user_id,agent_id,endpoint_id,selector_id,operation,outcome,occurred_at,retain_until)
-    SELECT id,user_id,agent_id,endpoint_id,selector_id,operation,outcome,occurred_at,retain_until FROM temp.usage_recent_events_old;
-DROP TABLE temp.usage_recent_events_old;
+    SELECT id,user_id,agent_id,endpoint_id,selector_id,operation,outcome,occurred_at,retain_until FROM usage_recent_events_old;
+DROP TABLE usage_recent_events_old;
 CREATE INDEX usage_events_retention ON usage_recent_events(retain_until);
 CREATE INDEX usage_events_order ON usage_recent_events(occurred_at);
 
@@ -112,8 +112,8 @@ CREATE TABLE usage_recent_events (
     FOREIGN KEY (selector_id,endpoint_id) REFERENCES container_selectors(id,endpoint_id) ON DELETE RESTRICT
 ) STRICT;
 INSERT INTO usage_recent_events(id,user_id,agent_id,endpoint_id,selector_id,operation,outcome,occurred_at,retain_until)
-    SELECT id,user_id,agent_id,endpoint_id,selector_id,operation,outcome,occurred_at,retain_until FROM temp.usage_recent_events_new;
-DROP TABLE temp.usage_recent_events_new;
+    SELECT id,user_id,agent_id,endpoint_id,selector_id,operation,outcome,occurred_at,retain_until FROM usage_recent_events_new;
+DROP TABLE usage_recent_events_new;
 CREATE INDEX usage_events_retention ON usage_recent_events(retain_until);
 
 CREATE TEMP TABLE usage_stats_daily_new AS SELECT id,bucket_start,user_id,agent_id,endpoint_id,selector_id,operation,allowed_count,denied_count,error_count FROM usage_stats_daily;
@@ -133,8 +133,8 @@ CREATE TABLE usage_stats_daily (
     FOREIGN KEY (selector_id,endpoint_id) REFERENCES container_selectors(id,endpoint_id) ON DELETE RESTRICT
 ) STRICT;
 INSERT INTO usage_stats_daily(id,bucket_start,user_id,agent_id,endpoint_id,selector_id,operation,allowed_count,denied_count,error_count)
-    SELECT id,bucket_start,user_id,agent_id,endpoint_id,selector_id,operation,allowed_count,denied_count,error_count FROM temp.usage_stats_daily_new;
-DROP TABLE temp.usage_stats_daily_new;
+    SELECT id,bucket_start,user_id,agent_id,endpoint_id,selector_id,operation,allowed_count,denied_count,error_count FROM usage_stats_daily_new;
+DROP TABLE usage_stats_daily_new;
 CREATE UNIQUE INDEX usage_daily_tuple ON usage_stats_daily(bucket_start,coalesce(user_id,''),coalesce(agent_id,''),endpoint_id,selector_id,operation);
 
 CREATE TEMP TABLE usage_stats_hourly_new AS SELECT id,bucket_start,user_id,agent_id,endpoint_id,selector_id,operation,allowed_count,denied_count,error_count FROM usage_stats_hourly;
@@ -154,6 +154,6 @@ CREATE TABLE usage_stats_hourly (
     FOREIGN KEY (selector_id,endpoint_id) REFERENCES container_selectors(id,endpoint_id) ON DELETE RESTRICT
 ) STRICT;
 INSERT INTO usage_stats_hourly(id,bucket_start,user_id,agent_id,endpoint_id,selector_id,operation,allowed_count,denied_count,error_count)
-    SELECT id,bucket_start,user_id,agent_id,endpoint_id,selector_id,operation,allowed_count,denied_count,error_count FROM temp.usage_stats_hourly_new;
-DROP TABLE temp.usage_stats_hourly_new;
+    SELECT id,bucket_start,user_id,agent_id,endpoint_id,selector_id,operation,allowed_count,denied_count,error_count FROM usage_stats_hourly_new;
+DROP TABLE usage_stats_hourly_new;
 CREATE UNIQUE INDEX usage_hourly_tuple ON usage_stats_hourly(bucket_start,coalesce(user_id,''),coalesce(agent_id,''),endpoint_id,selector_id,operation);
