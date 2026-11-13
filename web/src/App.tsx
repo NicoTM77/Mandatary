@@ -1,5 +1,8 @@
 import { lazy, Suspense } from 'react';
+import { AgentsContainer } from './containers/AgentsContainer';
 import { LoginContainer } from './containers/LoginContainer';
+import { RecoveryContainer } from './containers/RecoveryContainer';
+import { SecurityContainer } from './containers/SecurityContainer';
 import { SessionHome } from './containers/SessionHome';
 import { SetupContainer } from './containers/SetupContainer';
 import { ThemeProvider } from './theme';
@@ -15,7 +18,7 @@ function galleryView(): string | null {
   return new URLSearchParams(globalThis.location?.search ?? '').get('synthetic');
 }
 
-export type AppRoute = 'home' | 'setup' | 'login' | 'unknown';
+export type AppRoute = 'home' | 'setup' | 'login' | 'security' | 'recovery' | 'agents' | 'unknown';
 
 /**
  * The server serves this shell only at the exact document routes `/`, `/setup` and `/login` (D-ROUTE-1);
@@ -30,6 +33,12 @@ export function routeFor(pathname: string): AppRoute {
       return 'setup';
     case '/login':
       return 'login';
+    case '/security':
+      return 'security';
+    case '/recovery':
+      return 'recovery';
+    case '/agents':
+      return 'agents';
     default:
       return 'unknown';
   }
@@ -43,6 +52,12 @@ function View({ path }: { path: string }) {
       return <LoginContainer />;
     case 'home':
       return <SessionHome />;
+    case 'security':
+      return <SecurityContainer />;
+    case 'recovery':
+      return <RecoveryContainer />;
+    case 'agents':
+      return <AgentsContainer />;
     case 'unknown':
       return (
         <CenteredFrame>

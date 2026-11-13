@@ -181,7 +181,7 @@ function StateGallery() {
               <Specimen flow="F5-e" name="Waiting for key"><WebAuthnRegister state={{ kind: 'waiting' }} {...common} /></Specimen>
               <Specimen flow="F5-f" name="Cancelled or timed out"><WebAuthnRegister state={{ kind: 'rejected', reason: 'webauthn_cancelled' }} {...common} /></Specimen>
               <Specimen flow="F5-g" name="Insecure context"><WebAuthnRegister state={{ kind: 'rejected', reason: 'insecure_context' }} {...common} /></Specimen>
-              <Specimen flow="F5-h" name="Registered"><WebAuthnRegister state={{ kind: 'registered', name: 'Desk key' }} {...common} /></Specimen>
+              <Specimen flow="F5-h" name="Registered"><WebAuthnRegister state={{ kind: 'registered' }} {...common} /></Specimen>
             </Group>
 
             <Group id="g-recovery-codes" title="Recovery codes" slice={2} note="F6">

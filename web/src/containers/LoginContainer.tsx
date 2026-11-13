@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { AccountApi } from '../api/account';
+import { AccountApi, type TotpChoice } from '../api/account';
 import { commonReason } from '../api/http';
+import { getCredential } from '../api/webauthn';
 import type { LoginFactorState, LoginMethod, LoginState } from '../screens/contract';
 import { LoginFactor, LoginPassword } from '../screens/login';
 import { CenteredFrame } from '../ui';
@@ -30,6 +31,7 @@ export function LoginContainer({ api: injected, navigate = defaultNavigate }: { 
   const [password, setPassword] = useState<LoginState>({ kind: 'idle' });
   const [factor, setFactor] = useState<LoginFactorState>({ kind: 'idle' });
   const [next, setNext] = useState<Next>([]);
+  const [totpFactors, setTotpFactors] = useState<readonly TotpChoice[]>([]);
   const [method, setMethod] = useState<LoginMethod>('totp');
   const mounted = useRef(true);
 
@@ -76,6 +78,7 @@ export function LoginContainer({ api: injected, navigate = defaultNavigate }: { 
         return;
       }
       setNext(offered);
+      setTotpFactors(result.data.totpFactors);
       setMethod(offered.includes('totp') ? 'totp' : 'webauthn');
       setFactor({ kind: 'idle' });
       setPassword({ kind: 'idle' });
@@ -89,13 +92,38 @@ export function LoginContainer({ api: injected, navigate = defaultNavigate }: { 
     else setFactor({ kind: 'rejected', reason: commonReason(status) });
   }
 
-  function onTotp({ code }: { code: string }) {
+  function onTotp({ code, authenticatorId }: { code: string; authenticatorId?: string }) {
     setFactor({ kind: 'submitting' });
-    void api.loginTotp(code).then((result) => {
+    void api.loginTotp(code, authenticatorId).then((result) => {
       if (!mounted.current) return;
       if (result.ok) navigate('/');
       else failFactor(result.status, 'denied');
     });
+  }
+
+  /** Security-key sign-in: the server issues the ceremony for THIS preauth and verifies the signed result (UV required). */
+  function onWebAuthn() {
+    setFactor({ kind: 'webauthn_waiting' });
+    void (async () => {
+      const begun = await api.loginKeyBegin();
+      if (!mounted.current) return;
+      if (!begun.ok) {
+        // 404/409: this installation has no security-key service for this page; 401: the capability ended.
+        if (begun.status === 404 || begun.status === 405) setFactor({ kind: 'rejected', reason: 'webauthn_unsupported' });
+        else failFactor(begun.status, 'denied');
+        return;
+      }
+      const key = await getCredential(begun.data.options);
+      if (!mounted.current) return;
+      if (!key.ok) {
+        setFactor({ kind: 'rejected', reason: key.reason === 'insecure_context' ? 'webauthn_unsupported' : key.reason });
+        return;
+      }
+      const finished = await api.loginKeyFinish(begun.data.id, key.response);
+      if (!mounted.current) return;
+      if (finished.ok) navigate('/');
+      else failFactor(finished.status, 'denied');
+    })();
   }
 
   function onPasswordOnly() {
@@ -111,19 +139,19 @@ export function LoginContainer({ api: injected, navigate = defaultNavigate }: { 
     <CenteredFrame>
       <h1 className="sr-only">Sign in to Mandatary</h1>
       {step === 'password' ? (
-        <LoginPassword state={password} onSubmit={onPassword} />
+        <LoginPassword state={password} onSubmit={onPassword} recoveryHref="/recovery" />
       ) : (
         <LoginFactor
           next={next}
           method={method}
           state={factor}
+          totpFactors={totpFactors.map((candidate, index) => ({ id: candidate.id, label: `Authenticator app ${index + 1}` }))}
           onChooseMethod={(chosen) => {
             setMethod(chosen);
             setFactor({ kind: 'idle' });
           }}
           onSubmitTotp={onTotp}
-          // Security-key sign-in is slice 2 and no WebAuthn service is configured in this build.
-          onStartWebAuthn={() => setFactor({ kind: 'rejected', reason: 'webauthn_unsupported' })}
+          onStartWebAuthn={onWebAuthn}
           onContinuePasswordOnly={next.includes('no-mfa') ? onPasswordOnly : undefined}
           onRestart={restart}
         />

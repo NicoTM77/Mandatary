@@ -8,6 +8,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"os"
 	"sync"
 	"time"
@@ -95,13 +96,16 @@ func startSetup(ctx context.Context, logger *slog.Logger, c config.Config, repo 
 	// and factor services, which are built from the notice settings). Without it
 	// nothing is half-mounted: the paths fall through to the static 404/405.
 	if lifecycle != nil {
-		browser, ok := accountBrowser(lifecycle)
+		browser, ok := accountBrowser(lifecycle, c.PublicOrigin)
 		if !ok {
 			return nil, noop, false
 		}
-		for _, path := range auth.AccountPaths() {
+		paths := append(auth.AccountPaths(), auth.SecurityPaths()...)
+		for _, path := range paths {
 			mux.Handle(path, browser)
 		}
+		// The administrative API (P1.10) carries the agent-credential reveal-once routes.
+		mux.Handle(auth.AdminPathPrefix, browser)
 	}
 	background, cancel := context.WithCancel(ctx)
 	var wg sync.WaitGroup
@@ -123,15 +127,40 @@ func startSetup(ctx context.Context, logger *slog.Logger, c config.Config, repo 
 }
 
 // accountBrowser builds the session service and the browser boundary carrying the
-// slice-1 account routes (login, session, logout). WebAuthn is not configured in
-// this build, so no security-key login or enrolment path exists (slice 2).
-func accountBrowser(lifecycle *auth.Lifecycle) (*auth.Browser, bool) {
-	sessions, err := auth.NewSessions(lifecycle, nil, auth.DefaultSessionSettings())
+// account routes (login, session, logout), the account-security routes (step-up,
+// factors, recovery, addresses, notice health) and the administrative API.
+//
+// WebAuthn is derived from the one trusted origin: the relying-party ID is that
+// origin's host and the only allowed origin is the origin itself, never a Host or
+// forwarded header. When that pair is not acceptable to the WebAuthn service (an IP
+// literal, a public suffix) no key route exists at all rather than a weaker one.
+func accountBrowser(lifecycle *auth.Lifecycle, publicOrigin string) (*auth.Browser, bool) {
+	var keys *auth.WebAuthnService
+	if u, err := url.Parse(publicOrigin); err == nil {
+		if service, err := auth.NewWebAuthn(lifecycle, auth.WebAuthnSettings{RPID: u.Hostname(), Origins: []string{publicOrigin}}); err == nil {
+			keys = service
+		}
+	}
+	sessions, err := auth.NewSessions(lifecycle, keys, auth.DefaultSessionSettings())
 	if err != nil {
 		return nil, false
 	}
 	browser := auth.NewBrowser(sessions)
 	if err := auth.RegisterAccountRoutes(browser, sessions); err != nil {
+		return nil, false
+	}
+	if err := auth.RegisterSecurityRoutes(browser, sessions); err != nil {
+		return nil, false
+	}
+	// No authorizer exists in this build to push policy changes to (the executor and
+	// its leases arrive with C3/P1.19), so the change notification is nil: every
+	// revocation is durable and enforced on the next verification.
+	admin, err := auth.NewAdmin(lifecycle, auth.DefaultAdminSettings(), nil)
+	if err != nil {
+		return nil, false
+	}
+	adminHTTP, err := auth.NewAdminHTTP(admin)
+	if err != nil || adminHTTP.Register(browser) != nil {
 		return nil, false
 	}
 	return browser, true

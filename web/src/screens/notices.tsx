@@ -54,7 +54,7 @@ function AddAddressForm({ state, onSubmitAddress, onSubmitProof, onCancelAdd }: 
   );
 }
 
-export function AddressManagement({ addresses, maxAddresses, state, mailConfigured, onStartAdd, onSubmitAddress, onSubmitProof, onCancelAdd, onAskRemove, onCancelRemove, onConfirmRemove }: AddressManagementProps) {
+export function AddressManagement({ addresses, maxAddresses, state, mailConfigured, onStartAdd, onSubmitAddress, onSubmitProof, onCancelAdd, onAskRemove, onCancelRemove, onConfirmRemove, onSendCode }: AddressManagementProps) {
   const confirmed = addresses.filter((row) => row.status === 'confirmed');
   const atLimit = addresses.length >= maxAddresses;
   // The last confirmed address can never be removed: security notices need at least one live destination.
@@ -87,6 +87,11 @@ export function AddressManagement({ addresses, maxAddresses, state, mailConfigur
                     Not confirmed
                   </Badge>
                 )}
+                {row.status === 'unconfirmed' && onSendCode ? (
+                  <Button variant="secondary" disabled={!mailConfigured} onClick={() => onSendCode(row.id)} aria-label={`Send a confirmation code to ${row.address}`}>
+                    Send code
+                  </Button>
+                ) : null}
                 <Button variant="danger" disabled={!removable(row)} onClick={() => onAskRemove(row.id)} aria-label={`Remove ${row.address}`}>
                   Remove
                 </Button>
@@ -160,7 +165,10 @@ export function NoticeHealth({ health, onRetry, retrying = false }: NoticeHealth
           {quarantined > 0 ? <li>{quarantined} held back after an incident</li> : null}
           {pending > 0 ? <li>{pending} still waiting to be sent</li> : null}
         </ul>
-        <p className="mt-1.5">Check the mail relay settings and the addresses above. Retrying re-sends to the same recipients.</p>
+        <p className="mt-1.5">
+          Check the mail relay settings and the addresses above.
+          {onRetry ? ' Retrying re-sends to the same recipients.' : ' These counts are all this page can show: it lists no recipient and offers no retry.'}
+        </p>
       </Alert>
     );
   }

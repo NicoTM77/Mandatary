@@ -135,14 +135,22 @@ export type LoginFactorState =
   /** The 5-minute preauth capability ended. Start again from the password step. */
   | { kind: 'expired' };
 
+/** A usable authenticator app, named for people (never by its identifier). */
+export interface TotpChoiceRow {
+  id: string;
+  label: string;
+}
+
 export interface LoginFactorProps {
   /** Steps the server permitted for THIS login, in server order. Never computed by the UI. */
   next: readonly (LoginMethod | 'no-mfa')[];
   method: LoginMethod;
   state: LoginFactorState;
-  /** Authenticator identifier when the account has several TOTP factors; omitted for one. */
+  /** The account's usable authenticator apps. With more than one the person names which app the code is from. */
+  totpFactors?: readonly TotpChoiceRow[];
   onChooseMethod: (method: LoginMethod) => void;
-  onSubmitTotp: (values: { code: string }) => void;
+  /** `authenticatorId` is present exactly when the person had to choose between several apps. */
+  onSubmitTotp: (values: { code: string; authenticatorId?: string }) => void;
   onStartWebAuthn: () => void;
   /** Offered only when `next` contains 'no-mfa'. Produces a lower-assurance session. */
   onContinuePasswordOnly?: () => void;
@@ -169,8 +177,13 @@ export interface StepUpPanelProps {
   state: StepUpState;
   /** Non-secret; lets password managers associate the password with the right account. */
   username: string;
+  /** The account's usable authenticator apps; with more than one the person names the one the code is from. */
+  totpFactors?: readonly TotpChoiceRow[];
+  /** Every proof the server accepts for this step-up, in server order. With several, the person may switch. */
+  methods?: readonly StepUpMethod[];
+  onChooseMethod?: (method: StepUpMethod) => void;
   onSubmitPassword: (values: { password: string }) => void;
-  onSubmitTotp: (values: { password: string; code: string }) => void;
+  onSubmitTotp: (values: { password: string; code: string; authenticatorId?: string }) => void;
   onStartWebAuthn: () => void;
   onDismiss: () => void;
 }
@@ -196,6 +209,8 @@ export interface SignInMethodsProps {
   keys: readonly SecurityKeyRow[];
   /** Keys are capped (16). */
   maxKeys: number;
+  /** false when the installation has no WebAuthn service (its public origin is not an eligible relying party). Default true. */
+  keysSupported?: boolean;
   /** The row awaiting remove confirmation, if any. */
   confirmingRemoval?: { kind: 'totp' | 'webauthn'; id: string };
   /** Removal in flight. */
@@ -211,11 +226,15 @@ export type WebAuthnRegisterState =
   | { kind: 'idle' }
   | { kind: 'waiting' }
   | { kind: 'rejected'; reason: 'webauthn_cancelled' | 'webauthn_unsupported' | 'insecure_context' | 'limit_reached' | 'denied' | CommonReason }
-  | { kind: 'registered'; name: string };
+  | { kind: 'registered' };
 
+/**
+ * No key name is collected: the server stores none (no schema field exists), and a label that the
+ * page showed once and then lost would only mislead. Keys are listed by when they were added.
+ */
 export interface WebAuthnRegisterProps {
   state: WebAuthnRegisterState;
-  onSubmit: (values: { name: string }) => void;
+  onSubmit: () => void;
 }
 
 // ───────────────────────── Slice 2 · recovery ─────────────────────────
@@ -242,8 +261,12 @@ export interface RecoveryCodesProps {
 export type RestrictedRecoveryState =
   | Phase
   | { kind: 'rejected'; reason: 'denied' | CommonReason }
-  /** Code accepted: a 10-minute capability exists; the replacement authenticator must now be proven. */
-  | { kind: 'capability'; minutesLeft: number; totp: TotpEnrollState }
+  /**
+   * Code accepted: a 10-minute capability exists; a replacement authenticator must now be proven.
+   * `replacementCode` is the ONE replacement saved code, shown exactly once (the container drops it in
+   * `onReplacementHidden`); it is absent when the capability is resumed after a reload.
+   */
+  | { kind: 'capability'; minutesLeft: number; totp: TotpEnrollState; methods?: readonly ('totp' | 'webauthn')[]; key?: WebAuthnRegisterState; replacementCode?: string }
   | { kind: 'completed' };
 
 export interface RestrictedRecoveryProps {
@@ -251,6 +274,9 @@ export interface RestrictedRecoveryProps {
   onSubmit: (values: { username: string; password: string; code: string }) => void;
   onBeginTotp: () => void;
   onConfirmTotp: (code: string) => void;
+  /** Present only when the server offered WebAuthn for this capability. */
+  onRegisterKey?: () => void;
+  onReplacementHidden?: () => void;
   signInHref: string;
 }
 
@@ -280,6 +306,8 @@ export interface AddressManagementProps {
   onAskRemove: (id: string) => void;
   onCancelRemove: () => void;
   onConfirmRemove: () => void;
+  /** Sends (or re-sends) a confirmation code to an address that is not yet confirmed. */
+  onSendCode?: (id: string) => void;
 }
 
 /** Aggregate counts only (auth.NoticeStatus). There is deliberately no recipient or SMTP detail. */

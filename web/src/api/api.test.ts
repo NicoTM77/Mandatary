@@ -122,7 +122,7 @@ test('the account client drops factor steps it does not understand and keeps the
     .route('POST', '/api/v1/login/totp', (request) => requireCsrf(request, SESSION_CSRF, () => json(200, { step: 'session' })));
   const api = new AccountApi(server.fetcher);
   const result = await api.login('someone', 'a password');
-  expect(result).toEqual({ ok: true, status: 200, data: { step: 'factor', next: ['totp', 'webauthn', 'no-mfa'] } });
+  expect(result).toEqual({ ok: true, status: 200, data: { step: 'factor', next: ['totp', 'webauthn', 'no-mfa'], totpFactors: [] } });
   expect(JSON.stringify(result)).not.toContain(SESSION_CSRF);
   expect((await api.loginTotp('123456')).ok).toBe(true);
   expect(server.calls('POST', '/api/v1/login/totp')[0]?.body).toEqual({ code: '123456' });

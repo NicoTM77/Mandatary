@@ -84,9 +84,29 @@ func TestServerMountsAccountRoutesBehindTheBrowserBoundary(t *testing.T) {
 				t.Errorf("document %s: %d", path, ww.Code)
 			}
 		}
-		// WebAuthn login, step-up and recovery are slice 2: no route exists.
-		for _, path := range []string{"/api/v1/login/webauthn", "/api/v1/stepup/password", "/api/v1/recovery"} {
-			if ww := browserPost(h, path, `{}`); !unrouted(ww) {
+		// Slice 2 routes exist behind the same boundary: without a session or capability
+		// every one of them is the boundary's refusal, never an unguarded handler. Paths
+		// that were never registered stay unrouted.
+		for _, path := range []string{"/api/v1/stepup/password", "/api/v1/stepup/totp", "/api/v1/account/totp", "/api/v1/account/totp/confirm", "/api/v1/account/totp/remove", "/api/v1/account/recovery-codes", "/api/v1/account/addresses", "/api/v1/account/addresses/confirm", "/api/v1/account/addresses/remove", "/api/v1/account/webauthn/register/begin", "/api/v1/stepup/webauthn/begin", "/api/v1/login/webauthn/begin", "/api/v1/admin/agents", "/api/v1/admin/agents/a/credentials", "/api/v1/recovery/totp"} {
+			if ww := browserPost(h, path, `{}`); ww.Code != http.StatusUnauthorized && ww.Code != http.StatusForbidden {
+				t.Errorf("%s: %d", path, ww.Code)
+			}
+		}
+		for _, path := range []string{"/api/v1/account/security", "/api/v1/recovery/state", "/api/v1/admin/agents"} {
+			ww := httptest.NewRecorder()
+			sr := httptest.NewRequest(http.MethodGet, "https://mandatary.example.invalid"+path, nil)
+			sr.Host = "mandatary.example.invalid"
+			h.ServeHTTP(ww, sr)
+			if ww.Code != http.StatusUnauthorized {
+				t.Errorf("anonymous GET %s: %d", path, ww.Code)
+			}
+		}
+		// The recovery start is anonymous at the boundary and refuses a bad proof as one outcome.
+		if ww := browserPost(h, "/api/v1/recovery", `{"username":"nobody","password":"x","code":"y"}`); ww.Code != http.StatusForbidden || ww.Header().Get("Set-Cookie") != "" {
+			t.Errorf("recovery start: %d", ww.Code)
+		}
+		for _, path := range []string{"/api/v1/login/webauthn", "/api/v1/account/unknown", "/api/v1/stepup/unknown"} {
+			if ww := browserPost(h, path, `{}`); !unrouted(ww) && ww.Code != http.StatusNotFound {
 				t.Errorf("%s: %d", path, ww.Code)
 			}
 		}

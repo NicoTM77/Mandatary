@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
-	"sort"
 
 	"github.com/NicoTM77/Mandatary/internal/store"
 )
@@ -115,7 +114,13 @@ func (h *accountHTTP) login(w http.ResponseWriter, r *http.Request) {
 	}
 	h.b.SetSessionCookie(w, result.Session)
 	if result.Session.Info.Assurance == AssurancePreauth {
-		writeJSON(w, http.StatusOK, map[string]any{"step": "factor", "next": result.Next, "csrf_token": result.Session.CSRFToken()})
+		// The account's usable TOTP factors (non-secret identifiers) let the page offer
+		// a choice when there are several; with one, the server picks it anyway.
+		factors := []totpRow{}
+		if _, acct, e := h.s.preauthOwner(r.Context(), result.Session.Secret()); e == nil {
+			factors = totpFactorRows(acct)
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"step": "factor", "next": result.Next, "csrf_token": result.Session.CSRFToken(), "totp_factors": factors})
 		return
 	}
 	// An optional-MFA account with no second factor and a long password: a
@@ -133,7 +138,8 @@ func (h *accountHTTP) loginTOTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var body struct {
-		Code string `json:"code"`
+		Code            string `json:"code"`
+		AuthenticatorID string `json:"authenticator_id"`
 	}
 	if !decodeBody(r, &body) {
 		writeJSONError(w, http.StatusBadRequest, "invalid_request")
@@ -150,18 +156,12 @@ func (h *accountHTTP) loginTOTP(w http.ResponseWriter, r *http.Request) {
 		h.fault(w, err, func() { h.b.ClearSessionCookie(w); writeJSONError(w, http.StatusUnauthorized, "unauthenticated") })
 		return
 	}
-	ids := make([]string, 0, len(acct.totp))
-	for id := range acct.totp {
-		if acct.usableTOTP(id) {
-			ids = append(ids, id)
-		}
-	}
-	sort.Strings(ids)
-	if len(ids) != 1 {
+	id, chosen := chooseTOTP(acct, body.AuthenticatorID)
+	if !chosen {
 		writeJSONError(w, http.StatusForbidden, "denied")
 		return
 	}
-	issued, err := h.s.LoginTOTP(r.Context(), secret, ids[0], body.Code, peerIP(r))
+	issued, err := h.s.LoginTOTP(r.Context(), secret, id, body.Code, peerIP(r))
 	body.Code = ""
 	if err != nil {
 		h.fault(w, err, func() { writeJSONError(w, http.StatusForbidden, "denied") })
@@ -210,10 +210,13 @@ func (h *accountHTTP) info(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, http.StatusUnauthorized, "unauthenticated")
 		return
 	}
-	username := ""
+	var acct accountView
 	err := h.s.read(r.Context(), func(q *store.Queries) error {
-		u, e := q.GetUser(r.Context(), session.UserID)
-		username = u.Username
+		c, e := q.GetInstallationControl(r.Context())
+		if e != nil {
+			return e
+		}
+		acct, e = loadAccount(r.Context(), q, c, session.UserID, h.s.l.now().Unix())
 		return e
 	})
 	if err != nil {
@@ -223,7 +226,10 @@ func (h *accountHTTP) info(w http.ResponseWriter, r *http.Request) {
 	stale := h.s.l.now().Sub(session.AuthenticatedAt) > h.s.settings.StepUp
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]any{
-		"username":           username,
+		"username":           acct.user.Username,
+		"administrator":      acct.admin,
+		"step_up_methods":    acct.stepUpMethods(session, h.s.webauthnReady()),
+		"totp_factors":       totpFactorRows(acct),
 		"assurance":          session.Assurance,
 		"methods":            session.Methods,
 		"phishing_resistant": session.PhishingResistant,

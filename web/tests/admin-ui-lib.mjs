@@ -3,6 +3,7 @@ import { Buffer } from 'node:buffer';
 import { createHmac } from 'node:crypto';
 import https from 'node:https';
 import { URL } from 'node:url';
+import { auditAccessibility } from './a11y-audit.mjs';
 
 /* global fetch, document, localStorage, sessionStorage, location */
 
@@ -28,8 +29,44 @@ export function controlBase(value) {
   return url;
 }
 
-const DOCUMENTS = new Set(['/', '/setup', '/login']);
-const API_GET = new Set(['/api/v1/session', '/api/v1/setup/session']);
+const DOCUMENTS = new Set(['/', '/setup', '/login', '/security', '/recovery', '/agents']);
+const API_GET = new Set(['/api/v1/session', '/api/v1/setup/session', '/api/v1/account/security', '/api/v1/recovery/state', '/api/v1/admin/agents']);
+// Account-security, step-up, recovery and agent-credential routes (P1.16.4).
+const API_POST_SECURITY = new Set([
+  '/api/v1/stepup/password',
+  '/api/v1/stepup/totp',
+  '/api/v1/stepup/webauthn/begin',
+  '/api/v1/stepup/webauthn/finish',
+  '/api/v1/login/webauthn/begin',
+  '/api/v1/login/webauthn/finish',
+  '/api/v1/account/totp',
+  '/api/v1/account/totp/confirm',
+  '/api/v1/account/totp/remove',
+  '/api/v1/account/recovery-codes',
+  '/api/v1/account/webauthn/register/begin',
+  '/api/v1/account/webauthn/register/finish',
+  '/api/v1/account/webauthn/remove',
+  '/api/v1/account/addresses',
+  '/api/v1/account/addresses/proof',
+  '/api/v1/account/addresses/confirm',
+  '/api/v1/account/addresses/remove',
+  '/api/v1/recovery',
+  '/api/v1/recovery/totp',
+  '/api/v1/recovery/totp/confirm',
+  '/api/v1/recovery/webauthn/begin',
+  '/api/v1/recovery/webauthn/finish',
+]);
+// Agent credentials: issue, rotate and revoke on a server-issued agent (and credential) identifier.
+const SEGMENT = /^[A-Za-z0-9._-]+$/;
+function allowsAgentPost(pathname) {
+  const parts = pathname.split('/'); // '', api, v1, admin, agents, {agent}, credentials, ...rest
+  if (parts.length < 7 || parts.slice(0, 5).join('/') !== '/api/v1/admin/agents') return false;
+  const [agent, kind, ...rest] = parts.slice(5);
+  if (!SEGMENT.test(agent) || kind !== 'credentials') return false;
+  if (rest.length === 0) return true;
+  if (rest.length === 1) return rest[0] === 'rotate';
+  return rest.length === 2 && SEGMENT.test(rest[0]) && rest[1] === 'revoke';
+}
 const API_POST = new Set([
   '/api/v1/setup/exchange',
   '/api/v1/setup/account',
@@ -49,7 +86,7 @@ export function allowsAppRequest(origin, value, method) {
   const url = new URL(value);
   if (url.origin !== origin.origin || url.username || url.password || url.search || url.hash) return false;
   if (method === 'GET') return DOCUMENTS.has(url.pathname) || API_GET.has(url.pathname) || /^\/assets\/[A-Za-z0-9._-]+$/.test(url.pathname);
-  return method === 'POST' && API_POST.has(url.pathname);
+  return method === 'POST' && (API_POST.has(url.pathname) || API_POST_SECURITY.has(url.pathname) || allowsAgentPost(url.pathname));
 }
 
 // ───────────────────────── control channel (fixture host actions) ─────────────────────────
@@ -74,6 +111,20 @@ export function control(base) {
     policy: (mfa) => call('POST', '/policy', { mfa }),
     /** Whether any of these values appears in the server log. */
     leaked: async (canaries) => (await call('POST', '/check-logs', { canaries })).leaked,
+    /** Whether any of these values rests in the raw database/WAL/shm bytes. */
+    storeLeaked: async (canaries) => (await call('POST', '/check-store', { canaries })).leaked,
+    /** The newest address proof mailed to one recipient. */
+    proofTo: async (to) => (await call('POST', '/proof', { to })).proof,
+    /** Delivers the durable security-notice outbox to the loopback receiver; resolves with the count sent. */
+    dispatch: async () => (await call('POST', '/dispatch')).dispatched,
+    /** Messages held by the loopback receiver and their recipients. */
+    mailbox: () => call('GET', '/mailbox'),
+    /** The administrator role is switched off (the account becomes an ordinary person). */
+    demote: () => call('POST', '/demote'),
+    /** The mail relay disappears: later notices cannot be delivered. */
+    breakMail: () => call('POST', '/break-mail'),
+    /** An agent presents this token to the shared verifier: accepted now? */
+    agentAccepts: async (token) => (await call('POST', '/agent-accepts', { token })).accepted,
   };
 }
 
@@ -176,4 +227,6 @@ export async function scanSurfaces(page, secrets, label) {
   assert.equal(surfaces.local, '{}', `${label}: localStorage written`);
   assert.equal(surfaces.session, '{}', `${label}: sessionStorage written`);
   assert.equal(surfaces.cookie, '', `${label}: a script-readable cookie exists`);
+  // Every scanned page state is also audited for the serious/critical structural accessibility rules.
+  await auditAccessibility(page, label);
 }

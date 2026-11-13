@@ -1,5 +1,5 @@
 import { Alert, Button, CodeField, Icon, Panel, PasswordField, TextField } from '../ui';
-import type { LoginFactorProps, LoginMethod, LoginPasswordProps, StepUpPanelProps } from './contract';
+import type { LoginFactorProps, LoginMethod, LoginPasswordProps, StepUpMethod, StepUpPanelProps, TotpChoiceRow } from './contract';
 import { Command, RejectionAlert, commonRejection, useRequiredForm, type Rejection } from './shared';
 
 // ───────────────────────── password step ─────────────────────────
@@ -89,11 +89,39 @@ function MethodChoice({ methods, method, disabled, onChoose }: { methods: readon
   );
 }
 
-export function LoginFactor({ next, method, state, onChooseMethod, onSubmitTotp, onStartWebAuthn, onContinuePasswordOnly, onRestart }: LoginFactorProps) {
+/**
+ * Several authenticator apps: the person names which one the code is from (the server never guesses).
+ * Native radios inside the form; the first is preselected. Nothing here is a secret.
+ */
+export function AuthenticatorChoice({ factors }: { factors: readonly TotpChoiceRow[] }) {
+  if (factors.length < 2) return null;
+  return (
+    <fieldset className="space-y-1">
+      <legend className="mb-1 text-sm font-medium">Which authenticator app is the code from?</legend>
+      {factors.map((factor, index) => (
+        <label key={factor.id} className="flex min-h-11 cursor-pointer items-center gap-2.5 rounded-control border border-line-strong bg-surface px-3 text-sm has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-focus">
+          <input type="radio" name="authenticator" value={factor.id} defaultChecked={index === 0} className="size-4 accent-accent" />
+          {factor.label}
+        </label>
+      ))}
+    </fieldset>
+  );
+}
+
+function chosenAuthenticator(data: FormData, factors: readonly TotpChoiceRow[]): { authenticatorId?: string } {
+  if (factors.length < 2) return {};
+  const id = String(data.get('authenticator') ?? '');
+  return factors.some((factor) => factor.id === id) ? { authenticatorId: id } : {};
+}
+
+export function LoginFactor({ next, method, state, totpFactors = [], onChooseMethod, onSubmitTotp, onStartWebAuthn, onContinuePasswordOnly, onRestart }: LoginFactorProps) {
   const methods = next.filter((step): step is LoginMethod => step === 'totp' || step === 'webauthn');
   const passwordOnly = next.includes('no-mfa') && onContinuePasswordOnly;
   const busy = state.kind === 'submitting';
-  const form = useRequiredForm([['code', 'the code from your app']], (data) => onSubmitTotp({ code: String(data.get('code')).replace(/[\s-]/g, '') }), { rejected: state.kind === 'rejected', clearOnReject: ['code'] });
+  const form = useRequiredForm([['code', 'the code from your app']], (data) => onSubmitTotp({ code: String(data.get('code')).replace(/[\s-]/g, ''), ...chosenAuthenticator(data, totpFactors) }), {
+    rejected: state.kind === 'rejected',
+    clearOnReject: ['code'],
+  });
 
   if (state.kind === 'expired') {
     return (
@@ -111,6 +139,7 @@ export function LoginFactor({ next, method, state, onChooseMethod, onSubmitTotp,
         <MethodChoice methods={methods} method={method} disabled={busy || state.kind === 'webauthn_waiting'} onChoose={onChooseMethod} />
         {method === 'totp' ? (
           <form {...form.formProps} aria-label="Enter authenticator code" className="space-y-4">
+            <AuthenticatorChoice factors={totpFactors} />
             <CodeField kind="totp" name="code" label="6-digit code" hint="From your authenticator app." error={form.errorFor('code')} required readOnly={busy} />
             <Button type="submit" busy={busy} busyLabel="Verifying…" className="w-full">
               Verify
@@ -167,7 +196,18 @@ function stepUpRejection(reason: 'denied' | 'webauthn_cancelled' | 'rate_limited
  * old session, (2) take the rotated CSRF token from the new session, and (3) NOT replay the blocked
  * request — the person repeats it once the "verified" state shows.
  */
-export function StepUpPanel({ method, actionLabel, state, username, onSubmitPassword, onSubmitTotp, onStartWebAuthn, onDismiss }: StepUpPanelProps) {
+function stepUpMethodLabel(method: StepUpMethod): string {
+  switch (method) {
+    case 'password':
+      return 'Use my password';
+    case 'totp':
+      return 'Use my password and authenticator app';
+    case 'webauthn':
+      return 'Use a security key';
+  }
+}
+
+export function StepUpPanel({ method, actionLabel, state, username, totpFactors = [], methods = [], onChooseMethod, onSubmitPassword, onSubmitTotp, onStartWebAuthn, onDismiss }: StepUpPanelProps) {
   const busy = state.kind === 'submitting';
   const needsCode = method === 'totp';
   const form = useRequiredForm(
@@ -177,9 +217,13 @@ export function StepUpPanel({ method, actionLabel, state, username, onSubmitPass
           ['code', 'the code from your app'],
         ]
       : [['password', 'your password']],
-    (data) => (needsCode ? onSubmitTotp({ password: String(data.get('password')), code: String(data.get('code')).replace(/[\s-]/g, '') }) : onSubmitPassword({ password: String(data.get('password')) })),
+    (data) =>
+      needsCode
+        ? onSubmitTotp({ password: String(data.get('password')), code: String(data.get('code')).replace(/[\s-]/g, ''), ...chosenAuthenticator(data, totpFactors) })
+        : onSubmitPassword({ password: String(data.get('password')) }),
     { rejected: state.kind === 'rejected', clearOnReject: ['password', 'code'], untrimmed: ['password'] },
   );
+  const others = onChooseMethod ? methods.filter((candidate) => candidate !== method) : [];
 
   if (state.kind === 'verified') {
     return (
@@ -224,12 +268,22 @@ export function StepUpPanel({ method, actionLabel, state, username, onSubmitPass
             {/* Lets password managers file the password under the right account. Not a control for people. */}
             <input type="text" name="username" autoComplete="username" defaultValue={username} readOnly tabIndex={-1} aria-hidden="true" className="sr-only" />
             <PasswordField name="password" label="Password" autoComplete="current-password" required error={form.errorFor('password')} readOnly={busy} />
+            {needsCode ? <AuthenticatorChoice factors={totpFactors} /> : null}
             {needsCode ? <CodeField kind="totp" name="code" label="6-digit code" error={form.errorFor('code')} required readOnly={busy} /> : null}
             <Button type="submit" busy={busy} busyLabel="Verifying…">
               Verify
             </Button>
           </form>
         )}
+        {others.length > 0 ? (
+          <div className="flex flex-wrap gap-2" role="group" aria-label="Other ways to verify">
+            {others.map((candidate) => (
+              <Button key={candidate} variant="secondary" onClick={() => onChooseMethod?.(candidate)} disabled={busy || state.kind === 'webauthn_waiting'}>
+                {stepUpMethodLabel(candidate)}
+              </Button>
+            ))}
+          </div>
+        ) : null}
         <Button variant="quiet" onClick={onDismiss}>
           Cancel
         </Button>

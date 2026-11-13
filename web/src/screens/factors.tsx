@@ -23,7 +23,7 @@ function RemoveConfirm({ label, busy, onCancel, onConfirm }: { label: string; bu
   );
 }
 
-export function SignInMethods({ totp, keys, maxKeys, confirmingRemoval, removing = false, onAddTotp, onAddKey, onAskRemove, onCancelRemove, onConfirmRemove }: SignInMethodsProps) {
+export function SignInMethods({ totp, keys, maxKeys, keysSupported = true, confirmingRemoval, removing = false, onAddTotp, onAddKey, onAskRemove, onCancelRemove, onConfirmRemove }: SignInMethodsProps) {
   const prefix = useId();
   const totpHeading = `${prefix}-totp`;
   const keysHeading = `${prefix}-keys`;
@@ -67,11 +67,12 @@ export function SignInMethods({ totp, keys, maxKeys, confirmingRemoval, removing
           <h3 id={keysHeading} className="font-semibold">
             Security keys and passkeys
           </h3>
-          <Button variant="secondary" icon="plus" onClick={onAddKey} disabled={keys.length >= maxKeys}>
+          <Button variant="secondary" icon="plus" onClick={onAddKey} disabled={!keysSupported || keys.length >= maxKeys}>
             Add security key
           </Button>
         </div>
-        {keys.length >= maxKeys ? <p className="mt-2 text-sm text-muted">You’ve reached the limit of {maxKeys} keys. Remove one to add another.</p> : null}
+        {!keysSupported ? <p className="mt-2 text-sm text-muted">Security keys aren’t available on this installation: its public address can’t be used as a security-key identity.</p> : null}
+        {keysSupported && keys.length >= maxKeys ? <p className="mt-2 text-sm text-muted">You’ve reached the limit of {maxKeys} keys. Remove one to add another.</p> : null}
         {keys.length === 0 ? (
           <p className="mt-2 text-sm text-muted">No security keys yet. Keys resist phishing and are the strongest option.</p>
         ) : (
@@ -118,30 +119,28 @@ function registerRejection(reason: 'webauthn_cancelled' | 'webauthn_unsupported'
 
 export function WebAuthnRegister({ state, onSubmit }: WebAuthnRegisterProps) {
   const waiting = state.kind === 'waiting';
-  const form = useRequiredForm([['name', 'a name for this key']], (data) => onSubmit({ name: String(data.get('name')).trim() }), { rejected: state.kind === 'rejected' });
   if (state.kind === 'registered') {
     return (
       <Panel title="Security key added">
-        <Alert tone="success" role="status" title={`“${state.name}” is ready to use`}>
-          We emailed your notification addresses to say a sign-in method was added.
+        <Alert tone="success" role="status" title="Your security key is ready to use">
+          We emailed your notification addresses to say a sign-in method was added. For your security, signing in with it needs your PIN, fingerprint or face.
         </Alert>
       </Panel>
     );
   }
   return (
     <Panel title="Add a security key" description="A hardware key or a passkey that asks for your PIN, fingerprint or face.">
-      <form {...form.formProps} aria-label="Add security key" className="space-y-4">
+      <div className="space-y-4">
         {state.kind === 'rejected' ? <RejectionAlert rejection={registerRejection(state.reason)} active /> : null}
         {waiting ? (
           <Alert tone="info" role="status" title="Waiting for your security key…">
             Follow your browser’s prompt. You have 5 minutes.
           </Alert>
         ) : null}
-        <TextField name="name" label="Name" hint="Helps you tell keys apart later, for example “Desk key” or “Phone”." autoComplete="off" required error={form.errorFor('name')} readOnly={waiting} />
-        <Button type="submit" icon="usb" busy={waiting} busyLabel="Waiting for key…">
+        <Button icon="usb" busy={waiting} busyLabel="Waiting for key…" onClick={onSubmit}>
           Register security key
         </Button>
-      </form>
+      </div>
     </Panel>
   );
 }
@@ -203,7 +202,7 @@ export function RecoveryCodes({ state, onIssue, onAskRegenerate, onCancelRegener
 
 // ───────────────────────── restricted recovery (saved code) ─────────────────────────
 
-export function RestrictedRecovery({ state, onSubmit, onBeginTotp, onConfirmTotp, signInHref }: RestrictedRecoveryProps) {
+export function RestrictedRecovery({ state, onSubmit, onBeginTotp, onConfirmTotp, onRegisterKey, onReplacementHidden, signInHref }: RestrictedRecoveryProps) {
   const busy = state.kind === 'submitting';
   const form = useRequiredForm(
     [
@@ -228,12 +227,22 @@ export function RestrictedRecovery({ state, onSubmit, onBeginTotp, onConfirmTotp
     );
   }
   if (state.kind === 'capability') {
+    const methods = state.methods ?? ['totp'];
     return (
       <div className="space-y-5">
-        <Alert tone="info" role="status" title={`Recovery code accepted · ${state.minutesLeft} minutes left`}>
-          Add a new authenticator app to finish. This does not sign you in; you’ll sign in normally afterwards.
+        <Alert tone="info" role="status" title={`Recovery code accepted · ${state.minutesLeft} ${state.minutesLeft === 1 ? 'minute' : 'minutes'} left`}>
+          Add a new {methods.includes('totp') ? 'authenticator app' : 'security key'} to finish. This does not sign you in; you’ll sign in normally afterwards.
         </Alert>
-        <TotpEnrollment state={state.totp} algorithmLabel="SHA-256" digits={6} periodSeconds={30} onBegin={onBeginTotp} onConfirm={onConfirmTotp} />
+        {state.replacementCode !== undefined ? (
+          <SecretReveal
+            heading="Your replacement recovery code"
+            items={[state.replacementCode]}
+            intro="The code you just used is gone. This one replaces it. Keep it offline, apart from your devices. It works once and is shown only now."
+            acknowledge={{ confirmLabel: 'I have stored this code somewhere safe.', doneLabel: 'Hide the code', onDone: onReplacementHidden ?? (() => undefined) }}
+          />
+        ) : null}
+        {methods.includes('totp') ? <TotpEnrollment state={state.totp} algorithmLabel="SHA-256" digits={6} periodSeconds={30} onBegin={onBeginTotp} onConfirm={onConfirmTotp} /> : null}
+        {methods.includes('webauthn') && onRegisterKey ? <WebAuthnRegister state={state.key ?? { kind: 'idle' }} onSubmit={onRegisterKey} /> : null}
       </div>
     );
   }
