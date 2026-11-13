@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import path from 'node:path';
 import process from 'node:process';
 import { URL } from 'node:url';
-import { chromium } from '@playwright/test';
+import { engineName, launchEngine, viewport } from './engine.mjs';
 import { allowsAppRequest, appOrigin, control, controlBase, rawRequest, scanSurfaces, totpCode } from './admin-ui-lib.mjs';
 
 /* global console, document, ClipboardEvent */
@@ -28,13 +28,13 @@ const LOGIN_USER = 'synthetic-user';
 const LOGIN_PASSWORD = 'a unique synthetic public phrase';
 const WRONG_PASSWORD = 'definitely not the right one';
 
-const browser = await chromium.launch({ args: ['--host-resolver-rules=MAP example.invalid 127.0.0.1', '--no-proxy-server'] });
+const browser = await launchEngine();
 const observed = { blocked: [], console: [], errors: [], requests: [], responses: [] };
 const pending = [];
 const canaries = new Set();
 
 async function newContext() {
-  const context = await browser.newContext({ ignoreHTTPSErrors: true, serviceWorkers: 'block', colorScheme: scheme, viewport: { width: 1280, height: 900 } });
+  const context = await browser.newContext({ ignoreHTTPSErrors: true, serviceWorkers: 'block', colorScheme: scheme, viewport: viewport() });
   await context.route('**/*', (route) => {
     const request = route.request();
     if (allowsAppRequest(origin, request.url(), request.method())) return route.continue();
@@ -57,6 +57,8 @@ async function shot(page, name) {
 const step = (name) => ({ name, scan: (page, secrets) => scanSurfaces(page, [...secrets, ...canaries], name) });
 
 async function theme(page) {
+  // The theme is applied by an effect after the first render: wait for it (a slower engine loses this race), then assert.
+  await page.waitForFunction((expected) => document.documentElement.dataset.theme === expected, scheme, { timeout: 5000 }).catch(() => undefined);
   assert.equal(await page.evaluate(() => document.documentElement.dataset.theme), scheme, 'theme follows the colour scheme');
 }
 
@@ -464,7 +466,11 @@ try {
   else if (scenario === 'setup-replay-expiry') await setupReplayAndExpiry();
   else if (scenario === 'login-flows') await loginFlows();
   else throw new Error(`unknown scenario ${scenario}`);
-  console.log(JSON.stringify({ scenario, scheme, browser: browser.version(), requests: observed.requests.length, blockedEgress: 0, secretsInConsole: 0 }));
+  console.log(JSON.stringify({ scenario, scheme, engine: engineName, browser: browser.version(), requests: observed.requests.length, blockedEgress: 0, secretsInConsole: 0 }));
+} catch (error) {
+  // Print the real failure first: closing the browser makes in-flight header reads reject and would hide it.
+  console.error(error instanceof Error ? error.stack : String(error));
+  process.exitCode = 1;
 } finally {
-  await browser.close();
+  await browser.close().catch(() => undefined);
 }

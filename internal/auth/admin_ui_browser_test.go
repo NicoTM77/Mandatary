@@ -222,25 +222,46 @@ func TestAdminUIBrowser(t *testing.T) {
 		{"setup-replay-expiry", "setup"},
 		{"login-flows", "login"},
 	}
-	for _, scheme := range []string{"light", "dark"} {
-		for _, scenario := range scenarios {
-			t.Run(scenario.name+"/"+scheme, func(t *testing.T) {
-				fixture := startUIFixture(t, scenario.kind)
-				ctx, cancel := context.WithTimeout(t.Context(), 4*time.Minute)
-				defer cancel()
-				script := filepath.Join("..", "..", "web", "tests", "admin-ui-browser.mjs")
-				cmd := exec.CommandContext(ctx, "node", script, scenario.name, scheme, fixture.origin, fixture.control)
-				cmd.Env = os.Environ()
-				output, err := cmd.CombinedOutput()
-				if err != nil {
-					// The script never prints a secret; guard anyway before echoing anything.
-					if secretLookingOutput.Match(output) {
-						t.Fatalf("browser scenario failed and its output looked secret-bearing, so it is not shown: %v", err)
+	for _, engine := range browserEngines(t) {
+		for _, scheme := range []string{"light", "dark"} {
+			for _, scenario := range scenarios {
+				t.Run(engine+"/"+scenario.name+"/"+scheme, func(t *testing.T) {
+					fixture := startUIFixture(t, scenario.kind)
+					ctx, cancel := context.WithTimeout(t.Context(), 4*time.Minute)
+					defer cancel()
+					script := filepath.Join("..", "..", "web", "tests", "admin-ui-browser.mjs")
+					cmd := exec.CommandContext(ctx, "node", script, scenario.name, scheme, fixture.origin, fixture.control)
+					cmd.Env = append(os.Environ(), "MANDATARY_BROWSER_ENGINE="+engine)
+					output, err := cmd.CombinedOutput()
+					if err != nil {
+						// The script never prints a secret; guard anyway before echoing anything.
+						if secretLookingOutput.Match(output) {
+							t.Fatalf("browser scenario failed and its output looked secret-bearing, so it is not shown: %v", err)
+						}
+						t.Fatalf("browser scenario failed: %v\n%s", err, output)
 					}
-					t.Fatalf("browser scenario failed: %v\n%s", err, output)
-				}
-				t.Logf("%s", output)
-			})
+					t.Logf("%s", output)
+				})
+			}
 		}
 	}
+}
+
+// browserEngines lists the Playwright engines to drive: MANDATARY_BROWSER_ENGINES (comma separated, from
+// chromium, firefox, webkit), default chromium. An unknown name fails the test rather than being skipped.
+func browserEngines(t *testing.T) []string {
+	t.Helper()
+	list := os.Getenv("MANDATARY_BROWSER_ENGINES")
+	if list == "" {
+		return []string{"chromium"}
+	}
+	var engines []string
+	for _, engine := range strings.Split(list, ",") {
+		engine = strings.TrimSpace(engine)
+		if engine != "chromium" && engine != "firefox" && engine != "webkit" {
+			t.Fatalf("unknown browser engine %q in MANDATARY_BROWSER_ENGINES", engine)
+		}
+		engines = append(engines, engine)
+	}
+	return engines
 }

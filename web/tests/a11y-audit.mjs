@@ -164,7 +164,8 @@ function collectViolations() {
     const px = parseFloat(style.fontSize);
     const bold = Number(style.fontWeight) >= 700;
     const need = px >= 24 || (bold && px >= 18.66) ? 3 : 4.5;
-    if (ratio < need) add('color-contrast', 'serious', el, `contrast ${ratio.toFixed(2)}:1 < ${need}:1`);
+    const rgb = (c) => `rgb(${Math.round(c.r)},${Math.round(c.g)},${Math.round(c.b)})`;
+    if (ratio < need) add('color-contrast', 'serious', el, `contrast ${ratio.toFixed(2)}:1 < ${need}:1 (text ${rgb(fg)} on ${rgb(bg)}, class "${String(el.className).slice(0, 60)}", ${px}px)`);
   }
   return { violations: out, unverifiableContrast: unverifiable, controls: controls.length };
 }
@@ -200,14 +201,21 @@ async function keyboardWalk(page) {
   const problems = [];
   const reached = new Set();
   const trail = [];
+  // Start from a known place: a focusable anchor before everything else. blur() alone leaves Firefox's
+  // sequential-focus starting point where the previous click or focus was.
   await page.evaluate(() => {
-    if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
+    const anchor = document.createElement('span');
+    anchor.id = '__a11y-anchor';
+    anchor.tabIndex = -1;
+    document.body.insertBefore(anchor, document.body.firstChild);
+    anchor.focus();
+    window.__a11yAnchor = anchor;
   });
   for (let i = 0; i < expected.length + 3; i += 1) {
     await page.keyboard.press('Tab');
     const stop = await page.evaluate(() => {
       const el = document.activeElement;
-      if (!el || el === document.body || el === document.documentElement) return null;
+      if (!el || el === document.body || el === document.documentElement || el === window.__a11yAnchor) return null;
       const style = getComputedStyle(el);
       const outline = style.outlineStyle !== 'none' && parseFloat(style.outlineWidth) > 0;
       const shadow = style.boxShadow !== 'none';
@@ -226,6 +234,8 @@ async function keyboardWalk(page) {
   const states = await page.evaluate(() => window.__a11yWanted.map((el) => (el.isConnected ? (el.disabled ? 'disabled-now' : 'enabled') : 'replaced')));
   await page.evaluate(() => {
     if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
+    window.__a11yAnchor?.remove();
+    delete window.__a11yAnchor;
     delete window.__a11yExpected;
     delete window.__a11yGroups;
     delete window.__a11yWanted;
@@ -244,6 +254,9 @@ export async function auditAccessibility(page, label) {
   // Audit a settled state: no request in flight (aria-busy) and two painted frames since the last change.
   await page.waitForFunction(() => !document.querySelector('[aria-busy="true"]'), undefined, { timeout: 10_000 });
   await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  // Colours are audited at rest: let CSS transitions (the 150 ms colour fades) finish first, so a restored page
+  // is not judged mid-fade. Only finite transitions are awaited; the spinner animation is never waited on.
+  await page.evaluate(() => Promise.all(document.getAnimations().filter((animation) => animation.transitionProperty !== undefined).map((animation) => animation.finished.catch(() => undefined))));
   const { violations, unverifiableContrast, controls } = await page.evaluate(collectViolations);
   const walk = await keyboardWalk(page);
   const all = [...violations, ...walk.problems];

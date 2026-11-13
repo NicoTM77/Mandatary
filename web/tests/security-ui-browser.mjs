@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import path from 'node:path';
 import process from 'node:process';
 import { URL } from 'node:url';
-import { chromium } from '@playwright/test';
+import { engineName, launchEngine, viewport } from './engine.mjs';
 import { _collectViolationsForTest, auditAccessibility } from './a11y-audit.mjs';
 import { allowsAppRequest, appOrigin, control, controlBase, rawRequest, scanSurfaces, totpCode } from './admin-ui-lib.mjs';
 
@@ -29,13 +29,13 @@ const USER = 'synthetic-user';
 const PASSWORD = 'a unique synthetic public phrase';
 const WRONG_PASSWORD = 'definitely not the right one';
 
-const browser = await chromium.launch({ args: ['--host-resolver-rules=MAP example.invalid 127.0.0.1', '--no-proxy-server'] });
+const browser = await launchEngine();
 const observed = { blocked: [], console: [], errors: [], requests: [], responses: [] };
 const pending = [];
 const canaries = new Set();
 
 async function newContext() {
-  const context = await browser.newContext({ ignoreHTTPSErrors: true, serviceWorkers: 'block', colorScheme: scheme, viewport: { width: 1280, height: 900 } });
+  const context = await browser.newContext({ ignoreHTTPSErrors: true, serviceWorkers: 'block', colorScheme: scheme, viewport: viewport() });
   await context.route('**/*', (route) => {
     const request = route.request();
     if (allowsAppRequest(origin, request.url(), request.method())) return route.continue();
@@ -57,9 +57,17 @@ async function shot(page, name) {
 
 const step = (name) => ({ name, scan: (page, secrets) => scanSurfaces(page, [...secrets, ...canaries], name) });
 const field = (page, label) => page.getByLabel(label, { exact: true });
+
+// On a phone-sized viewport the primary navigation is collapsed behind a Menu button (aria-expanded); open it.
+async function openMenu(page) {
+  const menu = page.getByRole('button', { name: 'Menu', exact: true });
+  if ((await menu.isVisible()) && (await menu.getAttribute('aria-expanded')) === 'false') await menu.click();
+}
 const button = (page, name) => page.getByRole('button', { name, exact: true });
 
 async function theme(page) {
+  // The theme is applied by an effect after the first render: wait for it (a slower engine loses this race), then assert.
+  await page.waitForFunction((expected) => document.documentElement.dataset.theme === expected, scheme, { timeout: 5000 }).catch(() => undefined);
   assert.equal(await page.evaluate(() => document.documentElement.dataset.theme), scheme, 'theme follows the colour scheme');
 }
 
@@ -180,6 +188,7 @@ async function securityFlows() {
   await page.getByText('Authenticator app 1', { exact: true }).waitFor();
   await page.getByText('first@example.invalid').waitFor();
   await page.getByText('second@example.invalid').waitFor();
+  await openMenu(page); // a phone-sized viewport collapses the navigation behind the Menu button
   await page.getByRole('link', { name: 'Agents' }).first().waitFor(); // the server said this account administers
   await step('security page').scan(page, [PASSWORD, first.value]);
   await shot(page, 'security');
@@ -284,6 +293,7 @@ async function securityFlows() {
   await shot(page, 'login-app-choice');
 
   // ── agents: reveal-once token, accepted by the shared verifier, revoked
+  await openMenu(page); // a phone-sized viewport collapses the navigation behind the Menu button
   await page.getByRole('link', { name: 'Agents' }).first().click();
   await page.getByRole('heading', { name: 'Agents', level: 1 }).waitFor();
   await page.getByRole('heading', { name: 'Credentials for synthetic-agent' }).waitFor();
@@ -689,7 +699,7 @@ try {
   else if (scenario === 'key-flows') await keyFlows();
   else if (scenario === 'denial-matrix') await denialMatrix();
   else throw new Error(`unknown scenario ${scenario}`);
-  console.log(JSON.stringify({ scenario, scheme, browser: browser.version(), requests: observed.requests.length, blockedEgress: 0, secretsInConsole: 0 }));
+  console.log(JSON.stringify({ scenario, scheme, engine: engineName, browser: browser.version(), requests: observed.requests.length, blockedEgress: 0, secretsInConsole: 0 }));
 } catch (error) {
   // Diagnostics for a failed run: what the page showed and what it asked, never a secret-bearing value
   // (every credential in this suite is synthetic and the server never echoes one).

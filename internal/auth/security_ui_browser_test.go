@@ -222,24 +222,32 @@ func startSecurityUIFixture(t *testing.T) uiFixture {
 
 func TestSecurityUIBrowser(t *testing.T) {
 	scenarios := []string{"a11y-selfcheck", "security-flows", "recovery-flow", "key-flows", "denial-matrix"}
-	for _, scheme := range []string{"light", "dark"} {
-		for _, scenario := range scenarios {
-			t.Run(scenario+"/"+scheme, func(t *testing.T) {
-				fixture := startSecurityUIFixture(t)
-				ctx, cancel := context.WithTimeout(t.Context(), 6*time.Minute)
-				defer cancel()
-				script := filepath.Join("..", "..", "web", "tests", "security-ui-browser.mjs")
-				cmd := exec.CommandContext(ctx, "node", script, scenario, scheme, fixture.origin, fixture.control)
-				cmd.Env = os.Environ()
-				output, err := cmd.CombinedOutput()
-				if err != nil {
-					if secretLookingOutput.Match(output) {
-						t.Fatalf("browser scenario failed and its output looked secret-bearing, so it is not shown: %v", err)
-					}
-					t.Fatalf("browser scenario failed: %v\n%s", err, output)
+	for _, engine := range browserEngines(t) {
+		for _, scheme := range []string{"light", "dark"} {
+			for _, scenario := range scenarios {
+				// Playwright drives a WebAuthn virtual authenticator over CDP only (Chromium). The key
+				// scenario is therefore not enumerated for Firefox/WebKit; it is not skipped silently:
+				// docs/ui/p1.16-gate-integration.md lists it as unverified there.
+				if scenario == "key-flows" && engine != "chromium" {
+					continue
 				}
-				t.Logf("%s", output)
-			})
+				t.Run(engine+"/"+scenario+"/"+scheme, func(t *testing.T) {
+					fixture := startSecurityUIFixture(t)
+					ctx, cancel := context.WithTimeout(t.Context(), 6*time.Minute)
+					defer cancel()
+					script := filepath.Join("..", "..", "web", "tests", "security-ui-browser.mjs")
+					cmd := exec.CommandContext(ctx, "node", script, scenario, scheme, fixture.origin, fixture.control)
+					cmd.Env = append(os.Environ(), "MANDATARY_BROWSER_ENGINE="+engine)
+					output, err := cmd.CombinedOutput()
+					if err != nil {
+						if secretLookingOutput.Match(output) {
+							t.Fatalf("browser scenario failed and its output looked secret-bearing, so it is not shown: %v", err)
+						}
+						t.Fatalf("browser scenario failed: %v\n%s", err, output)
+					}
+					t.Logf("%s", output)
+				})
+			}
 		}
 	}
 }
