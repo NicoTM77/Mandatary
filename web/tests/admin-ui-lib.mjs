@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { Buffer } from 'node:buffer';
 import { createHmac } from 'node:crypto';
 import https from 'node:https';
+import process from 'node:process';
 import { URL } from 'node:url';
 import { auditAccessibility } from './a11y-audit.mjs';
 
@@ -154,6 +155,16 @@ export function totpCode(seed, unixSeconds) {
 
 // ───────────────────────── direct HTTP (a hostile client: any headers, any cookie) ─────────────────────────
 
+// The raw client verifies the fixture server's TLS certificate: it trusts exactly the fixture's own public
+// certificate (handed over by the Go test) and checks it against the name that certificate carries. The Host
+// header and Origin still name the synthetic origin; certificate validation is never switched off.
+const FIXTURE_CERT_NAME = 'example.com'; // a SAN of net/http/httptest's built-in certificate
+function fixtureCA() {
+  const pem = process.env.MANDATARY_FIXTURE_CA_PEM;
+  assert.ok(pem && pem.includes('BEGIN CERTIFICATE'), 'MANDATARY_FIXTURE_CA_PEM (the fixture certificate) is required');
+  return pem;
+}
+
 /**
  * Raw request to the fixture with full control over headers. Defaults mimic a same-origin browser fetch;
  * pass `headers` to break exactly one thing. Returns status, lower-cased headers and the parsed body.
@@ -173,7 +184,7 @@ export function rawRequest(origin, { method, path, body, headers = {}, cookie, c
   if (send !== undefined) merged.set('content-length', String(Buffer.byteLength(send)));
   return new Promise((resolve, reject) => {
     const request = https.request(
-      { host: '127.0.0.1', port: Number(origin.port), method, path, headers: Object.fromEntries(merged), rejectUnauthorized: false, servername: 'example.invalid' },
+      { host: '127.0.0.1', port: Number(origin.port), method, path, headers: Object.fromEntries(merged), ca: fixtureCA(), servername: FIXTURE_CERT_NAME },
       (response) => {
         const chunks = [];
         response.on('data', (chunk) => chunks.push(chunk));

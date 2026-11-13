@@ -116,11 +116,7 @@ func (h *accountHTTP) login(w http.ResponseWriter, r *http.Request) {
 	if result.Session.Info.Assurance == AssurancePreauth {
 		// The account's usable TOTP factors (non-secret identifiers) let the page offer
 		// a choice when there are several; with one, the server picks it anyway.
-		factors := []totpRow{}
-		if _, acct, e := h.s.preauthOwner(r.Context(), result.Session.Secret()); e == nil {
-			factors = totpFactorRows(acct)
-		}
-		writeJSON(w, http.StatusOK, map[string]any{"step": "factor", "next": result.Next, "csrf_token": result.Session.CSRFToken(), "totp_factors": factors})
+		writeJSON(w, http.StatusOK, map[string]any{"step": "factor", "next": result.Next, "csrf_token": result.Session.CSRFToken(), "totp_factors": result.totp})
 		return
 	}
 	// An optional-MFA account with no second factor and a long password: a

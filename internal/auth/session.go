@@ -151,6 +151,10 @@ func (i IssuedSession) CSRFToken() string { return csrfToken(i.secret, i.Info.ID
 type LoginResult struct {
 	Session IssuedSession
 	Next    []string
+	// totp lists the account's usable authenticator apps (random, non-secret record
+	// identifiers) read in the same transaction as the proof, so the login adapter can
+	// offer a choice without presenting the new session's secret to a second lookup.
+	totp []totpRow
 }
 
 // Sessions is the server-authoritative session service. Every assurance, method,

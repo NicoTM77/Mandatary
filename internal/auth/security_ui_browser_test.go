@@ -10,7 +10,6 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -217,7 +216,7 @@ func startSecurityUIFixture(t *testing.T) uiFixture {
 	t.Cleanup(app.Close)
 	ctl := httptest.NewServer(control)
 	t.Cleanup(ctl.Close)
-	return uiFixture{origin: origin, control: ctl.URL}
+	return uiFixture{origin: origin, control: ctl.URL, caPEM: fixtureCA(app)}
 }
 
 func TestSecurityUIBrowser(t *testing.T) {
@@ -237,7 +236,7 @@ func TestSecurityUIBrowser(t *testing.T) {
 					defer cancel()
 					script := filepath.Join("..", "..", "web", "tests", "security-ui-browser.mjs")
 					cmd := exec.CommandContext(ctx, "node", script, scenario, scheme, fixture.origin, fixture.control)
-					cmd.Env = append(os.Environ(), "MANDATARY_BROWSER_ENGINE="+engine)
+					cmd.Env = browserEnv(engine, fixture)
 					output, err := cmd.CombinedOutput()
 					if err != nil {
 						if secretLookingOutput.Match(output) {

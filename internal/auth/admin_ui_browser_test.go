@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"encoding/pem"
 	"fmt"
 	"log/slog"
 	"net"
@@ -51,6 +52,19 @@ func (b *syncBuffer) String() string {
 
 type uiFixture struct {
 	origin, control string
+	// caPEM is the fixture server's own (public) certificate. The scripts' raw HTTPS client trusts exactly
+	// this certificate instead of switching certificate validation off.
+	caPEM string
+}
+
+// fixtureCA returns the public certificate of the started fixture server, PEM encoded.
+func fixtureCA(app *httptest.Server) string {
+	return string(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: app.Certificate().Raw}))
+}
+
+// browserEnv is the environment of one browser script: the engine and the certificate to trust.
+func browserEnv(engine string, fixture uiFixture) []string {
+	return append(os.Environ(), "MANDATARY_BROWSER_ENGINE="+engine, "MANDATARY_FIXTURE_CA_PEM="+fixture.caPEM)
 }
 
 func writeJSONBody(w http.ResponseWriter, v any) {
@@ -195,7 +209,7 @@ func startUIFixture(t *testing.T, kind string) uiFixture {
 	t.Cleanup(app.Close)
 	ctl := httptest.NewServer(control)
 	t.Cleanup(ctl.Close)
-	return uiFixture{origin: origin, control: ctl.URL}
+	return uiFixture{origin: origin, control: ctl.URL, caPEM: fixtureCA(app)}
 }
 
 // mountAccount mounts the account routes exactly as cmd/mandatary does.
@@ -231,7 +245,7 @@ func TestAdminUIBrowser(t *testing.T) {
 					defer cancel()
 					script := filepath.Join("..", "..", "web", "tests", "admin-ui-browser.mjs")
 					cmd := exec.CommandContext(ctx, "node", script, scenario.name, scheme, fixture.origin, fixture.control)
-					cmd.Env = append(os.Environ(), "MANDATARY_BROWSER_ENGINE="+engine)
+					cmd.Env = browserEnv(engine, fixture)
 					output, err := cmd.CombinedOutput()
 					if err != nil {
 						// The script never prints a secret; guard anyway before echoing anything.

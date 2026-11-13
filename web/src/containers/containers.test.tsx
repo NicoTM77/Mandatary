@@ -223,6 +223,28 @@ describe.each(themes)('setup against the adapter contract (%s theme)', (theme) =
     expect((screen.getByLabelText('Username') as HTMLInputElement).value).toBe('first-admin');
   });
 
+  test('the rejected password is already blanked in the commit that first shows the guidance', async () => {
+    const world = setupWorld({ session: 'live' });
+    mountSetup(world, theme);
+    await screen.findByRole('form', { name: 'Create administrator' });
+    type('Username', 'first-admin');
+    type('Password', 'short');
+    type('Email address 1', 'admin@example.invalid');
+    // Observe the DOM at the moment the guidance first appears: a password still sitting in the field then
+    // (cleared only by a later passive effect) is what made the neighbouring test timing-dependent.
+    const seen: string[] = [];
+    const observer = new MutationObserver(() => {
+      if (seen.length === 0 && document.body.textContent?.includes('Use at least 8 characters.')) {
+        seen.push((document.querySelector('input[name="password"]') as HTMLInputElement).value);
+      }
+    });
+    observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+    submit('Create administrator');
+    expect(await screen.findByText('Use at least 8 characters.')).toBeTruthy();
+    observer.disconnect();
+    expect(seen).toEqual(['']);
+  });
+
   test('a session ended by the server (401) shows the expired state and drops a shown seed', async () => {
     const world = setupWorld({ session: 'live' });
     world.state.staged = true;

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { Alert, useAutoFocus } from '../ui';
 
 /** `[inputName, noun phrase used in "Enter …."]` */
@@ -26,7 +26,8 @@ export function useRequiredForm(required: readonly RequiredField[], onValues: (d
   const { rejected = false, clearOnReject = [], untrimmed = [] } = options;
   const clearKey = clearOnReject.join(',');
 
-  useEffect(() => {
+  // A layout effect: the blanking lands in the same commit that shows the rejection, never a paint later.
+  useLayoutEffect(() => {
     if (!rejected || !form.current || clearKey === '') return;
     for (const name of clearKey.split(',')) {
       const control = form.current.elements.namedItem(name);
