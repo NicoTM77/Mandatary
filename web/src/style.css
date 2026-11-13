@@ -148,6 +148,13 @@ p {
   transform: none;
 }
 
+/* The admin header is sticky (64px, up to ~92px when it wraps on a phone). Scrolling a focused control into view otherwise aligns it with
+ * the very top of the viewport, which is underneath that header (seen in WebKit after a failed submit: top -0.5px against a 64px header).
+ * scroll-padding applies to focus scrolling and anchor jumps alike and changes nothing else. */
+html {
+  scroll-padding-top: 6.5rem;
+}
+
 /* Reveal-once secrets are selectable as one unit and never re-flowed. */
 .secret-select {
   user-select: all;

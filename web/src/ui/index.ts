@@ -1,6 +1,9 @@
 export { AdminShell, CenteredFrame, type AccountSummary, type AdminShellProps, type NavItem } from './AdminShell';
 export { Alert, Badge, SyntheticBadge, type AlertProps, type BadgeTone, type Tone } from './Alert';
 export { Button, type ButtonProps, type ButtonVariant } from './Button';
+export { CheckboxField, RadioGroup, SelectField, type CheckboxFieldProps, type RadioGroupProps, type RadioOption, type SelectFieldProps, type SelectGroup, type SelectOption } from './Choice';
+export { ConfirmPanel, type ConfirmPanelProps } from './ConfirmPanel';
+export { Disclosure } from './Disclosure';
 export { EmptyState, type EmptyStateAction, type EmptyStateProps } from './EmptyState';
 export { CodeField, PasswordField, TextField, type CodeFieldProps, type CodeKind, type PasswordFieldProps, type TextFieldProps } from './Field';
 export { AutoFocusContext, useAutoFocus } from './focus';
