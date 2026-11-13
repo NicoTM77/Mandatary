@@ -72,11 +72,15 @@ func (c PrincipalCredentials) LogValue() slog.Value {
 // VerifiedPrincipal contains the trusted server-verified principal identity,
 // achieved assurance, active group memberships, and control generations.
 type VerifiedPrincipal struct {
-	Kind                PrincipalKind
-	UserID              domain.UserID
-	SessionID           SessionID
-	AgentID             domain.AgentID
-	AgentCredentialID   AgentCredentialID
+	Kind              PrincipalKind
+	UserID            domain.UserID
+	SessionID         SessionID
+	AgentID           domain.AgentID
+	AgentCredentialID AgentCredentialID
+	// OwnerUserID is the owning user of a user-owned agent (empty for a group-owned
+	// agent). It is attribution metadata for usage accounting only and never an
+	// implicit permission (TD 3.3).
+	OwnerUserID         domain.UserID
 	AchievedAssurance   int64
 	PhishingResistant   bool
 	ActiveGroups        []domain.GroupID
@@ -419,10 +423,15 @@ func verifyAgentToken(
 		}
 	}
 
+	var ownerUser domain.UserID
+	if agent.OwnerUserID.Valid {
+		ownerUser = domain.UserID(agent.OwnerUserID.String)
+	}
 	return VerifiedPrincipal{
 		Kind:                PrincipalAgent,
 		AgentID:             agentID,
 		AgentCredentialID:   AgentCredentialID(cred.ID),
+		OwnerUserID:         ownerUser,
 		AchievedAssurance:   0,
 		PhishingResistant:   false,
 		ActiveGroups:        activeGroups,

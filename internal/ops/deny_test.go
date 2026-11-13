@@ -10,6 +10,7 @@ import (
 
 	"github.com/NicoTM77/Mandatary/internal/authz"
 	"github.com/NicoTM77/Mandatary/internal/docker"
+	"github.com/NicoTM77/Mandatary/internal/domain"
 	"github.com/NicoTM77/Mandatary/internal/ops"
 )
 
@@ -418,7 +419,8 @@ func TestDenyMatrixCausesZeroOperationalBackendAttemptsForEveryPermissionKey(t *
 // (control), applies the adverse change once, then proves every cell is denied.
 func runDenyCells(t *testing.T, c denyCase, who string, cells []cell) {
 	t.Helper()
-	e := newEnv(t)
+	u := &usageSpy{}
+	e := newEnv(t, withUsage(u))
 	build := func(cl cell) ops.Request {
 		r := req(credsFor(who), "edge-proxy", cl.op)
 		if cl.follow {
@@ -433,6 +435,16 @@ func runDenyCells(t *testing.T, c denyCase, who string, cells []cell) {
 		}
 		if ctl.Logs != nil {
 			_ = ctl.Logs.Close()
+		}
+	}
+	// P1.15: each control is one ALLOWED event...
+	controlEvents := u.all()
+	if len(controlEvents) != len(cells) {
+		t.Fatalf("%s: %d controls accounted %d events", c.id, len(cells), len(controlEvents))
+	}
+	for _, ev := range controlEvents {
+		if ev.Outcome != domain.UsageAllowed {
+			t.Fatalf("%s: a control was accounted %s", c.id, ev.Outcome)
 		}
 	}
 	if c.mutate != nil {
@@ -485,6 +497,22 @@ func runDenyCells(t *testing.T, c denyCase, who string, cells []cell) {
 				t.Fatalf("%s %s: reason %q, want %q", c.id, cl, got, c.reason)
 			}
 		}
+	}
+	// P1.15 for EVERY deny condition of the matrix: a refusal is never accounted as
+	// allowed or error, is at most one denied event per attempt, and input rejected
+	// before authorization, a caller already gone or a failed authentication is never
+	// accounted at all (no verified principal, no decision).
+	refused := u.all()[len(controlEvents):]
+	if len(refused) > len(cells) {
+		t.Fatalf("%s: %d refused attempts accounted %d events", c.id, len(cells), len(refused))
+	}
+	for _, ev := range refused {
+		if ev.Outcome != domain.UsageDenied {
+			t.Fatalf("%s: a refusal was accounted %s", c.id, ev.Outcome)
+		}
+	}
+	if (c.invalid || c.ctxErr || c.status == 401) && len(refused) != 0 {
+		t.Fatalf("%s: %d events accounted for an attempt with no verified principal", c.id, len(refused))
 	}
 	// ACCEPTANCE: zero operational backend attempts across all denied cells.
 	if got := e.spy.operationalCalls()[opBefore:]; len(got) != 0 {

@@ -49,6 +49,9 @@ const (
 type DenialError struct {
 	Base   Error
 	Reason DenialReason
+	// attr is the usage attribution of a denial of a verified principal (see
+	// AttributionOf). It is unexported and never formatted.
+	attr *Attribution
 }
 
 func (e *DenialError) Error() string {

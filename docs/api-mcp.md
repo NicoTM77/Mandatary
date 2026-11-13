@@ -179,4 +179,5 @@ claim.
 | N63B4-SCOPE-MACHINE, N63B4-TOKEN-NOT-PRESENCE, N63B4-SESSION-COOKIE-CSRF (adapter side: no cookie, no CORS, no state-changing GET, Origin refused) | `TestAgentBearerNeverMintsCookiesSessionsOrAssuranceAndHumanCredentialsAreNotAgentCredentials`, `TestBrowserBoundaryNoCookiesNoCORSNoStateChangingGETAndBearerNeverMintsASession`, `TestBrowserBoundaryOriginIsRefusedAndNoCORSIsEverOffered` |
 | N63B4-DOC-FACTOR-INVENTORY, PWD-ROUTE-PARITY, OOB/WALLET/RESTRICTED-UNSUPPORTED, SCOPE-FEDERATION, RECOVERY-NO-SESSION (no human-authentication, factor, recovery, setup, federation or access-request route or tool exists on the machine surface) | `TestAdapterNamespacesExposeNoHumanAuthenticationFactorRecoverySetupFederationOrAccessRequestSurface` |
 | Versioned contract pinned | `TestContractFixtureIsCurrentAndExact` |
+| P1.15 usage accounting is identical over REST and MCP (shared service; see [usage-accounting.md](usage-accounting.md)) | `TestUsageIsAccountedIdenticallyOverRESTAndMCP` |
 | Concurrency under `-race` with racing revocation | `TestConcurrentRequestsOverBothTransportsAndRevocationAreRaceFree` |

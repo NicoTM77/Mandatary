@@ -13,6 +13,7 @@ import (
 
 	"github.com/NicoTM77/Mandatary/internal/api"
 	"github.com/NicoTM77/Mandatary/internal/docker"
+	"github.com/NicoTM77/Mandatary/internal/ops"
 )
 
 // follower is an open REST follow stream (NDJSON).
@@ -164,27 +165,32 @@ func TestFollowStreamEndsOnEveryRevocationOrExpiryCauseOverREST(t *testing.T) {
 		}
 	}
 	causes := []cause{
-		{"token-revoked", "granted", revoke("granted"), true, api.CodeForbidden, ""},
-		{"token-expired", "short", func(e *env) { e.clock.Advance(2 * time.Minute) }, true, api.CodeForbidden, ""},
-		{"agent-disabled", "granted", func(e *env) { e.exec(`UPDATE agents SET state='disabled' WHERE id=?`, e.agents["granted"].agentID) }, true, api.CodeForbidden, ""},
+		{"token-revoked", "granted", revoke("granted"), true, api.CodeForbidden, api.ReasonAuthorizationEnded},
+		{"token-expired", "short", func(e *env) { e.clock.Advance(2 * time.Minute) }, true, api.CodeForbidden, api.ReasonAuthorizationEnded},
+		{"agent-disabled", "granted", func(e *env) { e.exec(`UPDATE agents SET state='disabled' WHERE id=?`, e.agents["granted"].agentID) }, true, api.CodeForbidden, api.ReasonAuthorizationEnded},
 		{"logs-allow-removed", "granted", func(e *env) {
 			e.exec(`UPDATE policies SET state='disabled' WHERE agent_id=? AND operation='container:logs'`, e.agents["granted"].agentID)
-		}, true, api.CodeForbidden, ""},
+		}, true, api.CodeForbidden, api.ReasonAuthorizationEnded},
 		{"explicit-deny-added", "granted", func(e *env) {
 			e.policy("agent_id", e.agents["granted"].agentID, selEdge, "DENY", docker.OpLogs, nil, nil)
-		}, true, api.CodeForbidden, ""},
-		{"restore-quarantine", "granted", func(e *env) { e.exec(`UPDATE installation_control SET restore_quarantined=1 WHERE singleton=1`) }, true, api.CodeForbidden, ""},
+		}, true, api.CodeForbidden, api.ReasonAuthorizationEnded},
+		{"restore-quarantine", "granted", func(e *env) { e.exec(`UPDATE installation_control SET restore_quarantined=1 WHERE singleton=1`) }, true, api.CodeForbidden, api.ReasonAuthorizationEnded},
 		{"credential-generation-bumped-by-restore", "granted", func(e *env) {
 			e.exec(`UPDATE installation_control SET credential_generation=2 WHERE singleton=1`)
-		}, true, api.CodeForbidden, ""},
-		{"safety-proof-lost", "wildcard", func(e *env) { e.mock.SimulateEventDiscontinuity() }, false, api.CodeForbidden, ""},
+		}, true, api.CodeForbidden, api.ReasonAuthorizationEnded},
+		{"safety-proof-lost/backend-ends-stream-first", "wildcard", func(e *env) { e.mock.SimulateEventDiscontinuity() }, false, api.CodeForbidden, api.ReasonSafetyUnverified},
 		// The same revocations detected by the stream's own revalidation tick (no push at all).
-		{"pull/token-revoked", "granted", revoke("granted"), false, api.CodeForbidden, ""},
-		{"pull/token-expired", "short", func(e *env) { e.clock.Advance(2 * time.Minute) }, false, api.CodeForbidden, ""},
+		{"pull/token-revoked", "granted", revoke("granted"), false, api.CodeForbidden, api.ReasonAuthorizationEnded},
+		{"pull/token-expired", "short", func(e *env) { e.clock.Advance(2 * time.Minute) }, false, api.CodeForbidden, api.ReasonAuthorizationEnded},
 	}
 	for _, c := range causes {
 		t.Run(c.name, func(t *testing.T) {
-			e := newEnv(t, func(o *envOptions) { o.interval = 10 * time.Millisecond })
+			interval := 10 * time.Millisecond
+			if c.reason == api.ReasonSafetyUnverified {
+				// Only the transport may end this stream: the revalidation tick can never preempt it.
+				interval = ops.MaxRevalidateInterval
+			}
+			e := newEnv(t, func(o *envOptions) { o.interval = interval })
 			f := openFollow(t, e, e.token(c.agent), followPath)
 			if f.resp.StatusCode != 200 {
 				t.Fatalf("open: %d", f.resp.StatusCode)

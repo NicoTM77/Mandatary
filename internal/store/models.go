@@ -343,7 +343,7 @@ type UsageRecentEvent struct {
 	UserID      sql.NullString
 	AgentID     sql.NullString
 	EndpointID  domain.EndpointID
-	SelectorID  string
+	SelectorID  sql.NullString
 	Operation   string
 	Outcome     string
 	OccurredAt  int64
@@ -356,7 +356,7 @@ type UsageStatsDaily struct {
 	UserID       sql.NullString
 	AgentID      sql.NullString
 	EndpointID   domain.EndpointID
-	SelectorID   string
+	SelectorID   sql.NullString
 	Operation    string
 	AllowedCount int64
 	DeniedCount  int64
@@ -369,7 +369,7 @@ type UsageStatsHourly struct {
 	UserID       sql.NullString
 	AgentID      sql.NullString
 	EndpointID   domain.EndpointID
-	SelectorID   string
+	SelectorID   sql.NullString
 	Operation    string
 	AllowedCount int64
 	DeniedCount  int64

@@ -157,18 +157,19 @@ func (s *spy) Restart(ctx context.Context, t docker.TargetIdentity, o docker.Res
 var _ docker.DockerBackend = (*spy)(nil)
 
 type env struct {
-	t     *testing.T
-	db    *sql.DB
-	repo  *store.Repository
-	clock *fixtures.Clock
-	mock  *docker.MockBackend
-	spy   *spy
-	other *spy
-	az    *authz.Authorizer
-	svc   *ops.Service
-	rest  *api.Handler
-	mcp   *apimcp.Handler
-	srv   *httptest.Server
+	t      *testing.T
+	db     *sql.DB
+	repo   *store.Repository
+	clock  *fixtures.Clock
+	mock   *docker.MockBackend
+	spy    *spy
+	other  *spy
+	az     *authz.Authorizer
+	svc    *ops.Service
+	ledger *store.UsageLedger // nil unless envOptions.usage
+	rest   *api.Handler
+	mcp    *apimcp.Handler
+	srv    *httptest.Server
 
 	agents map[string]agentSpec
 }
@@ -177,6 +178,7 @@ type envOptions struct {
 	interval  time.Duration // stream revalidation interval (pull path); default 1s
 	perStream int
 	streams   int
+	usage     bool // install the persistent usage ledger (P1.15) behind the shared service
 }
 
 var policySeq atomic.Int64
@@ -242,6 +244,13 @@ func newEnv(t *testing.T, opt ...func(*envOptions)) *env {
 	}
 	t.Cleanup(func() { _ = e.az.Close() })
 	scfg := ops.Config{Authorizer: e.az}
+	if o.usage {
+		e.ledger, err = store.NewUsageLedger(repo, store.UsageConfig{Clock: e.clock.Now, DisableAutoPrune: true})
+		if err != nil {
+			t.Fatal(err)
+		}
+		scfg.Usage = e.ledger
+	}
 	if o.interval != 0 {
 		scfg.RevalidateInterval = o.interval
 	}

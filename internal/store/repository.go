@@ -18,7 +18,7 @@ import (
 	sqlite "modernc.org/sqlite"
 )
 
-const currentSchemaVersion = 12
+const currentSchemaVersion = 13
 
 var ErrStorage = errors.New("storage unavailable or unsafe")
 

@@ -5,8 +5,9 @@
 `internal/ops` is the single entry point that REST (`internal/api`), MCP
 (`internal/mcp`) and the later Operations UI call to run a container operation
 (`TD §§1.2, 3.3`). It binds the shared `authz.Authorizer` (P1.11) to the
-`DockerBackend` (P1.12) and owns nothing else: no HTTP/MCP route, no usage
-accounting (P1.15), no UI. `cmd/mandatary` is unchanged and still mounts no API
+`DockerBackend` (P1.12) and owns no HTTP/MCP route and no UI. Persistent usage
+accounting (P1.15) is recorded here, at the single point all callers share: see
+[usage-accounting.md](usage-accounting.md). `cmd/mandatary` is unchanged and still mounts no API
 route; **no caller can reach this service until P1.14 adds adapters.** P1.14 must
 authenticate and map errors on top of `Service.Execute`, never around it.
 
@@ -104,8 +105,9 @@ call's context; an inspect result that completes after that is **withheld**.
   by the authorizer before dispatch.
 * Every one-shot dispatch runs under a deadline derived from the lease: the daemon
   stop timeout plus `StopGrace` (default 15 s) for stop/restart, `OperationTimeout`
-  (default 30 s) otherwise. An already-expired bound dispatches nothing. Logs are
-  exempt: the stream's context is the lease.
+  (default 30 s) otherwise. An already-expired bound dispatches nothing. The Logs
+  open is bounded by `OperationTimeout` too; only the handed-off stream is exempt (its
+  context is the lease).
 * Configuration is validated fail-closed (`RevalidateInterval` 10 ms-30 s default
   1 s, `RevalidateTimeout` default 10 s, `AcquireTimeout` 1 ms-1 min default 10 s,
   `OperationTimeout` up to 10 min, `StopGrace` up to 5 min).
@@ -208,8 +210,9 @@ Other stream properties:
   (revalidation runs detached from caller cancellation; the authorizer cancels
   matching leases only on a real principal-specific failure).
 * A finite (non-follow) stream ends with `io.EOF` and releases its lease and watcher.
-* Not in this task: a cap on concurrent streams per principal and usage accounting
-  (P1.15). Each stream costs one goroutine, one lease and one DB read per interval.
+* Usage accounting counts a stream once, at the open (P1.15,
+  [usage-accounting.md](usage-accounting.md)). Not in this task: a cap on concurrent
+  streams per principal. Each stream costs one goroutine, one lease and one DB read per interval.
 
 ## Requirement-to-test map
 
@@ -239,8 +242,8 @@ Tests run with the container-free mock only. "Fixture IDs" follow the C2 checkpo
 | TD §9.3 redaction (L3 formatting of caller-held credentials) | `TestCredentialsAreNeverFormattedByRequestsResultsStreamsOrErrors` |
 | `Authorizer.BackendFor` binding | `TestBackendForReturnsOnlyTheBackendBoundToAFreshDecision`, `TestBackendForRefusesAfterRebindInvalidationRemovalOrSafetyLoss` (`internal/authz`) |
 
-Real-Docker behavior, REST/MCP transport, usage accounting and live-container
-SELF integration remain with P1.14, P1.15 and P1.19; mock success is not proof of
+Real-Docker behavior and live-container SELF integration remain with P1.19
+(REST/MCP transport is P1.14, usage accounting P1.15); mock success is not proof of
 real-Docker behavior.
 
 ## Carried items

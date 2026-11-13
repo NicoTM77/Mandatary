@@ -357,6 +357,9 @@ func (a *Authorizer) Authorize(ctx context.Context, req AuthorizeRequest) (Decis
 
 	var decision Decision
 	var decisionErr error
+	// attr is set once the principal is verified (never before): it lets the shared
+	// operation service account a denial of an authenticated principal (TD 9.1).
+	var attr *Attribution
 
 	readErr := a.repo.Read(ctx, func(q *store.Queries) error {
 		control, err := q.GetInstallationControl(ctx)
@@ -389,6 +392,9 @@ func (a *Authorizer) Authorize(ctx context.Context, req AuthorizeRequest) (Decis
 			decisionErr = newUnauthenticated(ReasonUnauthenticated)
 			return nil
 		}
+		base := principalAttribution(principal)
+		base.EndpointID, base.Operation = req.EndpointID, req.Operation
+		attr = &base
 
 		// Endpoint DB activation & authority generation check (403).
 		ep, epErr := q.GetEndpoint(ctx, req.EndpointID)
@@ -431,6 +437,7 @@ func (a *Authorizer) Authorize(ctx context.Context, req AuthorizeRequest) (Decis
 			normTimeout,
 		)
 		if evalErr != nil {
+			attr.SelectorID = selectorID // the deciding selector, when one decided
 			decisionErr = evalErr
 			return nil
 		}
@@ -464,18 +471,20 @@ func (a *Authorizer) Authorize(ctx context.Context, req AuthorizeRequest) (Decis
 		return Decision{}, newForbidden(ReasonDefaultDeny)
 	}
 	if decisionErr != nil {
-		return Decision{}, decisionErr
+		return Decision{}, attribute(decisionErr, attr)
 	}
 
 	// Final safety check so concurrent continuity loss during policy evaluation cannot allow.
+	// The principal and selector are known by now, so these denials are attributed too.
+	finalAttr := decision.Attribution()
 	a.mu.RLock()
 	defer a.mu.RUnlock()
 	if ctx.Err() != nil || epoch != a.policyEpoch {
-		return Decision{}, newForbidden(ReasonDecisionStale)
+		return Decision{}, attribute(newForbidden(ReasonDecisionStale), &finalAttr)
 	}
 	currentBackend, ok := a.backends[req.EndpointID]
 	if !ok || currentBackend != backend || !backend.Ready() || backend.VerificationState() != docker.StateVerified {
-		return Decision{}, newForbidden(ReasonSafetyUnverified)
+		return Decision{}, attribute(newForbidden(ReasonSafetyUnverified), &finalAttr)
 	}
 
 	return decision, nil
@@ -511,6 +520,7 @@ func evaluatePolicies(
 
 	var matchedAllow *store.ListEndpointOperationPoliciesWithSelectorsRow
 	sawCapExceeded := false
+	var capSelector domain.SelectorID
 
 	for i := range rows {
 		row := &rows[i]
@@ -602,9 +612,10 @@ func evaluatePolicies(
 			continue
 		}
 
-		// Precedence 3: Explicit DENY overrides all direct and group ALLOWs.
+		// Precedence 3: Explicit DENY overrides all direct and group ALLOWs. The
+		// denying rule's selector is returned with the denial for usage attribution.
 		if row.Effect == "DENY" {
-			return "", "", newForbidden(ReasonExplicitDeny)
+			return "", domain.SelectorID(row.SelectorID), newForbidden(ReasonExplicitDeny)
 		}
 
 		// Precedence 4: Explicit ALLOW must satisfy operation parameter caps.
@@ -613,6 +624,9 @@ func evaluatePolicies(
 				matchedAllow = row
 			}
 		} else {
+			if !sawCapExceeded {
+				capSelector = domain.SelectorID(row.SelectorID)
+			}
 			sawCapExceeded = true
 		}
 	}
@@ -621,7 +635,7 @@ func evaluatePolicies(
 		return PolicyID(matchedAllow.PolicyID), domain.SelectorID(matchedAllow.SelectorID), nil
 	}
 	if sawCapExceeded {
-		return "", "", newForbidden(ReasonParameterCapExceeded)
+		return "", capSelector, newForbidden(ReasonParameterCapExceeded)
 	}
 	return "", "", newForbidden(ReasonDefaultDeny)
 }
