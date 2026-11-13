@@ -1,9 +1,185 @@
 @import 'tailwindcss';
 
-:root { font-family: system-ui, sans-serif; color-scheme: light dark; }
-body { margin: 0; }
-main { min-height: 100vh; padding: 4rem 2rem; box-sizing: border-box; }
-main[data-theme='light'] { background: #f8fafc; color: #0f172a; color-scheme: light; }
-main[data-theme='dark'] { background: #0f172a; color: #f8fafc; color-scheme: dark; }
-button { font: inherit; padding: .6rem 1rem; cursor: pointer; }
-button:focus-visible { outline: 3px solid #0284c7; outline-offset: 4px; }
+/*
+ * Mandatary design tokens (P1.16.1). One semantic vocabulary for both themes:
+ * components use bg-surface / text-fg / border-line-strong ..., never a raw hex and
+ * never a `dark:` prefix, so a screen cannot look right in one theme only.
+ *
+ * The theme is selected by data-theme on <html> (see theme.tsx). Contrast of every
+ * foreground/background pair used by the components is asserted for BOTH themes in
+ * theme-contrast.test.ts, so editing a value here is a reviewed, tested change.
+ *
+ * CSP note: the static handler serves style-src 'self' and font-src falls back to
+ * default-src 'none'. Therefore: no inline style="" attributes, no web fonts and no
+ * data: URIs anywhere in the UI. Icons are inline SVG elements; fonts are system stacks.
+ */
+
+:root,
+[data-theme='light'] {
+  color-scheme: light;
+  --bg: #f2f5f5;
+  --surface: #ffffff;
+  --sunken: #e8eeee;
+  --line: #cbd6d7; /* decorative hairlines only (cards, dividers) */
+  --line-strong: #6b7f81; /* boundaries of controls: >= 3:1 (WCAG 1.4.11) */
+  --fg: #0f1e1f;
+  --muted: #44585a;
+  --subtle: #586c6e;
+  --accent: #0b6e78;
+  --accent-hover: #095a63;
+  --accent-fg: #ffffff;
+  --accent-soft: #dcf0f2;
+  --accent-text: #095a63;
+  --danger: #b42318;
+  --danger-soft: #fdecea;
+  --warn: #7a4a00;
+  --warn-soft: #fff0d1;
+  --success: #17623a;
+  --success-soft: #dff3e6;
+  --focus: #0b6e78;
+  --scrim: rgb(15 30 31 / 0.45);
+  --shadow: 0 1px 2px rgb(15 30 31 / 0.06), 0 6px 20px rgb(15 30 31 / 0.06);
+}
+
+[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #0b1213;
+  --surface: #121c1e;
+  --sunken: #0e1719;
+  --line: #263639;
+  --line-strong: #6a8184;
+  --fg: #e8f0f0;
+  --muted: #a9babc;
+  --subtle: #93a6a8;
+  --accent: #4fc3ce;
+  --accent-hover: #7ad6de;
+  --accent-fg: #041416;
+  --accent-soft: #123a3f;
+  --accent-text: #7ad6de;
+  --danger: #ff9a90;
+  --danger-soft: #3a1714;
+  --warn: #f2b45a;
+  --warn-soft: #3a2a0d;
+  --success: #74d894;
+  --success-soft: #12301d;
+  --focus: #4fc3ce;
+  --scrim: rgb(0 0 0 / 0.6);
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px rgb(0 0 0 / 0.35);
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-sunken: var(--sunken);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-subtle: var(--subtle);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-fg: var(--accent-fg);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-text: var(--accent-text);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-focus: var(--focus);
+  --color-scrim: var(--scrim);
+  --shadow-panel: var(--shadow);
+  --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI Variable Text', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
+  --radius-control: 0.5rem;
+  --radius-panel: 0.875rem;
+}
+
+html {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  font-size: 100%;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--fg);
+  font-size: 0.9375rem; /* 15px body; controls are 16px so iOS never zooms on focus */
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3 {
+  text-wrap: balance;
+}
+
+p {
+  text-wrap: pretty;
+}
+
+/* One visible focus treatment for every interactive element (WCAG 2.4.7 / 2.4.11). */
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* Skip link: first tab stop of the shell, visible only while focused. */
+.skip-link {
+  position: absolute;
+  left: 0.75rem;
+  top: 0.75rem;
+  z-index: 60;
+  transform: translateY(-200%);
+  background: var(--surface);
+  color: var(--fg);
+  padding: 0.5rem 0.875rem;
+  border-radius: var(--radius-control);
+  border: 1px solid var(--line-strong);
+}
+.skip-link:focus {
+  transform: none;
+}
+
+/* Reveal-once secrets are selectable as one unit and never re-flowed. */
+.secret-select {
+  user-select: all;
+  -webkit-user-select: all;
+  word-break: break-all;
+}
+
+@keyframes mdt-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.mdt-spin {
+  animation: mdt-spin 0.8s linear infinite;
+}
+
+/* Reduced motion: no transforms or transitions. Busy state is still conveyed by the visible
+ * "Working…" label next to the (now static) spinner, never by motion alone. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Windows high-contrast / forced colors: keep control boundaries visible. */
+@media (forced-colors: active) {
+  :focus-visible {
+    outline-color: Highlight;
+  }
+}

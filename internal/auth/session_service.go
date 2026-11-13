@@ -494,7 +494,7 @@ func (s *Sessions) PasswordLogin(ctx context.Context, name string, password []by
 			if e != nil {
 				return e
 			}
-			result = LoginResult{Session: issued, Next: next}
+			result = LoginResult{Session: issued, Next: next, totp: totpFactorRows(acct)}
 		default:
 			// MFA is required but no usable second factor exists: deny, do not weaken.
 			return ErrDenied

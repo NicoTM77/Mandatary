@@ -37,6 +37,10 @@ func NewAdminHTTP(a *Admin) (*AdminHTTP, error) {
 
 const adminAPIBase = "/api/v1/admin"
 
+// AdminPathPrefix is the subtree a server mounts to this boundary for the
+// administrative API; the Browser answers 404 for any path it did not register.
+const AdminPathPrefix = adminAPIBase + "/"
+
 // Register mounts the fixed route set. Each pattern carries an explicit policy:
 // reads need a normal session (the service requires the administrator);
 // identity/group/membership changes are class security-policy-change and

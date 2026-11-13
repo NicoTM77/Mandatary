@@ -41,7 +41,7 @@ func TestRuntimeLoggingAndFailureBoundaries(t *testing.T) {
 						s.ErrorLog.Print(canary)
 						log.Print(canary)
 						slog.Error(canary, "error", errors.New(canary))
-						r := httptest.NewRequest(http.MethodGet, "/setup?token="+canary, nil)
+						r := httptest.NewRequest(http.MethodGet, "/setup/exchange?token="+canary, nil)
 						r.Header.Set("Cookie", "session="+canary)
 						w := httptest.NewRecorder()
 						s.Handler.ServeHTTP(w, r)

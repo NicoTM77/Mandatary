@@ -20,6 +20,6 @@ func (l *Lifecycle) sendAddressProof(ctx context.Context, to, proof string) stri
 		return "permanent"
 	}
 	return l.submit(ctx, to, func() string {
-		return fmt.Sprintf("From: %s\r\nTo: %s\r\nSubject: Mandatary address confirmation\r\nMessage-ID: <%s@mandatary.invalid>\r\nContent-Type: text/plain; charset=utf-8\r\n\r\nAddress confirmation code: %s\r\nEnter this code in the Mandatary setup form to confirm that you control this address. It expires shortly and can be used once.\r\nIf you did not request this, ignore this message or contact %s. This message does not authorize any access.\r\nService: %s\r\n", l.notices.Sender, to, id, proof, l.notices.Contact, strings.TrimSuffix(l.notices.Origin, "/"))
+		return fmt.Sprintf("From: %s\r\nTo: %s\r\nSubject: Mandatary address confirmation\r\nMessage-ID: <%s@mandatary.invalid>\r\nContent-Type: text/plain; charset=utf-8\r\n\r\nAddress confirmation code: %s\r\nEnter this code in the Mandatary page that asked for it to confirm that you control this address. It expires shortly and can be used once.\r\nIf you did not request this, ignore this message or contact %s. This message does not authorize any access.\r\nService: %s\r\n", l.notices.Sender, to, id, proof, l.notices.Contact, strings.TrimSuffix(l.notices.Origin, "/"))
 	})
 }

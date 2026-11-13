@@ -7,13 +7,19 @@ product, browser or deployment conformance claim: the approved
 `N63B4-*` row keeps its other owners, and exact-head command results and CI are
 recorded on the original Kanban card / draft PR, not here.
 
-**What is NOT delivered here.** The static development server still mounts no
-login, setup, session, MFA, REST or MCP route (`tests/security` asserts this).
-`Browser` is middleware plus a policy registry; routes are registered only in
-tests. Login/step-up/logout HTTP adapters are P1.16, setup/recovery sessions are
-P1.09, agent bearer adapters are P1.14, own-session visibility UI is Phase 3,
-backup/agent-credential/policy mutations are P1.10/P1.18/P1.17, and trusted TLS
-topology evidence is P1.19/20.
+**What P1.08 itself delivers.** `Browser` is middleware plus a policy registry.
+The P1.08 tests register their own routes; the product mounted none at that point.
+**Update (P1.16.3, local contribution to P1.16, not independently reviewed):**
+`internal/auth/login_http.go` now registers the slice-1 account routes on this
+boundary with explicit policies when the server has a trusted origin and a notice
+relay: `POST /api/v1/login` (`RequireNone`), `POST /api/v1/login/totp` and
+`POST /api/v1/login/no-mfa` (`RequirePreauth`), `GET /api/v1/session` and
+`POST /api/v1/logout` (`RequireSession`). Step-up, security-key login and the
+factor/recovery routes remain slice 2 (P1.16.4) and are not mounted. See
+[the P1.16.3 integration record](ui/p1.16.3-setup-login-integration.md). Setup/recovery
+sessions are P1.09, agent bearer adapters are P1.14, own-session visibility UI is
+Phase 3, backup/agent-credential/policy mutations are P1.10/P1.18/P1.17, and
+trusted TLS topology evidence is P1.19/20.
 
 ## Components (`internal/auth`)
 
