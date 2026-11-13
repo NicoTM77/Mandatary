@@ -35,7 +35,9 @@ export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-export async function send<T = null>(fetcher: Fetcher, method: 'GET' | 'POST', path: string, options: RequestOptions<T> = {}): Promise<ApiResult<T>> {
+export type Method = 'GET' | 'POST' | 'PUT' | 'DELETE';
+
+export async function send<T = null>(fetcher: Fetcher, method: Method, path: string, options: RequestOptions<T> = {}): Promise<ApiResult<T>> {
   const headers: Record<string, string> = { Accept: 'application/json' };
   if (options.csrf) headers['X-CSRF-Token'] = options.csrf;
   let body: string | undefined;

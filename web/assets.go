@@ -27,7 +27,8 @@ const contentSecurityPolicy = "default-src 'none'; script-src 'self'; style-src 
 // is not /assets/<file> is 404. Whether a route does anything is decided by the
 // API behind it (for example the setup API answers 404 when no generation is
 // live); serving the static shell discloses nothing.
-var documentRoutes = map[string]bool{"/": true, "/setup": true, "/login": true, "/security": true, "/recovery": true, "/agents": true}
+var documentRoutes = map[string]bool{"/": true, "/setup": true, "/login": true, "/security": true, "/recovery": true, "/agents": true,
+	"/policy": true, "/policy/users": true, "/policy/groups": true, "/policy/agents": true}
 
 // Handler returns an exact static-file surface with no SPA wildcard or listings.
 func Handler() http.Handler {
@@ -46,7 +47,9 @@ func Handler() http.Handler {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 			return
 		}
-		if documentRoutes[r.URL.Path] {
+		// RawPath is set only when the request spelled the path differently from its canonical encoding (for
+		// example %2f for a slash). With nested document routes such a spelling would otherwise alias one.
+		if documentRoutes[r.URL.Path] && r.URL.RawPath == "" {
 			serveIndex(w, r, files)
 			return
 		}

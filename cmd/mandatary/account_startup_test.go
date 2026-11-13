@@ -87,12 +87,12 @@ func TestServerMountsAccountRoutesBehindTheBrowserBoundary(t *testing.T) {
 		// Slice 2 routes exist behind the same boundary: without a session or capability
 		// every one of them is the boundary's refusal, never an unguarded handler. Paths
 		// that were never registered stay unrouted.
-		for _, path := range []string{"/api/v1/stepup/password", "/api/v1/stepup/totp", "/api/v1/account/totp", "/api/v1/account/totp/confirm", "/api/v1/account/totp/remove", "/api/v1/account/recovery-codes", "/api/v1/account/addresses", "/api/v1/account/addresses/confirm", "/api/v1/account/addresses/remove", "/api/v1/account/webauthn/register/begin", "/api/v1/stepup/webauthn/begin", "/api/v1/login/webauthn/begin", "/api/v1/admin/agents", "/api/v1/admin/agents/a/credentials", "/api/v1/recovery/totp"} {
+		for _, path := range []string{"/api/v1/stepup/password", "/api/v1/stepup/totp", "/api/v1/account/totp", "/api/v1/account/totp/confirm", "/api/v1/account/totp/remove", "/api/v1/account/recovery-codes", "/api/v1/account/addresses", "/api/v1/account/addresses/confirm", "/api/v1/account/addresses/remove", "/api/v1/account/webauthn/register/begin", "/api/v1/stepup/webauthn/begin", "/api/v1/login/webauthn/begin", "/api/v1/admin/agents", "/api/v1/admin/agents/a/credentials", "/api/v1/recovery/totp", "/api/v1/admin/users", "/api/v1/admin/users/u/disable", "/api/v1/admin/groups/g/enable", "/api/v1/admin/agents/a/enable", "/api/v1/admin/policy/rules", "/api/v1/admin/policy/rules/preview", "/api/v1/admin/policy/rules/r/disable"} {
 			if ww := browserPost(h, path, `{}`); ww.Code != http.StatusUnauthorized && ww.Code != http.StatusForbidden {
 				t.Errorf("%s: %d", path, ww.Code)
 			}
 		}
-		for _, path := range []string{"/api/v1/account/security", "/api/v1/recovery/state", "/api/v1/admin/agents"} {
+		for _, path := range []string{"/api/v1/account/security", "/api/v1/recovery/state", "/api/v1/admin/agents", "/api/v1/admin/users", "/api/v1/admin/policy/users", "/api/v1/admin/policy/groups", "/api/v1/admin/policy/agents", "/api/v1/admin/policy/rules"} {
 			ww := httptest.NewRecorder()
 			sr := httptest.NewRequest(http.MethodGet, "https://mandatary.example.invalid"+path, nil)
 			sr.Host = "mandatary.example.invalid"

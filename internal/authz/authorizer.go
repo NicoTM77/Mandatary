@@ -915,6 +915,36 @@ func (a *Authorizer) ActiveLeaseCount() int {
 	return n
 }
 
+// ListEndpointContainers returns the endpoint's currently extant containers exactly as the evaluator can see
+// them: the backend never lists Mandatary itself or any peer, so neither can appear (SELF-04, SELF-08). It
+// is a read-only view for policy administration (the rule editor's inventory and preview); it grants
+// nothing and requires the same proof of self-identity that every operation does. A missing, closed or
+// UNVERIFIED backend fails closed with ReasonSafetyUnverified.
+func (a *Authorizer) ListEndpointContainers(ctx context.Context, endpointID domain.EndpointID) ([]docker.ContainerSummary, error) {
+	if _, err := domain.ParseEndpointID(string(endpointID)); err != nil {
+		return nil, newForbidden(ReasonEndpointInactive)
+	}
+	backend, ok := a.getBackend(endpointID)
+	if !ok || backend == nil || !backend.Ready() || backend.VerificationState() != docker.StateVerified {
+		return nil, newForbidden(ReasonSafetyUnverified)
+	}
+	containers, err := backend.ListContainers(ctx)
+	if err != nil {
+		if errors.Is(err, docker.ErrUnverified) {
+			return nil, newForbidden(ReasonSafetyUnverified)
+		}
+		return nil, newForbidden(ReasonDefaultDeny)
+	}
+	visible := make([]docker.ContainerSummary, 0, len(containers))
+	for _, c := range containers {
+		if docker.HasProtectedNamespaceLabel(c.Labels) {
+			continue // defence in depth: a backend that listed one must still not expose it
+		}
+		visible = append(visible, c)
+	}
+	return visible, nil
+}
+
 // InspectEndpointPolicyTargets evaluates all stored policies on endpointID against
 // the endpoint's currently extant non-protected containers so deleted targets remain
 // visible as TargetMissing ("Inactive / Target Missing") rather than vanishing (TD §7.2).

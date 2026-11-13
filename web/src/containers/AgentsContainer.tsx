@@ -58,7 +58,9 @@ function AgentsPage({ api, view, navigate, refresh }: SignedInContext) {
     void agentsApi.list().then((result) => {
       if (result.ok) {
         setLoad({ kind: 'ready', agents: result.data });
-        setSelected((current) => (result.data.some((agent) => agent.id === current) ? current : (result.data[0]?.id ?? '')));
+        // `#agent=<id>` (from Policy > Agents; a fragment, so it is never sent to the server or logged) preselects one; an id that is not in the list is ignored, never trusted.
+        const requested = new URLSearchParams((globalThis.location?.hash ?? '').replace(/^#/, '')).get('agent') ?? '';
+        setSelected((current) => (result.data.some((agent) => agent.id === current) ? current : result.data.some((agent) => agent.id === requested) ? requested : (result.data[0]?.id ?? '')));
       } else if (result.status === 401) navigate('/login');
       else if (result.status === 403) setLoad({ kind: 'forbidden' });
       else setLoad({ kind: 'failed' });

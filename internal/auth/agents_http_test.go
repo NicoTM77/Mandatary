@@ -135,6 +135,25 @@ func TestAdministrativeRouteInventoryIsExactAndExplicit(t *testing.T) { // defau
 		"POST " + adminBase + "/agents/{agent}/credentials":                     {Require: RequireSession, Sensitive: OpAgentAccessChange},
 		"POST " + adminBase + "/agents/{agent}/credentials/rotate":              {Require: RequireSession, Sensitive: OpAgentAccessChange},
 		"POST " + adminBase + "/agents/{agent}/credentials/{credential}/revoke": {Require: RequireSession, Sensitive: OpAgentAccessChange},
+		// P1.17: page-shaped reads (session), a body-carrying preview that writes nothing (session), and every
+		// mutation at class security-policy-change. No route deletes a user or an agent and none names a role.
+		"GET " + adminBase + "/policy/users":                 {Require: RequireSession},
+		"GET " + adminBase + "/policy/groups":                {Require: RequireSession},
+		"GET " + adminBase + "/policy/agents":                {Require: RequireSession},
+		"GET " + adminBase + "/policy/rules":                 {Require: RequireSession},
+		"POST " + adminBase + "/policy/rules/preview":        {Require: RequireSession},
+		"POST " + adminBase + "/policy/rules":                {Require: RequireSession, Sensitive: OpSecurityPolicy},
+		"PUT " + adminBase + "/policy/rules/{rule}":          {Require: RequireSession, Sensitive: OpSecurityPolicy},
+		"POST " + adminBase + "/policy/rules/{rule}/enable":  {Require: RequireSession, Sensitive: OpSecurityPolicy},
+		"POST " + adminBase + "/policy/rules/{rule}/disable": {Require: RequireSession, Sensitive: OpSecurityPolicy},
+		"DELETE " + adminBase + "/policy/rules/{rule}":       {Require: RequireSession, Sensitive: OpSecurityPolicy},
+		"POST " + adminBase + "/users/{user}/disable":        {Require: RequireSession, Sensitive: OpSecurityPolicy},
+		"POST " + adminBase + "/users/{user}/enable":         {Require: RequireSession, Sensitive: OpSecurityPolicy},
+		"POST " + adminBase + "/groups/{group}/disable":      {Require: RequireSession, Sensitive: OpSecurityPolicy},
+		"POST " + adminBase + "/groups/{group}/enable":       {Require: RequireSession, Sensitive: OpSecurityPolicy},
+		"DELETE " + adminBase + "/groups/{group}":            {Require: RequireSession, Sensitive: OpSecurityPolicy},
+		"POST " + adminBase + "/agents/{agent}/enable":       {Require: RequireSession, Sensitive: OpSecurityPolicy},
+		"PUT " + adminBase + "/agents/{agent}/owner":         {Require: RequireSession, Sensitive: OpSecurityPolicy},
 	}
 	got := map[string]RoutePolicy{}
 	for _, r := range h.b.Routes() {
@@ -166,13 +185,19 @@ func TestAdministrativeRouteInventoryIsExactAndExplicit(t *testing.T) { // defau
 		{method: http.MethodGet, path: adminBase + "/agents/"}, {method: http.MethodPost, path: adminBase + "/agents/x/credentials/"},
 		{method: http.MethodPost, path: adminBase + "//agents", body: `{}`}, {method: http.MethodPost, path: strings.ToUpper(adminBase) + "/AGENTS", body: `{}`},
 		{method: http.MethodPost, path: adminBase + "/agents/%2e%2e/credentials", body: `{}`},
+		// P1.17: nothing deletes an account or an agent, nothing reads one rule, nothing names a role.
+		{method: http.MethodDelete, path: adminBase + "/users/x"}, {method: http.MethodDelete, path: adminBase + "/agents/x"},
+		{method: http.MethodPatch, path: adminBase + "/policy/rules/x", body: `{}`}, {method: http.MethodGet, path: adminBase + "/policy/rules/x"},
+		{method: http.MethodPost, path: adminBase + "/policy/roles", body: `{}`}, {method: http.MethodPost, path: adminBase + "/policy/rules/x/preview", body: `{}`},
+		{method: http.MethodPut, path: adminBase + "/users/x/owner", body: `{}`}, {method: http.MethodGet, path: adminBase + "/policy"},
+		{method: http.MethodPost, path: adminBase + "/policy/rules/", body: `{}`}, {method: http.MethodPost, path: adminBase + "/policy//rules", body: `{}`},
 	} {
 		if w := h.do(q); w.Code != http.StatusNotFound && w.Code != http.StatusMethodNotAllowed && w.Code != http.StatusMovedPermanently && w.Code != http.StatusTemporaryRedirect && w.Code != http.StatusPermanentRedirect {
 			t.Errorf("%s %s reached a handler: %d", q.method, q.path, w.Code)
 		}
 	}
-	if len(h.b.Routes()) != 12 {
-		t.Fatalf("expected 12 routes, got %d", len(h.b.Routes()))
+	if len(h.b.Routes()) != 29 {
+		t.Fatalf("expected 29 routes, got %d", len(h.b.Routes()))
 	}
 }
 
