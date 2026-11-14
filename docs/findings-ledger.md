@@ -13,14 +13,14 @@ Every row has exactly one status:
 
 Source references keep the original card, comment, run and report identifiers (`/opt/data/scratch/...` report paths are historical audit sources, not repository files). Test results for this card are in the PR evidence at the exact head; this document makes no claim that a test passed.
 
-Counts: already_resolved 56, bounded_limitation 45, fixed_here 37, future_gate 21 (total 159).
+Counts: already_resolved 56, bounded_limitation 45, fixed_here 38, future_gate 21 (total 160).
 
 ## Excluded from scope
 
 * `t_3064b26e` — Explicitly excluded by Nico (P1.18.4 comment 224): closed unmerged PR 7 and its archived standalone maintenance proposal, including its historical unfinished F2 checks and monitor/performance work. Not reviewed, revived, imported or added to C4. The exclusion is not a waiver for current code.
 
 
-## Fixed in P1.18.4 (37)
+## Fixed in P1.18.4 (38)
 
 ### P111-L1-direct-api-contract — Direct Authorizer notification with an ended internal bound still fail-closes leases; docs overstate no-op guarantee
 
@@ -284,6 +284,13 @@ Counts: already_resolved 56, bounded_limitation 45, fixed_here 37, future_gate 2
 * Documentation: `docs/agent-credentials.md`, `docs/backup-restore.md`
 * Red evidence: Covered with the FC4-1 membership detail tests.
 
+### P116-R2-preauth-display-timer-test-race — Login preauth display-timer test advanced the fake clock before the timer existed: order- and load-dependent, failed on hosted Baseline Go 1.26.11 at 96cac6d (dark theme)
+
+* Source: P1.16.3; Hosted run 43629479329 job 132552688687 at 96cac6d (a documentation-only delta from the green 06a83b3); found while closing the P1.18.4 round-2 review, not from an earlier card report
+* Fix (9ea276a): The LoginContainer arms its five-minute display timer in a passive effect that runs after the factor form is committed, and the test advanced the fake clock as soon as the form was found, so it could run before the timer existed. The test now flushes pending effects (await act(async () => {})) before advancing the clock. Product code is unchanged and the assertion (the page shows the timed-out state at five minutes and one second) is not weakened.
+* Regression evidence: `web/src/containers/containers.test.tsx::the five-minute preauth window also ends on this page, as a display only`
+* Red evidence: Before the change `vitest run src/containers/containers.test.tsx -t "five-minute preauth window"` failed 2 of 2 (light and dark) in six consecutive local runs, and one hosted run failed the same assertion; after it, 2 of 2 pass in three consecutive isolated runs and the whole file passes 67 of 67 (local runs, not CI).
+
 ### AUTH-CI-BUDGET — Baseline jobs had timeout-minutes 30 while the arm64 package budget was already 45
 
 * Source: P1.09/P1.10; P1.09 #190 L8; P1.10 #192 owner item
@@ -482,7 +489,7 @@ Every original card is listed. `rows` are the ledger rows whose source is that c
 | C4 — Manage and recover authority | `t_1bb7a4c3` | ops | yes | 1 | 1 | `C4-O2-post-ceremony-proof`, `C4-O4-push-mutant-masked`, `C4-restore04-temporary-grants`, `C4-restore07-no-external-ledger`, `FC4-1`, `GATE-PRODUCTION-PACKAGING`, `OPS-P119-composition`, `OPS-WebKit-select-CSP`, `OPS-no-conformance-and-future-bounds`, `OPS-production-restart-runtime` |
 | P1.16.1 — Authentication UX contract and presentational baseline | `t_951f91cd` | ops | yes | 0 | 1 | `OPS-A11Y-no-conformance`, `OPS-O1-arm64-budget`, `OPS-SUP04-real-matrix`, `P116-I1-singular-codes`, `P116-L1-mobile-focus`, `P116-L2-expired-recovery-copy`, `P116-L3-notice-least-privilege`, `P116-L4-unverifiable-contrast`, `P116-L5-address-storage-fault`, `P116-L6-postcommit-recovery-view`, `P116-O4-TOTP-provisioning` |
 | P1.16.2 — Bounded non-secret UI primitives and presentational tests | `t_1ed3ed83` | ops | yes | 0 | 1 | `OPS-A11Y-no-conformance`, `OPS-O1-arm64-budget`, `OPS-SUP04-real-matrix`, `P116-I1-singular-codes`, `P116-L1-mobile-focus`, `P116-L2-expired-recovery-copy`, `P116-L3-notice-least-privilege`, `P116-L4-unverifiable-contrast`, `P116-L5-address-storage-fault`, `P116-L6-postcommit-recovery-view`, `P116-O4-TOTP-provisioning` |
-| P1.16.3 — Setup and login integration — slice 1 | `t_e8d6fdb5` | ops | yes | 0 | 1 | `OPS-A11Y-no-conformance`, `OPS-O1-arm64-budget`, `OPS-SUP04-real-matrix`, `P116-I1-singular-codes`, `P116-L1-mobile-focus`, `P116-L2-expired-recovery-copy`, `P116-L3-notice-least-privilege`, `P116-L4-unverifiable-contrast`, `P116-L5-address-storage-fault`, `P116-L6-postcommit-recovery-view`, `P116-O4-TOTP-provisioning` |
+| P1.16.3 — Setup and login integration — slice 1 | `t_e8d6fdb5` | ops | yes | 0 | 1 | `OPS-A11Y-no-conformance`, `OPS-O1-arm64-budget`, `OPS-SUP04-real-matrix`, `P116-I1-singular-codes`, `P116-L1-mobile-focus`, `P116-L2-expired-recovery-copy`, `P116-L3-notice-least-privilege`, `P116-L4-unverifiable-contrast`, `P116-L5-address-storage-fault`, `P116-L6-postcommit-recovery-view`, `P116-O4-TOTP-provisioning`, `P116-R2-preauth-display-timer-test-race` |
 | P1.16.4 — Account-security integration — slice 2 | `t_3ab2f0ae` | ops | yes | 0 | 8 | `OPS-A11Y-no-conformance`, `OPS-O1-arm64-budget`, `OPS-SUP04-real-matrix`, `P116-I1-singular-codes`, `P116-L1-mobile-focus`, `P116-L2-expired-recovery-copy`, `P116-L3-notice-least-privilege`, `P116-L4-unverifiable-contrast`, `P116-L5-address-storage-fault`, `P116-L6-postcommit-recovery-view`, `P116-O4-TOTP-provisioning` |
 | P1.17.1 — Management screens and policy-editing interaction contract | `t_bb9cfd69` | ops | yes | 0 | 1 | `P117-F1-detached-inventory`, `P117-L1-inventory-deadline`, `P117-accepted-ui-decisions`, `P117-note-encoded-route-guard`, `P117-note-generation-guards`, `P117-note-large-list-effective-access`, `P117-note-nav-and-route-integration`, `P117-note-no-endpoint-enable`, `P117-note-no-undisable-user`, `P117-note-rule-link`, `P117-note-structural-audit-preconditioning` |
 | P1.17.2 — Authorized management integration and A/B denial evidence | `t_334fc695` | ops | yes | 0 | 1 | `P117-F1-detached-inventory`, `P117-L1-inventory-deadline`, `P117-accepted-ui-decisions`, `P117-note-encoded-route-guard`, `P117-note-generation-guards`, `P117-note-large-list-effective-access`, `P117-note-nav-and-route-integration`, `P117-note-no-endpoint-enable`, `P117-note-no-undisable-user`, `P117-note-rule-link`, `P117-note-structural-audit-preconditioning` |

@@ -9,7 +9,7 @@
  },
  "status_counts": {
   "already_resolved": 56,
-  "fixed_here": 37,
+  "fixed_here": 38,
   "bounded_limitation": 45,
   "future_gate": 21
  },
@@ -2471,6 +2471,26 @@
    "commit": "680d1f3"
   },
   {
+   "id": "P116-R2-preauth-display-timer-test-race",
+   "group": "auth",
+   "source_card": "P1.16.3",
+   "status": "fixed_here",
+   "title": "Login preauth display-timer test advanced the fake clock before the timer existed: order- and load-dependent, failed on hosted Baseline Go 1.26.11 at 96cac6d (dark theme)",
+   "source_refs": [
+    "Hosted run 43629479329 job 132552688687 at 96cac6d (a documentation-only delta from the green 06a83b3); found while closing the P1.18.4 round-2 review, not from an earlier card report"
+   ],
+   "disposition": "The LoginContainer arms its five-minute display timer in a passive effect that runs after the factor form is committed, and the test advanced the fake clock as soon as the form was found, so it could run before the timer existed. The test now flushes pending effects (await act(async () => {})) before advancing the clock. Product code is unchanged and the assertion (the page shows the timed-out state at five minutes and one second) is not weakened.",
+   "tests": [
+    "web/src/containers/containers.test.tsx::the five-minute preauth window also ends on this page, as a display only"
+   ],
+   "docs": [],
+   "files": [
+    "web/src/containers/containers.test.tsx"
+   ],
+   "red": "Before the change `vitest run src/containers/containers.test.tsx -t \"five-minute preauth window\"` failed 2 of 2 (light and dark) in six consecutive local runs, and one hosted run failed the same assertion; after it, 2 of 2 pass in three consecutive isolated runs and the whole file passes 67 of 67 (local runs, not CI).",
+   "commit": "9ea276a"
+  },
+  {
    "id": "AUTH-CI-BUDGET",
    "group": "ci",
    "source_card": "P1.09/P1.10",
@@ -3724,7 +3744,8 @@
     "P116-L4-unverifiable-contrast",
     "P116-L5-address-storage-fault",
     "P116-L6-postcommit-recovery-view",
-    "P116-O4-TOTP-provisioning"
+    "P116-O4-TOTP-provisioning",
+    "P116-R2-preauth-display-timer-test-race"
    ]
   },
   {
