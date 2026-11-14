@@ -217,6 +217,13 @@ export interface SignInMethodsProps {
   confirmingRemoval?: { kind: 'totp' | 'webauthn'; id: string };
   /** Removal in flight. */
   removing?: boolean;
+  /** Unused saved recovery codes (a count; the inventory never shows a code). Used only to say what a last-factor removal leaves. Default 0. */
+  recoveryRemaining?: number;
+  /**
+   * Where the inventory behind the confirmation stands (AUTH-08-L4). `checking`: it is being re-read right now, so the confirmation cannot be used yet.
+   * `fresh`: it was re-read when the removal was asked for. `failed`: it could not be re-read, so the page assumes the worst. Default `fresh`.
+   */
+  removalCheck?: 'checking' | 'fresh' | 'failed';
   onAddTotp: () => void;
   onAddKey: () => void;
   onAskRemove: (kind: 'totp' | 'webauthn', id: string) => void;
