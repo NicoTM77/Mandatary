@@ -2,6 +2,7 @@ package auth
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"io"
 	"log/slog"
@@ -231,11 +232,12 @@ func TestSessionCookieAttributes(t *testing.T) { // S05 / N63B4-SESSION-COOKIE-C
 	if len(value) != 43 || strings.ContainsAny(value, "+/=") {
 		t.Fatalf("cookie value is not unpadded base64url of 32 bytes: %q", value)
 	}
-	// No identifier, role, assurance, PII or timestamp is readable from the cookie.
-	for _, leaked := range []string{"synthetic-user", "aal", "assurance", "admin", "preauth"} {
-		if strings.Contains(strings.ToLower(value), leaked) {
-			t.Fatal("cookie leaks state:", leaked)
-		}
+	// The cookie is the opaque encoding of exactly 32 secret bytes and nothing else. Guessing state-like substrings inside a uniformly random
+	// base64url value is NOT a metadata-leak proof (a random 43-character value contains "aal" or "admin" by chance now and then: P1.18.4
+	// P118-note-cookie-substring-flake), so the assertion is structural: canonical strict encoding that round-trips byte for byte.
+	decoded, err := base64.RawURLEncoding.Strict().DecodeString(value)
+	if err != nil || len(decoded) != sessionSecretBytes || base64.RawURLEncoding.EncodeToString(decoded) != value {
+		t.Fatalf("cookie value is not the canonical encoding of %d secret bytes: %q (%v)", sessionSecretBytes, value, err)
 	}
 	clear := httptest.NewRecorder()
 	h.b.ClearSessionCookie(clear)
@@ -989,5 +991,58 @@ func TestUnsafeRequestBodiesAreBounded(t *testing.T) { // bounded input before p
 	h.do(httpReq{method: "POST", path: "/t/bounded", cookie: set.fresh.cookie, csrf: set.fresh.csrf, body: `{"x":"ok"}`})
 	if observed != nil {
 		t.Fatal("small body rejected", observed)
+	}
+}
+
+// P1.18.4 P118-note-cookie-substring-flake: deterministic evidence that the cookie constructor serializes ONLY the secret bytes. The inputs
+// are synthetic secrets whose bytes deliberately spell state-like words; the output must still be exactly their base64url encoding (no
+// prefix, suffix, delimiter or structured claim), decode back to the same bytes, and be accepted by the parser only in that exact shape. A
+// cookie carrying structured claims ("aal2.<secret>", "<user>:<secret>") is refused whatever its content. No production token is logged,
+// no entropy is reduced and the cookie format is unchanged.
+func TestSessionCookieConstructorSerializesOnlyTheSecretBytes(t *testing.T) {
+	t.Parallel()
+	inputs := map[string][]byte{
+		"state words": []byte("aal2;admin;preauth;synthetic-user!"[:sessionSecretBytes]),
+		"all zero":    make([]byte, sessionSecretBytes),
+		"all ones":    bytes.Repeat([]byte{0xFF}, sessionSecretBytes),
+		"ascending": func() []byte {
+			b := make([]byte, sessionSecretBytes)
+			for i := range b {
+				b[i] = byte(i)
+			}
+			return b
+		}(),
+		"separator bytes": bytes.Repeat([]byte("=.:;/+"), 6)[:sessionSecretBytes],
+	}
+	for name, secret := range inputs {
+		value := encodeSessionCookie(secret)
+		want := base64.RawURLEncoding.EncodeToString(secret)
+		if value != want || len(value) != 43 || strings.ContainsAny(value, "+/=.:;") {
+			t.Fatalf("%s: cookie %q is not exactly the unpadded base64url of the secret (%q)", name, value, want)
+		}
+		r := httptest.NewRequest(http.MethodGet, "https://example.invalid/", nil)
+		r.AddCookie(&http.Cookie{Name: SessionCookieName, Value: value})
+		got, present, ok := sessionSecretFrom(r)
+		if !present || !ok || !bytes.Equal(got, secret) {
+			t.Fatalf("%s: the parser did not return the same secret bytes", name)
+		}
+		// The same secret always yields the same cookie, whoever the session belongs to: nothing but the secret goes into it.
+		if encodeSessionCookie(append([]byte(nil), secret...)) != value {
+			t.Fatalf("%s: the constructor is not a pure function of the secret bytes", name)
+		}
+	}
+	secret := inputs["ascending"]
+	for name, claim := range map[string]string{
+		"assurance prefix": "aal2." + encodeSessionCookie(secret),
+		"user prefix":      "synthetic-user:" + encodeSessionCookie(secret),
+		"padded":           encodeSessionCookie(secret) + "=",
+		"role suffix":      encodeSessionCookie(secret) + ".admin",
+		"standard base64":  base64.StdEncoding.EncodeToString(append(append([]byte(nil), secret...), 0xFB)),
+	} {
+		r := httptest.NewRequest(http.MethodGet, "https://example.invalid/", nil)
+		r.Header.Set("Cookie", SessionCookieName+"="+claim)
+		if got, _, ok := sessionSecretFrom(r); ok || len(got) != 0 {
+			t.Fatalf("%s: a cookie that is not exactly the encoded secret was accepted", name)
+		}
 	}
 }
