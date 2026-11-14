@@ -2,8 +2,8 @@
 
 Contribution P1.18.1 (`t_17ea8437`) to P1.18 (`t_d57c6741`). It implements `security-contracts.md` §S2
 (RESTORE-01…11) and `technical-decisions.md` §6.3. It is a **service and an HTTP safety contract, not a
-finished product feature**: browser integration, the host recovery ceremony and the operator runbook
-verification are outstanding (§9). Nothing here is a NIST, FIPS, accessibility or product-conformance
+finished product feature**: the host recovery ceremony and real-installation runbook
+verification are outstanding (§11); browser integration, the runbook and its evidence are §9–§10 (P1.18.3). Nothing here is a NIST, FIPS, accessibility or product-conformance
 claim. There is **no dry-run or preview API**: the only operations are export, restore, read the
 manifest, and approve named manifest entries.
 
@@ -113,7 +113,7 @@ No response contains a credential, verifier, token hash, ciphertext, archive con
 the failing check. `ManifestView` carries labels (names, the endpoint slug) and imported/effective
 *settings* only.
 
-## 7. Frontend interaction contract (bounded; a design input, not implemented UI)
+## 7. Frontend interaction contract (the design input that §9 implements)
 
 Decisions and what each needs. **Step-up** means fresh AAL2 within 15 minutes (the existing P1.16 step-up
 panel; a `403 step_up_required` is answered by that panel, then the same request is retried once).
@@ -148,12 +148,129 @@ routes: absence without a service, the declared step-up classes, ordinary-user a
 body bounds, session end, post-failure quarantine reporting and manifest/approval after a modeled
 recovery ceremony.
 
-## 9. Outstanding (not part of this contribution)
 
-* Browser integration of §7 and its accessibility/browser verification.
+## 9. Browser integration and evidence (P1.18.3)
+
+Contribution P1.18.3 (`t_dda7b4e2`) binds the P1.18.2 screens (`docs/ui/p1.18-restore-ux-contract.md`) to the routes of §6.
+Everything the client does is presentation: it never reads, parses or validates an archive, never decides
+whether a restore is allowed and never decides what is approvable. The server decides each of those and the
+client renders the fixed code it returns.
+
+* Pages (administrators only in the navigation; the server enforces this independently): `/backup`, `/restore`,
+  `/restore/review`, in the SPA allowlist of `web/assets.go` (unknown paths remain 404).
+* `web/src/api/recovery.ts` (`RecoveryApi`): export (the response body is saved under the **server-issued** name,
+  and only when the `X-Backup-Mode` header matches the request), restore (the file's text is wrapped in the request
+  as the `archive` value, never parsed by the client), manifest and approvals. Every decoder fails closed.
+* `web/src/api/http.ts`: carries `installation_state` only when it is exactly `restore_quarantine` and conflict
+  `items` only when strictly valid (≤ 500, token-shaped). Without the first, a failure *after* the quarantine
+  transition would read as "nothing changed" (§7). A restore has its own time bound; a client abort is an
+  `unconfirmed` outcome, never a failure and never a retry.
+* Step-up uses the existing P1.16 panel for `backup-export`, `backup-restore` and `security-policy-change`.
+  A blocked request is **not replayed**: the person presses the button again once verified.
+* A restore ends on a pre-session page that replaces the signed-in shell (complete, incomplete or unconfirmed).
+  None offers a retry button.
+
+### Evidence executed for this contribution
+
+| Layer | Where | What it pins |
+| --- | --- | --- |
+| Transport/client/containers (Vitest) | `web/src/api/{http-recovery,recovery}.test.ts`, `web/src/containers/recovery.test.tsx` | wire shapes, fail-closed decoding, timeouts, step-up without replay, every outcome page, no select-all, nothing sent for a wrong phrase / empty / oversized file |
+| REST + MCP over the real stack | `internal/auth/restore_e2e_test.go` | RESTORE-01, 03, 09, 11 (below) |
+| Direct requests | `internal/auth/backup_direct_test.go` | boundary violations on every route (no session, no CSRF, foreign Origin, form post, ordinary user), tamper and misversion, unverifiable clean archive, parallel restore, export scope |
+| Real browser (Chromium, light and dark) | `web/tests/recovery-ui-browser.mjs` driven by `internal/auth/recovery_ui_browser_test.go` (`make browser-test`) | export both modes, step-up without replay, local refusals, five tamper variants, acknowledgement, terminal page, closed sign-in, reapproval by name, credential reissuance, injected database failure and retry, two tabs restoring at once, an ordinary signed-in person and crafted requests, dependency-free structural accessibility audit (`a11y-audit.mjs`) of each state, both themes and a phone-sized run (`MANDATARY_VIEWPORT=390x844`), no secret in console/URL/log/database |
+
+Mutation checks (real source mutated, the named test must fail, source restored): step-up treated as failure, a
+quarantine-state failure read as "nothing changed", a lost answer read as a failure, a spliced instead of wrapped
+file, no restore timeout, acknowledgement defaulting to true, extra fields sent on approval, shell kept after a
+restore, export mode mismatch accepted, a guessed comparison for an unreadable manifest (all 10 killed by the
+web tests), and CSRF skipped, confirmation phrase ignored, integrity tag not compared, quarantine state not
+reported (all 4 killed by the Go tests).
+
+The host recovery ceremony is **modeled** (`PolicyE2E.RecoveryCeremony`, and the fixture's control server for the
+browser): no web route can end quarantine, and the real host helper belongs to a later card (§10).
+
+### RESTORE-xx crosswalk
+
+Tests are named so each can be run on its own (`go test ./internal/auth ./internal/backup -run '<name>'`).
+
+| ID | Evidence | Status for this contribution |
+| --- | --- | --- |
+| RESTORE-01 | `TestRestoreNeverRevivesAuthorityOverRESTAndMCP` (the pre-revocation token fails every REST and MCP operation after restore; a **new** token works only with newly approved rules; no operational call reaches the mock Docker); `TestHistoricalExpiryIsKeptAndNeverBecomesAFreshLifetime`; browser `restore-flows` (old token never revived; a reissued token is accepted by the shared verifier) | covered |
+| RESTORE-02 | `TestSameKeyRestoreIntoAFreshInstanceImportsOnlyInactiveRecords`, `TestRestoreOverALiveInstallationRetiresLocalAuthorityAndNeverRevivesAnything`, `TestCleanRestoreOntoANewKeyStripsEveryCredentialAndIsAcknowledgedAsUnauthenticated` (`internal/backup`); the reinstated administrator role is `single_administrator` and not approvable | covered at the service level; the browser does not exercise a password/MFA login with a reverted credential |
+| RESTORE-03 | `TestRestoreNeverDiscardsALocalDenyDuringPartialReview`; `TestAnImportedAllowNeverOverwritesALocalDenyForTheSameRule`; browser `restore-flows` (a post-backup person and DENY are kept, switched off, shown as "Not in the file") | covered |
+| RESTORE-04 | `TestHistoricalExpiryIsKeptAndNeverBecomesAFreshLifetime` | **partial**: no temporary grants exist in Phase 1; clock-rollback and restart behaviour is not exercised here (Phase 2) |
+| RESTORE-05 | `TestParallelRestoreRequestsOverHTTPLeaveOneConsistentInactiveState`, `TestAFailureAfterTheTransitionLeavesQuarantineAndNoPartialImport`, `TestADatabaseFailureMidImportRollsEverythingBack`, `TestARestoreOvertakenByANewerOneAppliesNothing`, `TestQuarantinePersistsAcrossReopen`; browser `restore-failure` (a real database fault inside the import: quarantine in force, sessions ended, no import kept, the page never says "nothing changed", the same file restores after recovery) and `parallel-restore` (two tabs, exactly one completes) | covered; a process crash/restart of `cmd/mandatary` is not exercised (the binary composes no backend, §10) |
+| RESTORE-06 | `TestTamperedAndMisversionedArchivesAreRefusedOverHTTPWithoutQuarantine`, `TestAnUnauthorizedInitiatorChangesNothingAndCannotTriggerQuarantine`, `TestRestoreRefusalsChangeNothingAndNeverEnterQuarantine`; browser five tamper variants, a non-JSON file that tries to set the acknowledgement itself, and the denial scenario | covered |
+| RESTORE-07 | none: no external checkpoint or ledger exists. Quarantine remains the default | not applicable to this contribution |
+| RESTORE-08 | none: the host recovery token and ceremony belong to a later card | **not covered**; modeled only |
+| RESTORE-09 | `TestRestoreNeverDiscardsALocalDenyDuringPartialReview` and the manifest comparison (`imported` beside `effective`); browser `restore-flows` (a fresh-instance-style restore: nothing effective until named, no rule becomes effective by approving its group, only the named rule is effective) | covered, with no invented historical rollback |
+| RESTORE-10 | `TestNoExportCarriesSessionsOrSetupAndRecoveryState`; usage aggregates are outside the backup scope and the pages say so; no recovery is claimed | covered as an exclusion |
+| RESTORE-11 | `TestAWeakerImportedSecuritySettingNeverBecomesEffective`, `TestNoLocalControlOrStateFieldCanBeSmuggledIn`, the smuggled-field tamper case in the browser, and the manifest comparison | covered |
+
+## 10. Operator runbook
+
+For an administrator restoring Mandatary from a logical backup. A backup is a snapshot of what it knew, not
+a rollback: it can neither re-create a revocation or a DENY that happened after it was taken nor restore a
+credential. Nothing below is a conformance claim, and there is no dry run: **the restore is the first step that
+changes anything**.
+
+### Before
+
+1. Decide the mode when exporting. **Full** is sealed to this installation's key and carries credential
+   records; it only authenticates on the same installation key. **Clean** carries no credential and can be
+   restored anywhere, with an acknowledgement that its origin cannot be verified. Keep either file as
+   confidential: a full file is useless without the key, a clean file is not secret but is not proof of anything.
+2. Keep the file you restore from. Every failure before the first change leaves it untouched, and the same
+   file can be restored again.
+3. Know that **everyone is signed out, including you**, and that sign-in stays closed until the host recovery.
+
+### Restore
+
+1. Open **Restore from backup**, choose the file, press **Restore from this file…**, type `RESTORE`, confirm.
+   If a fresh verification is needed, complete it and press the button again (the request is never replayed).
+2. **A refusal** (integrity, malformed, unsupported version, inconsistent, wrong phrase, not an administrator)
+   says nothing was changed, and you stay signed in. Fix the cause or use another file.
+3. **Restore complete**: the installation is in restore quarantine. Nothing from the file is effective.
+4. **The restore didn't finish**: quarantine is already in force but nothing from the file was kept. Run the
+   host recovery, then restore the same file again; that is safe.
+5. **Couldn't confirm what happened** (the connection ended with no answer): do not assume either result.
+   Reload; if the sign-in page is closed, a restore began. Run the host recovery and read the manifest.
+
+### Host recovery
+
+Ending quarantine and re-establishing the administrator is a **host-authorized** action that no browser can
+perform; backup passwords or factors alone cannot leave quarantine. Its implementation is a later card
+(`mandatary recovery restore-admin` stays refused until then, see §11), so this
+runbook records the step and its place in the order but cannot yet give commands for it. The browser evidence models it.
+
+### After: reapproval and credential reissuance
+
+1. Sign in as the administrator and open **Review restored access**. Every record is listed as switched off, with
+   what the file held beside what is in force. Records that were in this installation but not in the file are
+   kept switched off and marked "Not in the file".
+2. Approve **by name, one record at a time**; the confirmation lists exactly what will become effective. There
+   is no approve-everything. A rule is approved only after you have looked at it; approving a group makes no rule
+   effective, and approving an agent grants no credential. Refused records show a fixed reason.
+3. **Reissue credentials** through their own flows: issue a new token for each agent that needs one (**Agents**,
+   shown once), re-enroll sign-in methods, re-verify notification addresses. A token from before is never
+   revived, whatever the file says. The administrator role is established by the host recovery, not by approval.
+4. Check **Agents** and **Policy** against what you intended before restoring any workload. Anything not
+   approved by name remains denied.
+
+### What this runbook does not do
+
+It does not recover usage counters, sessions, setup or recovery state or the installation key (§2), does not roll
+back to a point in time, and was exercised only against a test installation with synthetic data and a modeled host
+ceremony, not on a real Docker or Unraid host.
+
+## 11. Outstanding (not part of this contribution)
+
 * The host recovery ceremony that ends quarantine and re-establishes the administrator (`mandatary recovery
-  restore-admin` stays refused until then); the restore tests model it only as direct SQL.
-* Operator runbook verification of a restore on a real installation; an application-level restart test of
-  `cmd/mandatary` (the binary composes no backend yet).
+  restore-admin` stays refused until then); the tests model it only as direct SQL or the fixture's control action.
+* Operator verification of the runbook on a real installation; an application-level restart/crash test of
+  `cmd/mandatary` (the binary composes no backend yet). Evidence here is component and integration over a mock
+  backend.
+* RESTORE-04 clock behaviour with real temporary grants (Phase 2), RESTORE-07 and RESTORE-08.
 * Wiring `SetBackup` and `ops.NotifyAuthorityChange` in the composition root (P1.19).
 * Hosted CI evidence, including the ARM64 timeout adjustment of owner decision O1 (committed separately).
+* A link from the terminal pages to the runbook is not wired (`runbookHref` is unset: no route serves documents).

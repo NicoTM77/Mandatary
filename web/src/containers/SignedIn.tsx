@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { AccountApi, type SessionView } from '../api/account';
 import { AdminShell, Alert, Button, Skeleton, type NavItem } from '../ui';
 import { POLICY_NAV, type PolicyPageId } from '../screens/policy/nav';
+import { RECOVERY_NAV, type RecoveryPageId } from '../screens/recovery/nav';
 import { defaultNavigate, type Navigate } from './LoginContainer';
 
 /**
@@ -12,7 +13,7 @@ import { defaultNavigate, type Navigate } from './LoginContainer';
  * did not confirm is never presented as done.
  */
 
-export type PageId = 'overview' | 'security' | 'agents' | PolicyPageId;
+export type PageId = 'overview' | 'security' | 'agents' | PolicyPageId | RecoveryPageId;
 
 const TICK_MS = 30_000;
 
@@ -20,13 +21,15 @@ const TICK_MS = 30_000;
  * Only destinations that exist are listed. The administrator's links (agent tokens and the Policy group) are shown to
  * administrators only; that is a convenience, and the server refuses every one of those routes for anyone else.
  * The P1.16 credentials page is labelled "Agent tokens" so it cannot be mistaken for Policy > Agents (docs/ui/p1.17 §4).
+ * The Recovery group (P1.18: export, restore, review restored access) follows the same rule: administrators only, and the server
+ * refuses each of its routes for anyone else.
  */
 export function navFor(view: SessionView | null): readonly NavItem[] {
   const items: NavItem[] = [
     { id: 'overview', label: 'Overview', href: '/' },
     { id: 'security', label: 'Account security', href: '/security' },
   ];
-  if (view?.administrator) items.push({ id: 'agents', label: 'Agent tokens', href: '/agents' }, ...POLICY_NAV);
+  if (view?.administrator) items.push({ id: 'agents', label: 'Agent tokens', href: '/agents' }, ...POLICY_NAV, ...RECOVERY_NAV);
   return items;
 }
 

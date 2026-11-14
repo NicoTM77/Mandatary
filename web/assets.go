@@ -28,7 +28,8 @@ const contentSecurityPolicy = "default-src 'none'; script-src 'self'; style-src 
 // API behind it (for example the setup API answers 404 when no generation is
 // live); serving the static shell discloses nothing.
 var documentRoutes = map[string]bool{"/": true, "/setup": true, "/login": true, "/security": true, "/recovery": true, "/agents": true,
-	"/policy": true, "/policy/users": true, "/policy/groups": true, "/policy/agents": true}
+	"/policy": true, "/policy/users": true, "/policy/groups": true, "/policy/agents": true,
+	"/backup": true, "/restore": true, "/restore/review": true}
 
 // Handler returns an exact static-file surface with no SPA wildcard or listings.
 func Handler() http.Handler {

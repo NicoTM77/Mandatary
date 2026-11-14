@@ -3,6 +3,7 @@ import { AgentsContainer } from './containers/AgentsContainer';
 import { GroupsContainer, PolicyAgentsContainer, RulesContainer, UsersContainer } from './containers/PolicyContainers';
 import { LoginContainer } from './containers/LoginContainer';
 import { RecoveryContainer } from './containers/RecoveryContainer';
+import { ExportContainer, RestoreContainer, ReviewContainer } from './containers/RecoveryContainers';
 import { SecurityContainer } from './containers/SecurityContainer';
 import { SessionHome } from './containers/SessionHome';
 import { SetupContainer } from './containers/SetupContainer';
@@ -19,7 +20,7 @@ function galleryView(): string | null {
   return new URLSearchParams(globalThis.location?.search ?? '').get('synthetic');
 }
 
-export type AppRoute = 'home' | 'setup' | 'login' | 'security' | 'recovery' | 'agents' | 'policy-rules' | 'policy-users' | 'policy-groups' | 'policy-agents' | 'unknown';
+export type AppRoute = 'home' | 'setup' | 'login' | 'security' | 'recovery' | 'agents' | 'policy-rules' | 'policy-users' | 'policy-groups' | 'policy-agents' | 'backup-export' | 'backup-restore' | 'backup-review' | 'unknown';
 
 /**
  * The server serves this shell only at the exact document routes `/`, `/setup` and `/login` (D-ROUTE-1);
@@ -48,6 +49,12 @@ export function routeFor(pathname: string): AppRoute {
       return 'policy-groups';
     case '/policy/agents':
       return 'policy-agents';
+    case '/backup':
+      return 'backup-export';
+    case '/restore':
+      return 'backup-restore';
+    case '/restore/review':
+      return 'backup-review';
     default:
       return 'unknown';
   }
@@ -75,6 +82,12 @@ function View({ path }: { path: string }) {
       return <GroupsContainer />;
     case 'policy-agents':
       return <PolicyAgentsContainer />;
+    case 'backup-export':
+      return <ExportContainer />;
+    case 'backup-restore':
+      return <RestoreContainer />;
+    case 'backup-review':
+      return <ReviewContainer />;
     case 'unknown':
       return (
         <CenteredFrame>

@@ -30,7 +30,7 @@ export function controlBase(value) {
   return url;
 }
 
-const DOCUMENTS = new Set(['/', '/setup', '/login', '/security', '/recovery', '/agents', '/policy', '/policy/users', '/policy/groups', '/policy/agents']);
+const DOCUMENTS = new Set(['/', '/setup', '/login', '/security', '/recovery', '/agents', '/policy', '/policy/users', '/policy/groups', '/policy/agents', '/backup', '/restore', '/restore/review']);
 const API_GET = new Set([
   '/api/v1/session',
   '/api/v1/setup/session',
@@ -42,6 +42,8 @@ const API_GET = new Set([
   '/api/v1/admin/policy/groups',
   '/api/v1/admin/policy/agents',
   '/api/v1/admin/policy/rules',
+  // Recovery (P1.18): the restored-records manifest.
+  '/api/v1/admin/restore/manifest',
 ]);
 // Policy administration commands (P1.17), by method. Identifiers are server-issued path segments; nothing else is open.
 const ID = '[A-Za-z0-9._-]+';
@@ -109,6 +111,10 @@ const API_POST = new Set([
   '/api/v1/login/totp',
   '/api/v1/login/no-mfa',
   '/api/v1/logout',
+  // Recovery (P1.18): export, restore and the named, per-record approvals.
+  '/api/v1/admin/backup/export',
+  '/api/v1/admin/restore',
+  '/api/v1/admin/restore/approvals',
 ]);
 
 /** The only browser egress: the exact fixture origin, known documents/assets and the known API paths, no query string. */
@@ -155,6 +161,13 @@ export function control(base) {
     breakMail: () => call('POST', '/break-mail'),
     /** An agent presents this token to the shared verifier: accepted now? */
     agentAccepts: async (token) => (await call('POST', '/agent-accepts', { token })).accepted,
+    /** P1.18 fixture host actions (internal/auth/recovery_ui_browser_test.go): a seeded world, a change made after a backup, the modeled host recovery, the installation's state, a real database fault, an ordinary signed-in person. */
+    world: () => call('POST', '/world'),
+    localChange: () => call('POST', '/local-change'),
+    state: () => call('GET', '/state'),
+    ceremony: () => call('POST', '/ceremony'),
+    fault: (on) => call('POST', '/fault', { on }),
+    ordinary: async () => (await call('POST', '/ordinary')).cookie,
   };
 }
 

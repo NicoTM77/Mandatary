@@ -91,6 +91,8 @@ If that authority is unavailable, stale, inconsistent, unverifiable or missing a
 
 P1.02/P1.03 model/retain generations and quarantine before accepting persisted authority; P1.08/P1.10/P1.11 enforce them continuously; P1.18 delivers restore scenarios; P1.20 repeats fresh-instance acceptance. Tests below are **specified**, not executed product tests.
 
+**P1.18 evidence (local, component/integration over a mock backend; not independent review):** the per-ID crosswalk to executed service, REST/MCP, direct-request and real-browser tests, and the operator runbook, is `docs/backup-restore.md` §9–§10. RESTORE-01/02/03/05/06/09/10/11 are covered there; RESTORE-04 is partial (no temporary grants in Phase 1) and RESTORE-07/08 are not covered (no external ledger; host recovery ceremony belongs to a later card).
+
 | Test ID | Required evidence |
 | --- | --- |
 | RESTORE-01 | Backup before token revocation; revoke; full-import old backup: old token fails every API/MCP path, including non-expiring tokens. Newly issued token works only with newly approved rules. |

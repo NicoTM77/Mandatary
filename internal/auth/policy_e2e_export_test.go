@@ -20,6 +20,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/NicoTM77/Mandatary/internal/backup"
 	"github.com/NicoTM77/Mandatary/internal/domain"
 	"github.com/NicoTM77/Mandatary/internal/store"
 )
@@ -42,6 +43,18 @@ type PolicyE2E struct {
 // notify hook is whatever SetNotify installs (the shared service's NotifyAuthorityChange).
 func NewPolicyE2E(t *testing.T) *PolicyE2E {
 	t.Helper()
+	return newPolicyE2E(t, false)
+}
+
+// NewPolicyE2EWithBackup is NewPolicyE2E with the P1.18 backup service attached BEFORE the routes are registered
+// (the four backup routes exist only when a service was attached), exactly as a composition root would.
+func NewPolicyE2EWithBackup(t *testing.T) *PolicyE2E {
+	t.Helper()
+	return newPolicyE2E(t, true)
+}
+
+func newPolicyE2E(t *testing.T, withBackup bool) *PolicyE2E {
+	t.Helper()
 	e := newAdminEnv(t)
 	p := &PolicyE2E{T: t, env: e, Repo: e.l.repo, Clock: e.clock}
 	e.exec(`UPDATE endpoints SET state='active', authority_generation=1 WHERE slug='local'`)
@@ -60,6 +73,15 @@ func NewPolicyE2E(t *testing.T) *PolicyE2E {
 		t.Fatal(err)
 	}
 	p.Admin = a
+	if withBackup {
+		svc, err := backup.New(e.l.repo, "test")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := a.SetBackup(svc); err != nil {
+			t.Fatal(err)
+		}
+	}
 	p.browser = NewBrowser(e.s)
 	adapter, err := NewAdminHTTP(a)
 	if err != nil {
@@ -78,6 +100,35 @@ func (p *PolicyE2E) SetNotify(fn func(context.Context) error) { p.notifier.Store
 func (p *PolicyE2E) Now() time.Time { return p.Clock.Now() }
 
 func (p *PolicyE2E) Exec(query string, args ...any) { p.env.exec(query, args...) }
+
+// Scalar reads one integer from the installation's database (a fixture probe, never a product path).
+func (p *PolicyE2E) Scalar(query string, args ...any) int64 { return p.env.scalar(query, args...) }
+
+// Text reads one string from the installation's database.
+func (p *PolicyE2E) Text(query string, args ...any) string {
+	var out string
+	if err := p.env.db.QueryRow(query, args...).Scan(&out); err != nil {
+		p.T.Fatal(err)
+	}
+	return out
+}
+
+// RecoveryCeremony MODELS the host-authorized recovery that ends restore quarantine (a later card owns the real
+// ceremony; no web route can do it): the administrator account, its role and its factors are made effective again at the
+// current generations and the administrator's own session row is live again, so the SAME cookie and CSRF token work. It
+// approves nothing else: every other restored record stays inactive until named in an approval.
+func (p *PolicyE2E) RecoveryCeremony() {
+	p.T.Helper()
+	e := p.env
+	g := e.scalar(`SELECT authority_generation FROM installation_control`)
+	c := e.scalar(`SELECT credential_generation FROM installation_control`)
+	s := e.scalar(`SELECT session_generation FROM installation_control`)
+	e.exec(`UPDATE installation_control SET restore_quarantined=0`)
+	e.exec(`UPDATE users SET state='active',credential_generation=?,authority_generation=? WHERE id='u'`, c, g)
+	e.exec(`UPDATE administrative_roles SET state='active',authority_generation=? WHERE id='adm'`, g)
+	e.exec(`UPDATE authenticators SET state='active',credential_generation=? WHERE user_id='u'`, c)
+	e.exec(`UPDATE sessions SET state='active',revoked_at=NULL,credential_generation=?,session_generation=? WHERE id=?`, c, s, e.sessID)
+}
 
 // AdminSession is the administrator's cookie value and CSRF token.
 func (p *PolicyE2E) AdminSession() (cookie, csrf string) {
