@@ -150,6 +150,16 @@ UPDATE notification_addresses SET state = 'revoked', revoked_at = sqlc.arg(now) 
 UPDATE installation_control SET credential_generation = 1, session_generation = 1, authority_generation = 1, restore_generation = 1, restore_quarantined = 0
 WHERE singleton = 1 AND credential_generation = 0 AND session_generation = 0 AND authority_generation = 0 AND restore_generation = 0 AND restore_quarantined = 1;
 
+-- name: ActivateFreshLocalEndpoint :execrows
+-- Runs only inside the first-administrator commit, in the same transaction as UnlockInstallation (it
+-- fails if that did not just lift every generation to 1). The seeded local endpoint is still quarantined
+-- at generation zero; it becomes a valid policy target at the installation's current authority generation.
+-- It never touches a restored endpoint (a restore leaves generations above zero and reapproves
+-- explicitly), a disabled endpoint, or any other slug, and it grants no operation by itself.
+UPDATE endpoints SET state = 'active', authority_generation = (SELECT authority_generation FROM installation_control WHERE singleton = 1)
+WHERE slug = 'local' AND transport = 'unix' AND state = 'quarantined' AND authority_generation = 0
+  AND (SELECT authority_generation FROM installation_control WHERE singleton = 1) > 0;
+
 -- name: EndRestoreQuarantine :execrows
 -- The ONLY statement that ends a restore quarantine (S2.2.5): the completion of the host-authorized
 -- restore-administrator recovery. It leaves every generation exactly as the restore transition rotated it

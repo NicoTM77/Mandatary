@@ -38,8 +38,9 @@ func TestDataDirectoryValidationAndFormatting(t *testing.T) {
 }
 
 func TestUnavailableSettingsFailClosed(t *testing.T) {
-	// Refuse misleading no-op settings; these surfaces belong to later cards.
-	for _, name := range []string{"MANDATARY_ADMIN_LISTEN_ADDR", "MANDATARY_DOCKER_SOCKET", "MANDATARY_DEV_MOCK_DOCKER", "MANDATARY_OPS_UI_ENABLED", "MANDATARY_OPS_LISTEN_ADDR", "MANDATARY_PASSWORD_HIBP_ENABLED"} {
+	// Refuse misleading no-op settings; these surfaces belong to later cards (P1.19
+	// implemented the listener, socket and mock switches; Phase 4 and HIBP stay refused).
+	for _, name := range []string{"MANDATARY_OPS_UI_ENABLED", "MANDATARY_OPS_LISTEN_ADDR", "MANDATARY_PASSWORD_HIBP_ENABLED"} {
 		_, err := Load(func(k string) string {
 			if k == name {
 				return "synthetic-unavailable-setting-canary"

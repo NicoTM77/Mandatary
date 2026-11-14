@@ -1,0 +1,12 @@
+# Allowlist: the build context is exactly what the Dockerfile copies. Nothing else (git history, worktrees,
+# local toolchains, previous build output, credentials or editor files) can reach a layer.
+*
+!go.mod
+!go.sum
+!cmd
+!internal
+!web
+!scripts/isolate-node-modules.mjs
+web/node_modules
+web/dist
+**/*_test.go

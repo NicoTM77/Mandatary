@@ -58,8 +58,24 @@ test('the budget increase did not touch parallelism, memory, check names, action
   assert.match(workflow, /go test -race -timeout=30m -count=1 -v \.\/\.\.\./, 'the arm64 per-test timeout is unchanged');
 });
 
-test('the security job still requires every Baseline and negative-control job to have passed', () => {
+test('the security job still requires every Baseline, negative-control and image job to have passed', () => {
   const security = workflow.slice(workflow.indexOf('  security:'));
-  assert.match(security, /needs:/);
-  assert.match(security, /Require every Baseline and negative-control job to have passed/);
+  assert.match(security, /needs: \[baseline, negative-control, image\]/);
+  assert.match(security, /Require every Baseline, negative-control and image job to have passed/);
+  assert.match(security, /"\$BASELINE_RESULT" == success && "\$NEGATIVE_CONTROL_RESULT" == success && "\$IMAGE_RESULT" == success/);
+});
+
+// P1.19: the production image is built AND run on both supported CPUs (never cross-compile only), the scanner is pinned by digest and
+// is never handed the Docker socket, and a HIGH/CRITICAL finding fails the job.
+test('the image job covers both CPUs natively and gates on a digest-pinned Trivy HIGH/CRITICAL scan', () => {
+  const image = job('image');
+  assert.equal(minutes(image), 40);
+  assert.match(image, /name: Image \(\$\{\{ matrix\.platform \}\}\)/);
+  assert.match(image, /platform: linux\/amd64\n\s+runner: ubuntu-24\.04\n/);
+  assert.match(image, /platform: linux\/arm64\n\s+runner: ubuntu-24\.04-arm\n/);
+  assert.match(image, /TRIVY_IMAGE: ghcr\.io\/aquasecurity\/trivy@sha256:[0-9a-f]{64}/);
+  assert.match(image, /--severity HIGH,CRITICAL --exit-code 1/);
+  assert.match(image, /tests\/image\/acceptance\.py/);
+  assert.doesNotMatch(image, /docker\.sock/, 'the scanner step is never given the Docker socket');
+  assert.doesNotMatch(image, /--privileged/);
 });

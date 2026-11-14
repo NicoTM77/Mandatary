@@ -1,0 +1,39 @@
+# Reverse-proxy overlay (TD §2.2): Caddy terminates TLS and forwards to mandatary:8080 on the private
+# `edge` network. This is ONE example of the proxy contract in docs/deployment.md §5; any proxy that
+# meets the contract is acceptable. Use together with the production file:
+#
+#   docker compose -f docker-compose.yml -f deploy/compose.proxy.yml up -d
+#
+# Only the proxy publishes ports. For a private/internal name Caddy issues from its own local CA
+# (`tls internal` in the Caddyfile); for a public name it uses ACME. Neither is a Mandatary component.
+services:
+  proxy:
+    image: ${MANDATARY_PROXY_IMAGE:-docker.io/library/caddy:2.11@sha256:4e2425f6009577e7c651010f16679c28f7d12df3e7b1914f941a7a3370746b3c}
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    cap_add: [NET_BIND_SERVICE]
+    security_opt: ["no-new-privileges:true"]
+    environment:
+      MANDATARY_PUBLIC_HOST: ${MANDATARY_PUBLIC_HOST:?set MANDATARY_PUBLIC_HOST to the DNS name of MANDATARY_PUBLIC_ORIGIN}
+    ports:
+      - "${MANDATARY_PROXY_HTTPS_PORT:-443}:443"
+    volumes:
+      - type: bind
+        source: ./deploy/Caddyfile
+        target: /etc/caddy/Caddyfile
+        read_only: true
+      - proxy_data:/data
+      - proxy_config:/config
+    tmpfs: [/tmp]
+    networks: [edge]
+    depends_on:
+      mandatary:
+        condition: service_started
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
+
+volumes:
+  proxy_data: {}
+  proxy_config: {}

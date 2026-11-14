@@ -635,6 +635,13 @@ func (s *Setup) completeInitial(ctx context.Context, q *store.Queries, sess stor
 	if n != 1 {
 		return CompleteResult{}, nil, errSetupLogical
 	}
+	// The same fresh-install unlock makes the seeded local endpoint a valid policy target. It grants
+	// no operation: rules, credentials and a verified self-protection proof are still required.
+	if n, err = q.ActivateFreshLocalEndpoint(ctx); err != nil {
+		return CompleteResult{}, nil, err
+	} else if n != 1 {
+		return CompleteResult{}, nil, errSetupLogical
+	}
 	if n, err = q.ActivateStagedAdmin(ctx, user.ID); err != nil {
 		return CompleteResult{}, nil, err
 	} else if n != 1 {

@@ -1,0 +1,49 @@
+# Proxy contract (docs/deployment.md §5) implemented for Caddy:
+#   - TLS terminates here; the upstream is plain HTTP on the private `edge` network only.
+#   - The Host header reaches Mandatary UNCHANGED (it checks it against MANDATARY_PUBLIC_ORIGIN) and no
+#     path is rewritten; Mandatary consults no X-Forwarded-* header.
+#   - Responses are streamed unbuffered (log follow, MCP Streamable HTTP) with no idle cut-off.
+#   - Access logs never record Authorization, Cookie or Set-Cookie, and never a body or query string.
+{
+	# Global options: ACME/`tls internal` storage lives in /data (the proxy_data volume).
+	admin off
+	log {
+		output stdout
+		format json
+	}
+}
+
+{$MANDATARY_PUBLIC_HOST} {
+	# Replace with a public ACME name's defaults, or keep `internal` for a private name (local CA).
+	tls internal
+
+	encode zstd gzip
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		-Server
+	}
+
+	log {
+		output stdout
+		format filter {
+			wrap json
+			request>headers>Authorization delete
+			request>headers>Cookie delete
+			request>headers>Set-Cookie delete
+			resp_headers>Set-Cookie delete
+			request>uri query {
+				delete token
+			}
+		}
+	}
+
+	reverse_proxy mandatary:8080 {
+		flush_interval -1
+		transport http {
+			dial_timeout 5s
+			response_header_timeout 60s
+			read_timeout 0
+			write_timeout 0
+		}
+	}
+}

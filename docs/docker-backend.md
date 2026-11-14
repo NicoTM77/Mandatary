@@ -21,12 +21,12 @@
   `ContainerSummary`) and fail-closed sanitizers for environment variables,
   labels, command arguments, mount sources, and SDK/transport errors.
 
-The `cmd/mandatary` binary remains the loopback-only static skeleton; P1.12 does
-not expose HTTP/MCP routes or enable `MANDATARY_DOCKER_SOCKET` /
-`MANDATARY_DEV_MOCK_DOCKER` in `internal/config`. Shared execution/rate-limiting
-is owned by **P1.13**, REST/MCP transport wiring by **P1.14**, UI views by
-**P1.16**, and container/OpenRC packaging and live-container isolation evidence
-by **P1.19**.
+P1.12 itself did not expose routes or enable the settings; the `cmd/mandatary` composition root now does (P1.19): with
+`MANDATARY_DOCKER_SOCKET` it wires the real SDK adapter, with `MANDATARY_DEV_MOCK_DOCKER=true` the mock, and with
+neither no Docker surface. A verifier runs `VerifySelf` at start, after every loss of proof and as a periodic inventory
+heartbeat, and readiness (`/api/v1/readyz`) is true only while the proof is verified. Shared execution/rate-limiting is
+owned by **P1.13**, REST/MCP transport wiring by **P1.14**, UI views by **P1.16**, and the image, Compose files and
+live-container isolation evidence by **P1.19** ([deployment.md](deployment.md)).
 
 ## Self-protection and deployment identity binding (§S1)
 

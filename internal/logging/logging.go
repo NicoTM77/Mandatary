@@ -16,7 +16,7 @@ const redacted = "[REDACTED]"
 const (
 	RequestCompleted   = "request completed"
 	RequestPanicked    = "request panicked"
-	ServerStarted      = "development server started"
+	ServerStarted      = "server started"
 	StartupFailed      = "startup failed"
 	ServerFailed       = "server failed"
 	StorageCloseFailed = "storage close failed"
@@ -26,7 +26,14 @@ const (
 	SetupAvailable   = "initial setup available"
 	SetupUnavailable = "initial setup unavailable"
 	SetupNoMail      = "setup notice delivery not configured"
+	// Docker-backend state transitions (P1.19). They carry only a reason from dockerReasons.
+	DockerVerified   = "docker backend verified"
+	DockerUnverified = "docker backend unverified"
+	DockerMockActive = "mock docker backend active"
 )
+
+// dockerReasons are the only admitted reasons of the Docker-backend events; no path, error text or ID.
+var dockerReasons = map[string]bool{"unreachable": true, "unsupported_api": true, "identity": true}
 
 // SetupReasons are the only admitted values of the "reason" attribute.
 var setupReasons = map[string]bool{"origin_not_configured": true, "rotation_required": true, "storage": true, "clock": true}
@@ -82,7 +89,7 @@ func (h *handler) Enabled(ctx context.Context, level slog.Level) bool {
 func (h *handler) Handle(ctx context.Context, r slog.Record) error {
 	message := redacted
 	switch r.Message {
-	case RequestCompleted, RequestPanicked, ServerStarted, StartupFailed, ServerFailed, StorageCloseFailed, SetupAvailable, SetupUnavailable, SetupNoMail:
+	case RequestCompleted, RequestPanicked, ServerStarted, StartupFailed, ServerFailed, StorageCloseFailed, SetupAvailable, SetupUnavailable, SetupNoMail, DockerVerified, DockerUnverified, DockerMockActive:
 		message = r.Message
 	}
 	level := r.Level
@@ -159,7 +166,7 @@ func sanitize(a slog.Attr, deny bool) slog.Attr {
 			return a
 		}
 	case "reason":
-		if a.Value.Kind() == slog.KindString && setupReasons[a.Value.String()] {
+		if a.Value.Kind() == slog.KindString && (setupReasons[a.Value.String()] || dockerReasons[a.Value.String()]) {
 			return a
 		}
 	case "generation":

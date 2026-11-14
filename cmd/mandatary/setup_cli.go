@@ -22,6 +22,7 @@ import (
 // token is written only to the verified controlling terminal.
 
 const cliUsage = `usage:
+  mandatary healthcheck [--ready]
   mandatary setup status|rotate|reveal [flags]
   mandatary recovery reset-mfa --user NAME --acknowledge-all-factors-lost-risk [--replace-password] [flags]
   mandatary recovery reveal --user NAME [flags]
@@ -53,6 +54,12 @@ func productionCLI(args []string) cliEnv {
 // information, e.g. a test binary) is its own identity and is never "equal" to a
 // stamped one.
 func buildIdentity() string {
+	// A container build has no .git, so Go records no VCS revision. The image build stamps the exact
+	// source revision through the linker (-X main.stampedRevision=<40 hex>); the stamp is trusted
+	// only when it is a plain lowercase-hex commit id, never as free text.
+	if validRevision(stampedRevision) {
+		return "rev:" + stampedRevision
+	}
 	info, ok := debug.ReadBuildInfo()
 	if !ok {
 		return "unstamped"
@@ -73,6 +80,21 @@ func buildIdentity() string {
 		return "rev:" + revision + "+dirty"
 	}
 	return "rev:" + revision
+}
+
+// stampedRevision is set by the image build's linker flags; empty for ordinary builds.
+var stampedRevision string
+
+func validRevision(v string) bool {
+	if len(v) < 7 || len(v) > 64 {
+		return false
+	}
+	for _, r := range v {
+		if (r < '0' || r > '9') && (r < 'a' || r > 'f') {
+			return false
+		}
+	}
+	return true
 }
 
 // cliFailure prints a FIXED message. No error, path, argument or storage detail
@@ -174,6 +196,9 @@ func runCLI(e cliEnv) int {
 		return 2
 	}
 	group, rest := e.args[0], e.args[1:]
+	if group == "healthcheck" {
+		return runHealthcheck(e, rest)
+	}
 	if (group != "setup" && group != "recovery") || len(rest) == 0 {
 		_, _ = fmt.Fprint(e.stderr, cliUsage)
 		return 2

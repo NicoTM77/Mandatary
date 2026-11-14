@@ -1,0 +1,72 @@
+# Mandatary — production Compose example (P1.19). IN ACTIVE DEVELOPMENT: the Phase 1 roadmap is not
+# complete, this file is an example for the reviewed deployment contract, not a release or a support claim.
+# Read docs/deployment.md before using it; nothing here has been deployed by the project.
+#
+# What it enforces (technical-decisions.md §2.2, security-contracts.md §S1/S3):
+#   * non-root 65532:65532, read-only root filesystem, ALL capabilities dropped, no-new-privileges;
+#   * the ONLY writable path is the persistent data bind mount (host-local, so the host helper can reach it);
+#   * the Docker socket is mounted for the local endpoint, with group access only; Mandatary refuses to
+#     operate on itself or any container carrying the io.mandatary.self label;
+#   * no published port: TLS is terminated by a reverse proxy on the `edge` network (deploy/compose.proxy.yml).
+#
+# Required variables are listed in deploy/env.example. `docker compose config` refuses to render without them.
+name: mandatary
+
+services:
+  mandatary:
+    # Pin by digest: MANDATARY_IMAGE=<registry>/mandatary@sha256:<64 hex>. A mutable tag is not accepted.
+    image: ${MANDATARY_IMAGE:?set MANDATARY_IMAGE to the reviewed image reference pinned by digest}
+    user: "65532:65532"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    restart: unless-stopped
+    stop_grace_period: 15s
+    pids_limit: 512
+    init: false
+    # SELF-08/SELF-11: the membership label and the per-deployment instance binding. The UUID is generated
+    # once by the operator (`uuidgen | tr A-Z a-z`) and is the SAME value in the label and in the environment.
+    labels:
+      io.mandatary.self: "true"
+      io.mandatary.self.instance-uuid: ${MANDATARY_INSTANCE_UUID:?set MANDATARY_INSTANCE_UUID (lowercase UUID, see deploy/env.example)}
+    environment:
+      MANDATARY_ADMIN_LISTEN_ADDR: ":8080"
+      MANDATARY_DATA_DIR: /data
+      MANDATARY_MASTER_KEY_FILE: /run/secrets/mandatary_master_key
+      MANDATARY_PUBLIC_ORIGIN: ${MANDATARY_PUBLIC_ORIGIN:?set MANDATARY_PUBLIC_ORIGIN to the https origin users reach}
+      MANDATARY_DOCKER_SOCKET: unix:///var/run/docker.sock
+      MANDATARY_SELF_INSTANCE_UUID: ${MANDATARY_INSTANCE_UUID}
+      MANDATARY_SMTP_RELAY: ${MANDATARY_SMTP_RELAY:?set the verified-TLS SMTP relay host:port}
+      MANDATARY_SMTP_TLS: ${MANDATARY_SMTP_TLS:?implicit or starttls}
+      MANDATARY_SMTP_SENDER: ${MANDATARY_SMTP_SENDER:?sender address for security notices}
+      MANDATARY_NOTICE_CONTACT: ${MANDATARY_NOTICE_CONTACT:?operator contact shown in notices}
+      MANDATARY_LOG_LEVEL: ${MANDATARY_LOG_LEVEL:-info}
+      MANDATARY_LOG_FORMAT: json
+    # The service user reaches the socket through the host's docker group id (stat -c %g /var/run/docker.sock).
+    # This is the ONLY extra privilege; it is root-equivalent on the Docker host, which is why Mandatary
+    # exists as the intermediary. Do not widen it.
+    group_add: ["${DOCKER_SOCKET_GID:?set DOCKER_SOCKET_GID to the numeric group id of the Docker socket}"]
+    volumes:
+      # Host-local bind mount so the same-binary host helper (docs/deployment.md §6) opens the SAME directory.
+      # Prepared before first start: mkdir, chown 65532:65532, chmod 0700.
+      - type: bind
+        source: ${MANDATARY_DATA_HOST_DIR:?absolute host directory for persistent data}
+        target: /data
+      - type: bind
+        source: ${MANDATARY_DOCKER_SOCKET_HOST:-/var/run/docker.sock}
+        target: /var/run/docker.sock
+    secrets:
+      - mandatary_master_key
+    networks: [edge]
+    expose: ["8080"]
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
+
+secrets:
+  # A host file owned by 65532:65532, mode 0400, 32 random bytes as 64 hex characters. Never commit it.
+  mandatary_master_key:
+    file: ${MANDATARY_MASTER_KEY_HOST_FILE:?absolute host path of the master key file}
+
+networks:
+  edge: {}

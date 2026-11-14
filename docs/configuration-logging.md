@@ -31,15 +31,19 @@ and listener failures use its selected format, fixed events and safe stage codes
 no raw error, path, SQL, DSN, key source or stack is logged. Close failures also
 return nonzero rather than being hidden by `log.Fatal`/`os.Exit` before cleanup.
 
-The approved TD §13 table describes the eventual Phase 1/4 product, not today's
-implemented switches. `MANDATARY_ADMIN_LISTEN_ADDR`, `MANDATARY_DOCKER_SOCKET`,
-`MANDATARY_DEV_MOCK_DOCKER`, `MANDATARY_OPS_UI_ENABLED`,
-`MANDATARY_OPS_LISTEN_ADDR`, and `MANDATARY_PASSWORD_HIBP_ENABLED` are currently
-**unavailable**. Any nonempty setting of one of these fails configuration,
-including a nominal future default: silently accepting a no-op security setting
-would be misleading. Unset them for this skeleton. The listener remains fixed
-at `127.0.0.1:8080`. P1.12 owns the actual guaranteed container-free Docker mock;
-P1.19 owns configurable production exposure. No native real-socket exception.
+The approved TD §13 table describes the eventual Phase 1/4 product. Implemented since P1.19:
+
+| Setting | Meaning |
+| --- | --- |
+| `MANDATARY_ADMIN_LISTEN_ADDR` | `host:port` the single administration/API listener binds. Default `127.0.0.1:8080`; the production image sets `:8080` behind a TLS proxy. The host must be an IP literal or empty; a bare port, a hostname, port 0 and out-of-range ports are refused. |
+| `MANDATARY_DOCKER_SOCKET` | `unix:///absolute/path` of the local Docker socket. Only unix sockets are accepted; `tcp://`, `ssh://` and other transports are refused (remote endpoints are planned, not implemented). Unset: no Docker surface exists (no endpoint routes, no MCP, no readiness route). |
+| `MANDATARY_DEV_MOCK_DOCKER` | `true` or `false` only. `true` composes the in-memory mock backend with the identical safety state machine and no socket. Combining it with `MANDATARY_DOCKER_SOCKET` is refused (SELF-13). |
+| `MANDATARY_SELF_CONTAINER_ID`, `MANDATARY_SELF_INSTANCE_UUID` | Self-protection assertions described in [docker-backend.md](docker-backend.md). |
+
+`MANDATARY_OPS_UI_ENABLED`, `MANDATARY_OPS_LISTEN_ADDR` and `MANDATARY_PASSWORD_HIBP_ENABLED` remain
+**unavailable**: any nonempty setting fails configuration, including a nominal future default, because silently
+accepting a no-op security setting would be misleading. There is no Phase 4 listener. No native real-socket
+exception exists. The deployment variables of the image and Compose files are in [deployment.md](deployment.md).
 Unrecognized environment names are not enumerated or logged; this is not a
 promise to detect misspelled arbitrary environment variables.
 
@@ -51,7 +55,7 @@ entropy guesses and lists of known secrets cannot reliably recognize an unknown
 password, short OTP, challenge, cookie or arbitrary error/payload. No debug-level
 exception exists. The current schema admits:
 
-- Fixed event messages: `development server started`, `startup failed`,
+- Fixed event messages: `server started`, `startup failed`,
   `server failed`, `storage close failed`, `request completed`, `request panicked`.
 - `method`: exact standard HTTP method enumeration, not arbitrary client input.
 - `status`: integer 100–599; `duration`: nonnegative `slog.Duration`.
