@@ -114,8 +114,8 @@ Shape (REST body and MCP `structuredContent`):
 | `method_not_allowed` | 405 | Known route, wrong method. |
 | `payload_too_large` / `unsupported_media` | 413 / 415 | Body bounds / content type. |
 | `too_many_streams` | 429 | Follow stream cap. |
-| `canceled` | 499 | Caller disconnected. |
-| `backend_failed` / `backend_unavailable` / `timeout` | 502 / 503 / 504 | Docker-side fault, no verified backend, deadline. |
+| `canceled` | 499 | Caller disconnected, or any error that is `context.Canceled`. Same code on REST and as a structured MCP tool error; never `forbidden`. |
+| `backend_failed` / `backend_unavailable` / `timeout` | 502 / 503 / 504 | Docker-side fault, no verified backend, deadline. `timeout` is any error that is `context.DeadlineExceeded` (for example a fired dispatch/open deadline); never `forbidden`. See [operations.md](operations.md) for the precedence between a departed caller and a fired deadline. |
 | `internal` | 500 | Any unclassified error (text never exposed). |
 
 Self-protected (self and labelled peers), missing, explicitly denied, ungranted
@@ -186,5 +186,7 @@ claim.
 | N63B4-SCOPE-MACHINE, N63B4-TOKEN-NOT-PRESENCE, N63B4-SESSION-COOKIE-CSRF (adapter side: no cookie, no CORS, no state-changing GET, Origin refused) | `TestAgentBearerNeverMintsCookiesSessionsOrAssuranceAndHumanCredentialsAreNotAgentCredentials`, `TestBrowserBoundaryNoCookiesNoCORSNoStateChangingGETAndBearerNeverMintsASession`, `TestBrowserBoundaryOriginIsRefusedAndNoCORSIsEverOffered` |
 | N63B4-DOC-FACTOR-INVENTORY, PWD-ROUTE-PARITY, OOB/WALLET/RESTRICTED-UNSUPPORTED, SCOPE-FEDERATION, RECOVERY-NO-SESSION (no human-authentication, factor, recovery, setup, federation or access-request route or tool exists on the machine surface) | `TestAdapterNamespacesExposeNoHumanAuthenticationFactorRecoverySetupFederationOrAccessRequestSurface` |
 | Versioned contract pinned | `TestContractFixtureIsCurrentAndExact` |
+| Duplicate JSON object keys (top-level, retargeting identifier, nested) are rejected on the MCP wire by the real adapter+SDK exactly like REST: sanitized `invalid_request`, zero backend calls, zero usage; non-duplicate control reaches one stop | `TestMCPDuplicateObjectKeysAreRejectedOnTheWireWithZeroBackendAndUsageEffect` (REST: `TestStrictSchemaRefusesEveryUnknownOrMalformedQueryAndBodyBeforeTheSharedService`) |
+| `canceled`/499 and `timeout`/504 mapping of context errors, identical on REST and structured MCP, never forbidden, no cause leakage, one accounted error | `TestContextErrorsMapToCanceled499AndTimeout504OnBothTransportsAndNeverToForbidden`, `TestClassifyContextErrorContractIsCanceled499AndTimeout504NeverForbidden` |
 | P1.15 usage accounting is identical over REST and MCP (shared service; see [usage-accounting.md](usage-accounting.md)) | `TestUsageIsAccountedIdenticallyOverRESTAndMCP` |
 | Concurrency under `-race` with racing revocation | `TestConcurrentRequestsOverBothTransportsAndRevocationAreRaceFree` |

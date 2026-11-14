@@ -153,6 +153,25 @@ shared authorization or backend state.
   that is closed and never handed out. The watcher is retired the moment the open
   returns, so the deadline can never end a handed-off stream (its lifetime is the
   lease, not a deadline).
+* **Caller-gone versus deadline: exact outcomes (P1.18.4 P113-L2).** `Execute` only
+  ever returns the *bare* sentinel (`docker.SanitizeError`: no cause text, no
+  credential; `Canceled` is tested before `DeadlineExceeded`, so a joined
+  cancellation+deadline is `context.Canceled`). Precedence is deliberate and unchanged:
+  for the **Logs open** a fired dispatch deadline is an evidenced backend fault and
+  wins even when the caller has also left (`context.DeadlineExceeded`); for a
+  **one-shot** call a vanished caller gets its own `context.Canceled` and a caller
+  that is still present gets `context.DeadlineExceeded`. Every such row is exactly one
+  accounted **error** event (never denied, no second event), returns no result and
+  releases the lease. The adapters map `context.Canceled` to `canceled`/499 and
+  `context.DeadlineExceeded` to `timeout`/504 identically on REST and as structured MCP
+  tool errors, never as `forbidden` (`internal/api` `Classify` checks the deadline
+  before the cancellation on an UNSANITIZED joined error; that order cannot be observed
+  through the service because the service sanitizes first). No `request_cancelled` or
+  408 code exists or is introduced. Tests:
+  `TestCallerGoneAndDispatchDeadlineKeepDistinctCancelAndTimeoutOutcomes` (`internal/ops`),
+  `TestClassifyContextErrorContractIsCanceled499AndTimeout504NeverForbidden` (`internal/api`),
+  `TestContextErrorsMapToCanceled499AndTimeout504OnBothTransportsAndNeverToForbidden`
+  (`tests/adapters`).
 * **An open stream is bound to the caller.** Once a log stream has been handed off, the
   request context ending releases its lease and ends the stream with the request's
   context error as its terminal error. Canceling an already-open stream is a local
@@ -234,7 +253,7 @@ Tests run with the container-free mock only. "Fixture IDs" follow the C2 checkpo
 | A caller leaving mid-call never cancels the backend operational context, for all six keys (reviewer RP-04 regression + control); result withheld, own ctx error, no leak, sibling intact; revocation (with or without the caller leaving) still cancels it; an open stream still ends with its request | `TestCallerLeavingMidBackendCallNeverCancelsTheBackendContext`, `TestRevocationStillCancelsAMidCallBackendContextWhenCallerAlsoLeft`, `TestAdmittedLeaseStaysBoundToTheCallerLifetime` |
 | Revocation isolation; healthy streams survive | `TestRevocationIsolationBetweenStreams`, `TestHealthyStreamSurvivesTicksAndNoopNotifications`, `TestNotifyAuthorityChangeIsNotKilledByRequestContext` |
 | Stop/restart bounds and dispatch deadline | `TestStopAndRestartForwardOnlyNormalizedBoundedTimeouts`, `TestPolicyStopTimeoutCapIsEnforced`, `TestOneShotDispatchIsBoundedByDeadline`, `TestDispatchDeadlineFiringReleasesInFlightOperation` |
-| The Logs open call is bounded by the dispatch deadline even with the caller gone (reviewer RP-06 regression + inspect control); a late-opening stream is closed, never handed out; a handed-off stream survives the deadline | `TestHungOpenIsBoundedByTheDispatchDeadline`, `TestStreamOpenedAfterItsDeadlineIsClosedNotHandedOut`, `TestHandedOffStreamSurvivesTheOpenDeadline` |
+| The Logs open call is bounded by the dispatch deadline even with the caller gone (reviewer RP-06 regression + inspect control); a late-opening stream is closed, never handed out; a handed-off stream survives the deadline | `TestHungOpenIsBoundedByTheDispatchDeadline`, `TestStreamOpenedAfterItsDeadlineIsClosedNotHandedOut`, `TestHandedOffStreamSurvivesTheOpenDeadline`; exact caller-gone x deadline outcomes with one accounted error: `TestCallerGoneAndDispatchDeadlineKeepDistinctCancelAndTimeoutOutcomes` |
 | In-flight revocation cancels the call and withholds data; concurrency under `-race` | `TestRevocationDuringInFlightOperationCancelsItAndWithholdsData`, `TestConcurrentExecuteAndRevocation` |
 | SELF-01/04/05/08/09/13 service level (SELF-07 stream loss) | deny-matrix `SELF-*` cases, `TestLossOfSafetyProofEndsStreamAndBlocksNewDispatch` (P1.11/P1.12 retain SELF-01-13 at authorizer and adapter level) |
 | RESTORE-03 (quarantined allow grants nothing), restore quarantine, stale generations | deny-matrix `RESTORE-*`, `C2R-Q03` |
