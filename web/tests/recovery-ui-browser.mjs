@@ -9,7 +9,7 @@ import { engineName, launchEngine, viewport } from './engine.mjs';
 import { auditAccessibility } from './a11y-audit.mjs';
 import { allowsAppRequest, appOrigin, control, controlBase, rawRequest, scanSurfaces, totpCode } from './admin-ui-lib.mjs';
 
-/* global console, document */
+/* global console, document, window */
 
 // Export, restore and reapproval browser tests (P1.18.3) against the REAL services (internal/auth/recovery_ui_browser_test.go starts
 // them behind synthetic loopback TLS). One scenario per invocation, in one colour scheme (the theme follows prefers-color-scheme).
@@ -260,6 +260,28 @@ async function exportFlows() {
   await context.close();
 }
 
+
+/**
+ * P1.18.4 round-1 review (FC4-1, phone): on a narrow screen the exact-authority sentence must keep (almost) the full row width, not a ~110 px column squeezed
+ * beside a badge. Measured on the real layout: the text column of a checkbox label or the confirmation list takes at least 60% of the viewport and the
+ * page never scrolls sideways. Returns true when the phone-specific assertions ran, so the Go test can require them (see TestRecoveryUIBrowserPhone).
+ */
+let phoneChecks = false;
+async function assertReadableAtPhoneWidth(page, locator, what) {
+  const { width } = viewport();
+  if (width > 480) return;
+  const measured = await locator.evaluate((el) => {
+    const label = el.closest('label');
+    const column = label ? label.querySelector('span') : el;
+    const rect = column.getBoundingClientRect();
+    return { column: rect.width, left: rect.left, right: rect.right, overflowX: document.documentElement.scrollWidth > window.innerWidth, viewport: window.innerWidth };
+  });
+  assert.ok(measured.column >= measured.viewport * 0.6, `${what}: the exact-authority text is only ${Math.round(measured.column)}px wide on a ${measured.viewport}px screen (a squeezed column)`);
+  assert.ok(measured.left >= 0 && measured.right <= measured.viewport + 1, `${what}: the text runs outside the screen`);
+  assert.equal(measured.overflowX, false, `${what}: the page scrolls sideways`);
+  phoneChecks = true;
+}
+
 // ───────────────────────── scenario: restore, reapproval, tamper, scope ─────────────────────────
 
 async function restoreFlows() {
@@ -417,6 +439,8 @@ async function restoreFlows() {
   const facts = (await detailBlock.locator('dt').allTextContents()).join('|');
   assert.match(facts, /Effect\|Operation\|Applies to\|Endpoint\|Container name\|/, 'the row lists the facts an approval restores');
   await shot(page, 'review-exact');
+  await assertReadableAtPhoneWidth(page, allowRule, 'review rule row');
+  await assertReadableAtPhoneWidth(page, denyRule, 'review lookalike DENY row');
   await auditAccessibility(page, 'review exact detail');
 
   await page.getByRole('checkbox', { name: 'User browser-alice', exact: true }).check();
@@ -446,6 +470,7 @@ async function restoreFlows() {
   assert.match(confirmText, /Allow group browser-ops \(ID [0-9A-Za-z-]+\) to read logs of “browser-proxy” on endpoint local \(ID [0-9a-f-]{36}\)/, 'the confirmation names the exact rule');
   assert.doesNotMatch(confirmText, /Deny group/, 'the lookalike DENY is not part of this approval');
   await shot(page, 'review-exact-confirm');
+  await assertReadableAtPhoneWidth(page, second.getByRole('list', { name: 'Records to approve' }), 'confirmation list');
   await second.getByRole('button', { name: 'Approve 2 records' }).click();
   await page.getByText('Approved 2 records').waitFor();
   const final = await host.state();
@@ -653,7 +678,7 @@ try {
   else if (scenario === 'parallel-restore') await parallelRestore();
   else if (scenario === 'denial') await denial();
   else throw new Error(`unknown scenario ${scenario}`);
-  console.log(JSON.stringify({ scenario, scheme, engine: engineName, browser: browser.version(), requests: observed.requests.length, blockedEgress: 0, secretsInConsole: 0 }));
+  console.log(JSON.stringify({ scenario, scheme, engine: engineName, browser: browser.version(), requests: observed.requests.length, blockedEgress: 0, secretsInConsole: 0, phoneChecks }));
 } catch (error) {
   // Diagnostics for a failed run: what the page showed and what it asked, never a secret-bearing value (every credential in this
   // suite is synthetic and the server never echoes one).

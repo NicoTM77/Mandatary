@@ -547,9 +547,13 @@ func TestRemoveThenAddOfARestoredMembershipIsAnExplicitRegrantOfExactlyThatRecor
 	if err := h.a.RemoveMember(ctx, h.secret, g1, MemberAgent, m1); err != nil {
 		t.Fatalf("removal replay: %v", err)
 	}
-	// An unknown pair (similar IDs, wrong group) is not found and changes nothing.
-	if err := h.a.AddMember(ctx, h.secret, g2, MemberAgent, m2); err != nil && !errors.Is(err, ErrAdminNotFound) {
+	// A different pair with similar IDs (m2 in g2) is its own membership: AddMember may create it as a NEW active record or refuse it, and either
+	// outcome is acceptable here. What it must never do is touch the removed (m1, g1) record or the two still-quarantined siblings.
+	if err := h.a.AddMember(ctx, h.secret, g2, MemberAgent, m2); err != nil && !errors.Is(err, ErrAdminNotFound) && !errors.Is(err, ErrAdminConflict) {
 		t.Fatalf("unrelated pair: %v", err)
+	}
+	if state(m1, g1) != "disabled" || state(m2, g1) != "quarantined" || state(m1, g2) != "quarantined" {
+		t.Fatalf("adding an unrelated pair changed a record that was not named: %q", rows())
 	}
 
 	// Explicit re-grant: that one record becomes active at the CURRENT generation.

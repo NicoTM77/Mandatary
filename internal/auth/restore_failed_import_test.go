@@ -8,11 +8,13 @@ package auth_test
 import (
 	"context"
 	"net/http"
+	"regexp"
 	"strings"
 	"sync/atomic"
 	"testing"
 
 	"github.com/NicoTM77/Mandatary/internal/auth"
+	"github.com/NicoTM77/Mandatary/internal/authz"
 	"github.com/NicoTM77/Mandatary/internal/docker"
 )
 
@@ -47,6 +49,16 @@ func TestAFailedImportAfterTheTransitionStillDropsTheSelfProtectionProofAndReach
 	policiesBefore := w.p.Scalar(`SELECT count(*) FROM policies`)
 	callsBefore := len(w.spy.calls())
 
+	// A live lease (an in-flight stream) held by the still-valid agent before the restore: it must have ended when the call returns (round-1 review).
+	lease, err := w.az.AcquireLease(t.Context(), authz.AuthorizeRequest{Principal: authz.PrincipalCredentials{AgentToken: oldToken}, EndpointID: w.p.EndpointID, TargetRef: A, Operation: authz.OpContainerInspectStatus})
+	if err != nil {
+		t.Fatalf("baseline lease: %v", err)
+	}
+	defer lease.Release()
+	if lease.Context().Err() != nil || w.az.ActiveLeaseCount() != 1 {
+		t.Fatal("the baseline lease is not live: the check below would prove nothing")
+	}
+
 	// The import fails AFTER the quarantine transition committed (SQLite itself refuses the
 	// group row, exactly like the existing HTTP failure test).
 	for _, ev := range []string{"INSERT", "UPDATE"} {
@@ -68,6 +80,9 @@ func TestAFailedImportAfterTheTransitionStillDropsTheSelfProtectionProofAndReach
 	if w.mock.VerificationState() != docker.StateUnverified {
 		t.Fatal("a failed import after the transition left the self-protection proof in place")
 	}
+	if lease.Context().Err() == nil || w.az.ActiveLeaseCount() != 0 {
+		t.Fatalf("a live lease survived the failed import (active leases %d)", w.az.ActiveLeaseCount())
+	}
 	// The partial import was rolled back, the transition (quarantine, ended sessions) stayed.
 	if w.p.Scalar(`SELECT count(*) FROM groups`) != groupsBefore || w.p.Scalar(`SELECT count(*) FROM policies`) != policiesBefore {
 		t.Fatal("a failed import left partially imported records")
@@ -84,6 +99,66 @@ func TestAFailedImportAfterTheTransitionStillDropsTheSelfProtectionProofAndReach
 	if _, err := w.az.ListEndpointContainers(t.Context(), w.p.EndpointID); err == nil {
 		t.Fatal("the endpoint inventory was served without a verified proof")
 	}
+}
+
+// The control for the test above (round-1 review, reviewer mutant MP1): a restore REFUSED before the quarantine transition changed nothing, so it must
+// not drop the self-protection proof, end a lease, end the administrator's session or call the safety reset. A clean archive whose origin this
+// installation cannot verify, sent without the explicit acknowledgement, is refused by the restore service itself (after the archive was opened,
+// before the transition). Calling the reset on that refusal fails this test.
+func TestARestoreRefusedBeforeTheTransitionKeepsTheProofTheLeaseAndTheSession(t *testing.T) {
+	t.Parallel()
+	w := newWorldFrom(t, auth.NewPolicyE2EWithBackup(t))
+	var resets atomic.Int32
+	w.p.Admin.WithSafetyReset(func() {
+		resets.Add(1)
+		w.az.InvalidateSelfProtection()
+	})
+	A := "edge-proxy"
+	_, groupID, _, oldToken := w.newAgent("alice", "ops", "ci-runner")
+	selector := `"selector":{"container_name":"edge-proxy","compose_project":"platform","compose_service":"edge-proxy"}`
+	w.must(http.MethodPost, pol+"/rules", `{"subject":{"kind":"group","id":"`+groupID+`"},"effect":"ALLOW","operations":["container:inspect_status"],`+selector+`}`, http.StatusCreated)
+	w.both(oldToken, "status", A, okOutcome, "", nil)
+	lease, err := w.az.AcquireLease(t.Context(), authz.AuthorizeRequest{Principal: authz.PrincipalCredentials{AgentToken: oldToken}, EndpointID: w.p.EndpointID, TargetRef: A, Operation: authz.OpContainerInspectStatus})
+	if err != nil {
+		t.Fatalf("baseline lease: %v", err)
+	}
+	defer lease.Release()
+	code, archive := w.p.Do(http.MethodPost, admin+"/backup/export", `{"mode":"clean"}`, w.cookie, w.csrf)
+	if code != http.StatusOK {
+		t.Fatalf("export: %d %s", code, archive)
+	}
+	foreign := regexp.MustCompile(`"integrity_hmac":"[^"]*"`).ReplaceAllStringFunc(archive, func(m string) string {
+		return `"integrity_hmac":"` + strings.Repeat("A", len(m)-len(`"integrity_hmac":""`)) + `"`
+	})
+	if foreign == archive {
+		t.Fatal("the archive has no integrity tag to replace: the scenario proves nothing")
+	}
+	sessions := w.p.Scalar(`SELECT count(*) FROM sessions WHERE state='active'`)
+	generation := w.p.Scalar(`SELECT restore_generation FROM installation_control`)
+	if sessions == 0 {
+		t.Fatal("no active session before the refused restore")
+	}
+
+	body := `{"archive":` + foreign + `,"confirm":"RESTORE","acknowledge_unauthenticated_provenance":false}`
+	c, out := w.p.Do(http.MethodPost, admin+"/restore", body, w.cookie, w.csrf)
+	if c == http.StatusOK || c == http.StatusServiceUnavailable || strings.Contains(out, "restore_quarantine") {
+		t.Fatalf("an unacknowledged unverifiable archive was not refused before the transition: %d %s", c, out)
+	}
+	if resets.Load() != 0 {
+		t.Fatalf("a restore refused before the transition called the safety reset %d times", resets.Load())
+	}
+	if w.mock.VerificationState() != docker.StateVerified {
+		t.Fatal("a refused restore dropped the self-protection proof")
+	}
+	if lease.Context().Err() != nil || w.az.ActiveLeaseCount() != 1 {
+		t.Fatal("a refused restore ended a live lease")
+	}
+	if w.p.Scalar(`SELECT count(*) FROM sessions WHERE state='active'`) != sessions || w.p.Scalar(`SELECT restore_generation FROM installation_control`) != generation ||
+		w.p.Scalar(`SELECT restore_quarantined FROM installation_control`) != 0 {
+		t.Fatal("a refused restore changed the sessions, the generation or the quarantine")
+	}
+	w.must(http.MethodGet, pol+"/rules", "", http.StatusOK) // the administrator's session is still alive
+	w.both(oldToken, "status", A, okOutcome, "", nil)
 }
 
 // The notifier contract (C4-O4): the shared authorizer is TOLD about every committed authority

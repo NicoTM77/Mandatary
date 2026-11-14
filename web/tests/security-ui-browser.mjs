@@ -352,6 +352,44 @@ async function securityFlows() {
 // ───────────────────────── scenario: restricted recovery with a saved code ─────────────────────────
 
 /**
+ * Round-1 review (P116-L1): before the harness focuses anything itself, the PRODUCT must have moved focus to the reveal region (the documented
+ * target: a tabindex=-1 section labelled by its heading, so a screen-reader user lands on the warning first), and the heading and the first
+ * warning ("This is the only time it will be shown") must be fully visible below the sticky header and inside the viewport, with no sideways scroll.
+ */
+async function assertProductFocusAndFirstWarning(page, label, headingName, { stickyHeader }) {
+  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  const measured = await page.evaluate(() => {
+    const active = document.activeElement;
+    const region = active && active.tagName === 'SECTION' && active.getAttribute('tabindex') === '-1' ? active : null;
+    const heading = region ? document.getElementById(region.getAttribute('aria-labelledby') ?? '') : null;
+    const warning = region ? Array.from(region.querySelectorAll('p')).find((p) => /only time it will be shown/.test(p.textContent ?? '')) : null;
+    const stuck = Array.from(document.querySelectorAll('header')).filter((h) => ['sticky', 'fixed'].includes(getComputedStyle(h).position));
+    const headerBottom = stuck.length ? Math.max(...stuck.map((h) => h.getBoundingClientRect().bottom)) : 0;
+    const box = (el) => (el ? { top: el.getBoundingClientRect().top, bottom: el.getBoundingClientRect().bottom, left: el.getBoundingClientRect().left, right: el.getBoundingClientRect().right } : null);
+    return {
+      focusedRegion: region !== null,
+      headingText: heading ? (heading.textContent ?? '').trim() : null,
+      heading: box(heading),
+      warning: box(warning),
+      headerBottom,
+      innerWidth: window.innerWidth,
+      innerHeight: window.innerHeight,
+      overflowX: document.documentElement.scrollWidth > window.innerWidth,
+    };
+  });
+  assert.equal(measured.focusedRegion, true, `${label}: the product did not move focus to the reveal region`);
+  assert.equal(measured.headingText, headingName, `${label}: the focused region is not the ${headingName} reveal`);
+  assert.equal(measured.headerBottom > 0, stickyHeader, `${label}: a sticky header is ${stickyHeader ? 'expected here (the signed-in shell)' : 'not expected on the public recovery page'}`);
+  for (const [name, rect] of [['heading', measured.heading], ['first warning', measured.warning]]) {
+    assert.ok(rect, `${label}: the ${name} was not found in the focused region`);
+    assert.ok(rect.top >= measured.headerBottom - 1, `${label}: the ${name} starts at ${Math.round(rect.top)}px, under the ${Math.round(measured.headerBottom)}px sticky header`);
+    assert.ok(rect.bottom <= measured.innerHeight + 1, `${label}: the ${name} ends at ${Math.round(rect.bottom)}px, below the ${measured.innerHeight}px fold`);
+    assert.ok(rect.left >= 0 && rect.right <= measured.innerWidth + 1, `${label}: the ${name} runs outside the ${measured.innerWidth}px screen`);
+  }
+  assert.equal(measured.overflowX, false, `${label}: the page scrolls sideways on a phone`);
+}
+
+/**
  * P1.18.4 P116-L1: the recovery-code reveals on a PHONE-sized screen, permanently. The shared `html { scroll-padding-top: 6.5rem }` keeps a
  * focused control below the sticky two-row admin header; this scenario proves it for BOTH reveals: the ten saved codes on Account security
  * (inside the signed-in shell, whose header is sticky) and the one replacement code of restricted recovery. For each reveal the heading, the copy
@@ -409,6 +447,7 @@ async function recoveryRevealPhone() {
   await button(page, 'Create recovery codes').click();
   const codes = await revealed(page, 'Your recovery codes');
   for (const code of codes) canaries.add(code);
+  await assertProductFocusAndFirstWarning(page, 'saved codes', 'Your recovery codes', { stickyHeader: true });
   const stuck = await page.evaluate(() => Array.from(document.querySelectorAll('header')).filter((h) => ['sticky', 'fixed'].includes(getComputedStyle(h).position)).length);
   assert.ok(stuck >= 1, 'the signed-in shell has a sticky header: the scenario is only meaningful with one');
   const tenReport = await assertRevealReachable(page, 'saved codes', [
@@ -434,6 +473,7 @@ async function recoveryRevealPhone() {
   await page.getByText(/Recovery code accepted/).waitFor();
   const [replacement] = await revealed(page, 'Your replacement recovery code');
   canaries.add(replacement);
+  await assertProductFocusAndFirstWarning(page, 'replacement code', 'Your replacement recovery code', { stickyHeader: false });
   assert.equal(await page.getByRole('button', { name: 'Copy all codes' }).count(), 0, 'one code is not "all codes"');
   const copy = page.getByRole('button', { name: 'Copy code', exact: true });
   await copy.waitFor();

@@ -209,8 +209,9 @@ function RecordRow({ row, selectable, checked, failure, inspectHref, credentials
   const note = followUp(row, credentialsHref);
   return (
     <li className="py-4 first:pt-0 last:pb-0" data-record={`${row.kind}:${row.id}`}>
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div className="min-w-0 flex-1">
+      {/* On a phone the badges go below the exact-authority text; beside it they squeezed the checkbox label into a ~110 px column. */}
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0 sm:flex-1">
           {selectable ? <CheckboxField label={heading} checked={checked} onChange={onToggle} /> : <p className="break-words">{heading}</p>}
         </div>
         <div className="flex flex-wrap items-center gap-2">
