@@ -14,7 +14,8 @@ import { allowsAppRequest, appOrigin, control, controlBase, rawRequest, scanSurf
 // Export, restore and reapproval browser tests (P1.18.3) against the REAL services (internal/auth/recovery_ui_browser_test.go starts
 // them behind synthetic loopback TLS). One scenario per invocation, in one colour scheme (the theme follows prefers-color-scheme).
 // Failures name a step and a surface, never a secret. All credentials are synthetic. The host recovery ceremony that ends restore
-// quarantine is MODELED by the fixture's control server (a later card owns the real one): everything else is the product.
+// quarantine (RESTORE-08) is the REAL setup-service ceremony, run by the fixture's control server (no web route can do it): it
+// enrols a NEW administrator, which these scenarios then sign in as. Everything else is the product.
 
 const [scenario, scheme, originArg, controlArg] = process.argv.slice(2);
 assert.ok(['light', 'dark'].includes(scheme), 'scheme');
@@ -118,11 +119,11 @@ async function freshCode(seed) {
   return code;
 }
 
-async function signIn(page, seed) {
+async function signIn(page, seed, who = { username: USER, password: PASSWORD }) {
   lastPage = page;
   await page.goto(new URL('/login', origin).href);
-  await field(page, 'Username').fill(USER);
-  await field(page, 'Password').fill(PASSWORD);
+  await field(page, 'Username').fill(who.username);
+  await field(page, 'Password').fill(who.password);
   await button(page, 'Sign in').click();
   await page.getByRole('heading', { name: 'Verify it’s you' }).waitFor();
   await field(page, '6-digit code').fill(await freshCode(seed));
@@ -380,9 +381,22 @@ async function restoreFlows() {
   assert.equal((await host.state()).sessions, 0, 'no session exists while quarantined');
   await shot(page, 'login-closed');
 
-  // ── the modeled host recovery, then explicit, per-record reapproval
-  await host.ceremony();
-  await signIn(page, seed);
+  // ── the REAL host recovery (a NEW administrator), then explicit, per-record reapproval
+  const recovered = await host.ceremony();
+  canaries.add(recovered.seed);
+  canaries.add(recovered.password);
+  assert.notEqual(recovered.username, USER, 'the recovery administrator is a new account, not the backup administrator');
+  assert.equal((await host.state()).quarantined, 0, 'the ceremony ended quarantine');
+  assert.equal((await host.state()).sessions, 0, 'the ceremony issued no session');
+  // The backup administrator's own password and authenticator are NOT enough: that account was never revived.
+  await page.goto(new URL('/login', origin).href);
+  await field(page, 'Username').fill(USER);
+  await field(page, 'Password').fill(PASSWORD);
+  await button(page, 'Sign in').click();
+  await page.getByRole('alert').first().waitFor();
+  assert.equal(await page.getByRole('heading', { name: 'Verify it’s you' }).count(), 0, 'the restored administrator cannot even reach the second factor');
+  assert.equal((await host.state()).sessions, 0, 'no session for the restored administrator');
+  await signIn(page, recovered.seed, recovered);
   await openRecovery(page, 'Review restored access', 'Review restored access');
   await page.getByText('Nothing listed here is active until you approve it').waitFor();
   await shot(page, 'review');
@@ -479,8 +493,10 @@ async function restoreFailure() {
 
   // The same file can be restored again after the host recovery, and that is safe.
   await host.fault(false);
-  await host.ceremony();
-  await signIn(page, seed);
+  const recovered = await host.ceremony();
+  canaries.add(recovered.seed);
+  canaries.add(recovered.password);
+  await signIn(page, recovered.seed, recovered);
   await openRecovery(page, 'Restore from backup', 'Restore from a backup');
   await chooseFile(page, full.upload);
   await typeAndConfirm(page);

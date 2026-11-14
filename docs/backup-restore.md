@@ -24,7 +24,9 @@ Code: `internal/backup` (archive, service, restore, approval), `internal/auth/ba
 * A restore ends in persisted `RESTORE_QUARANTINE`: every session (the initiator's too) is revoked, the
   credential, session, authority and restore generations are rotated, and no imported record is effective.
   The administrator who restored is signed out and cannot sign back in: ending quarantine is the
-  **host-authorized recovery ceremony** (a host helper, never a web route, owned by a later card).
+  **host-authorized restore-administrator recovery** (RESTORE-08, S2.2.5: a host helper, never a web route; see
+  [setup-recovery.md](setup-recovery.md)). It enrolls ONE new administrator with a fresh password and a fresh
+  authenticator and revives nothing the backup carried.
 * After the ceremony each record is made effective only by **explicit approval of the named manifest
   entry** (`POST …/restore/approvals`). Approval grants no credential: tokens and factors are reissued by
   their own flows.
@@ -145,8 +147,8 @@ weaker-MFA refusal, credential retention without reissuance, tamper/structure/ve
 authentic-but-inconsistent (re-signed) archives, smuggled-control cases, crash points, a real mid-import database
 failure, a competing-restore race and reopen persistence. `internal/auth/backup_admin_test.go` covers the
 routes: absence without a service, the declared step-up classes, ordinary-user and stale-evidence refusal,
-body bounds, session end, post-failure quarantine reporting and manifest/approval after a modeled
-recovery ceremony.
+body bounds, session end, post-failure quarantine reporting and manifest/approval after the real
+restore-administrator recovery.
 
 
 ## 9. Browser integration and evidence (P1.18.3)
@@ -186,8 +188,12 @@ restore, export mode mismatch accepted, a guessed comparison for an unreadable m
 web tests), and CSRF skipped, confirmation phrase ignored, integrity tag not compared, quarantine state not
 reported (all 4 killed by the Go tests).
 
-The host recovery ceremony is **modeled** (`PolicyE2E.RecoveryCeremony`, and the fixture's control server for the
-browser): no web route can end quarantine, and the real host helper belongs to a later card (§10).
+The host recovery ceremony is the **real** one (`PolicyE2E.RecoveryCeremony` and the browser fixture's control action both
+drive the production setup service through issue, reveal, exchange, account, address proof, fresh TOTP and completion): a NEW
+administrator is enrolled and quarantine ends in that transaction, and the scenarios then sign in as that administrator. The
+backup administrator, its factors and its revoked session stay dead (the earlier model that re-activated them is gone). Only the
+mail transport (the proof is captured instead of mailed) and, in the Go fixtures, the new administrator's AAL2 session row are
+synthetic; the browser signs in through the real login.
 
 ### RESTORE-xx crosswalk
 
@@ -200,9 +206,9 @@ Tests are named so each can be run on its own (`go test ./internal/auth ./intern
 | RESTORE-03 | `TestRestoreNeverDiscardsALocalDenyDuringPartialReview`; `TestAnImportedAllowNeverOverwritesALocalDenyForTheSameRule`; browser `restore-flows` (a post-backup person and DENY are kept, switched off, shown as "Not in the file") | covered |
 | RESTORE-04 | `TestHistoricalExpiryIsKeptAndNeverBecomesAFreshLifetime` | **partial**: no temporary grants exist in Phase 1; clock-rollback and restart behaviour is not exercised here (Phase 2) |
 | RESTORE-05 | `TestParallelRestoreRequestsOverHTTPLeaveOneConsistentInactiveState`, `TestAFailureAfterTheTransitionLeavesQuarantineAndNoPartialImport`, `TestADatabaseFailureMidImportRollsEverythingBack`, `TestARestoreOvertakenByANewerOneAppliesNothing`, `TestQuarantinePersistsAcrossReopen`; browser `restore-failure` (a real database fault inside the import: quarantine in force, sessions ended, no import kept, the page never says "nothing changed", the same file restores after recovery) and `parallel-restore` (two tabs, exactly one completes) | covered; a process crash/restart of `cmd/mandatary` is not exercised (the binary composes no backend, §10) |
-| RESTORE-06 | `TestTamperedAndMisversionedArchivesAreRefusedOverHTTPWithoutQuarantine`, `TestAnUnauthorizedInitiatorChangesNothingAndCannotTriggerQuarantine`, `TestRestoreRefusalsChangeNothingAndNeverEnterQuarantine`; browser five tamper variants, a non-JSON file that tries to set the acknowledgement itself, and the denial scenario | covered |
+| RESTORE-06 | `TestTamperedAndMisversionedArchivesAreRefusedOverHTTPWithoutQuarantine`, `TestAnUnauthorizedInitiatorChangesNothingAndCannotTriggerQuarantine`, `TestRestoreRefusalsChangeNothingAndNeverEnterQuarantine`; browser five tamper variants, a non-JSON file that tries to set the acknowledgement itself, and the denial scenario; `TestARestoreAndTheEndpointReapprovalDropTheSelfProtectionProofUntilItIsVerifiedAgain` (a committed restore and the endpoint reapproval each drop the shared self-protection proof through `Admin.WithSafetyReset` → `Authorizer.InvalidateSelfProtection`; nothing dispatches, `safety_unverified`, until a fresh `VerifySelf`) | covered over the mock backend. The composition root (P1.19) must pass `InvalidateSelfProtection` to `WithSafetyReset`; until it does, nothing in the binary reaches Docker at all (§10) |
 | RESTORE-07 | none: no external checkpoint or ledger exists. Quarantine remains the default | not applicable to this contribution |
-| RESTORE-08 | none: the host recovery token and ceremony belong to a later card | **not covered**; modeled only |
+| RESTORE-08 | `TestRestoreRecoveryIsIssuedOnlyInsideARestoreQuarantine`, `TestRestoreRecoveryEnrollsExactlyOneFreshAdministratorAndApprovesNothing`, `TestBackupCredentialsAndOrdinaryPathsCannotLeaveRestoreQuarantine`, `TestRestoreRecoverySessionIsNotASessionAndCannotDoAnythingElse`, `TestRestoreRecoveryTokenWinsOnceAndIsBounded`, `TestRestoreRecoveryRefusesWhenTheQuarantineIsNoLongerThere`, `TestRestoreRecoveryWorksAfterAFailedImport`, `TestRestoreRecoveryCrashPoints`, `TestRestoreRecoveryOverHTTPEndsQuarantineAndIssuesNoSession` (`internal/auth`); `TestCLIRestoreAdministratorRecoveryProtocol`, `TestCLIUsageAndRefusals` (`cmd/mandatary`); `web` containers test and browser `restore-flows` / `restore-failure` (the backup administrator's own password cannot reach the second factor; the new administrator signs in through the ordinary login) | covered: the token enrolls one new administrator, no restored factor/session/authority is revived or approved, backup password/MFA alone cannot leave quarantine; not run on a real host or with a real mail relay |
 | RESTORE-09 | `TestRestoreNeverDiscardsALocalDenyDuringPartialReview` and the manifest comparison (`imported` beside `effective`); browser `restore-flows` (a fresh-instance-style restore: nothing effective until named, no rule becomes effective by approving its group, only the named rule is effective) | covered, with no invented historical rollback |
 | RESTORE-10 | `TestNoExportCarriesSessionsOrSetupAndRecoveryState`; usage aggregates are outside the backup scope and the pages say so; no recovery is claimed | covered as an exclusion |
 | RESTORE-11 | `TestAWeakerImportedSecuritySettingNeverBecomesEffective`, `TestNoLocalControlOrStateFieldCanBeSmuggledIn`, the smuggled-field tamper case in the browser, and the manifest comparison | covered |
@@ -239,9 +245,17 @@ changes anything**.
 ### Host recovery
 
 Ending quarantine and re-establishing the administrator is a **host-authorized** action that no browser can
-perform; backup passwords or factors alone cannot leave quarantine. Its implementation is a later card
-(`mandatary recovery restore-admin` stays refused until then, see §11), so this
-runbook records the step and its place in the order but cannot yet give commands for it. The browser evidence models it.
+perform; backup passwords or factors alone cannot leave quarantine. On the host, as the service identity (full
+reference and guarantees: [setup-recovery.md](setup-recovery.md), "Restore-administrator recovery"):
+
+1. `mandatary recovery restore-admin --acknowledge-restore-recovery` (the flag records that this is a trusted-host
+   procedure, not NIST AAL2 account recovery). It refuses outside a restore quarantine.
+2. `mandatary recovery reveal --restore-admin` on a real terminal: the token is written once to that terminal and
+   expires in 30 minutes. If it expires or a step fails, run step 1 again.
+3. Open the setup page the log or runbook names, enter the token, then choose a **new** username and password, confirm a
+   notification address and enroll a fresh authenticator, and press **Finish recovery**. Quarantine ends in that step.
+   Nothing the backup carried is switched on, no one is signed in, and the restored administrator's own password and
+   authenticator never work again unless you approve them below.
 
 ### After: reapproval and credential reissuance
 
@@ -260,17 +274,16 @@ runbook records the step and its place in the order but cannot yet give commands
 ### What this runbook does not do
 
 It does not recover usage counters, sessions, setup or recovery state or the installation key (§2), does not roll
-back to a point in time, and was exercised only against a test installation with synthetic data and a modeled host
-ceremony, not on a real Docker or Unraid host.
+back to a point in time, and was exercised only against a test installation with synthetic data, not on a real
+Docker or Unraid host or with a real mail relay.
 
 ## 11. Outstanding (not part of this contribution)
 
-* The host recovery ceremony that ends quarantine and re-establishes the administrator (`mandatary recovery
-  restore-admin` stays refused until then); the tests model it only as direct SQL or the fixture's control action.
 * Operator verification of the runbook on a real installation; an application-level restart/crash test of
   `cmd/mandatary` (the binary composes no backend yet). Evidence here is component and integration over a mock
   backend.
-* RESTORE-04 clock behaviour with real temporary grants (Phase 2), RESTORE-07 and RESTORE-08.
-* Wiring `SetBackup` and `ops.NotifyAuthorityChange` in the composition root (P1.19).
+* RESTORE-04 clock behaviour with real temporary grants (Phase 2) and RESTORE-07.
+* Wiring `SetBackup`, `Admin.WithSafetyReset(authorizer.InvalidateSelfProtection)` and `ops.NotifyAuthorityChange` in the
+  composition root (P1.19), and a real-host run of the restore-administrator recovery.
 * Hosted CI evidence, including the ARM64 timeout adjustment of owner decision O1 (committed separately).
 * A link from the terminal pages to the runbook is not wired (`runbookHref` is unset: no route serves documents).

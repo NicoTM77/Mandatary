@@ -24,8 +24,9 @@ import (
 // P1.18.3 browser tests: the REAL admin bundle (web/dist), the REAL static handler, the REAL account, step-up and administrative
 // routes including the four P1.18 routes, and the real services (Admin, backup service, sessions, lifecycle) over a real SQLite
 // installation. Only the clock, the origin and the synthetic password are synthetic. The control server (plain loopback HTTP, never
-// part of the product) stands in for the host operator: it seeds a world, changes records after a backup, MODELS the host recovery
-// ceremony that ends restore quarantine (a later card owns the real one; no web route can do it), reports the installation's state,
+// part of the product) stands in for the host operator: it seeds a world, changes records after a backup, RUNS the real host
+// recovery ceremony that ends restore quarantine (RESTORE-08, no web route can do it: a new administrator with a fresh password
+// and authenticator is enrolled, nothing the backup carried is revived), reports the installation's state,
 // and plants a real database fault. It is not linked into cmd/mandatary.
 
 func startRecoveryUIFixture(t *testing.T) uiFixture {
@@ -177,15 +178,12 @@ func startRecoveryUIFixture(t *testing.T) uiFixture {
 			"policies":          count(`SELECT count(*) FROM policies`),
 		})
 	})
-	// The modeled host recovery: ends quarantine and makes only the administrator effective again. It approves nothing else.
+	// The REAL host recovery (setup service, purpose restore_recovery): a NEW administrator with a fresh password and TOTP, who
+	// signs in through the ordinary login. The backup administrator and everything it held stay inactive; nothing else is approved.
+	// The new credentials are returned so the browser can sign in with them (they are synthetic).
 	control.HandleFunc("POST /ceremony", func(w http.ResponseWriter, r *http.Request) {
-		g := e.scalar(`SELECT authority_generation FROM installation_control`)
-		c := e.scalar(`SELECT credential_generation FROM installation_control`)
-		e.exec(`UPDATE installation_control SET restore_quarantined=0`)
-		e.exec(`UPDATE users SET state='active',credential_generation=?,authority_generation=? WHERE id='u'`, c, g)
-		e.exec(`UPDATE administrative_roles SET state='active',authority_generation=? WHERE id='adm'`, g)
-		e.exec(`UPDATE authenticators SET state='active',credential_generation=? WHERE user_id='u'`, c)
-		reply(w, map[string]bool{"ok": true})
+		r2 := ae.hostRecoveryCeremony()
+		reply(w, map[string]string{"username": r2.Username, "password": r2.Password, "seed": r2.Seed})
 	})
 	// A REAL database fault in the middle of the import: SQLite itself raises it, exactly as a constraint failure would.
 	control.HandleFunc("POST /fault", func(w http.ResponseWriter, r *http.Request) {

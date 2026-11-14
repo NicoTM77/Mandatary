@@ -30,11 +30,11 @@ func TestHostRecoveryIssuanceScope(t *testing.T) {
 			t.Fatal("MFA reset issued on an installation with no administrator")
 		}
 	})
-	t.Run("restore recovery is unavailable", func(t *testing.T) {
+	t.Run("restore recovery is refused outside a restore quarantine", func(t *testing.T) {
 		e := newSetupEnv(t)
 		e.firstAdmin()
 		if _, err := e.s.Issue(e.ctx(), IssueRequest{Purpose: PurposeRestoreRecovery, RiskAcknowledged: true}); err == nil {
-			t.Fatal("restore recovery issued before a restore service exists")
+			t.Fatal("restore recovery issued on an installation that was never restored (see restore_recovery_test.go)")
 		}
 	})
 	t.Run("risk acknowledgement is mandatory", func(t *testing.T) {

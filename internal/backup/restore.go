@@ -69,7 +69,7 @@ var excludedScope = []string{"sessions", "rate_limit_state", "usage_statistics",
 //
 // Nothing here ends quarantine. Only the host-authorized recovery ceremony does (S2.2.5).
 func (s *Service) Restore(ctx context.Context, v *Verified, o RestoreOptions) (Report, error) {
-	if v == nil || o.Authorize == nil || (o.Initiator != InitiatorAdmin && o.Initiator != InitiatorHost) {
+	if v == nil || v.wiped || o.Authorize == nil || (o.Initiator != InitiatorAdmin && o.Initiator != InitiatorHost) {
 		return Report{}, ErrInvalid
 	}
 	if v.provenance == ProvenanceUnauthenticated && !o.AcknowledgeUnauthenticated {
@@ -165,13 +165,22 @@ func (s *Service) Restore(ctx context.Context, v *Verified, o RestoreOptions) (R
 }
 
 // sealedMaterial holds the re-encrypted TOTP and WebAuthn records for the TARGET installation. They
-// are produced before the transaction (the repository's cipher takes its own lock) and cleared after.
+// are produced before the transaction (the repository's cipher takes its own lock) and zeroed after.
 type sealedMaterial struct {
 	totp     map[string][]byte
 	webauthn map[string][]byte
 }
 
-func (m *sealedMaterial) clear() {}
+// clear zeroes every sealed envelope as far as Go allows. The runtime may have copied or moved a buffer, so this
+// limits how long the material stays reachable from this package; it is not a guarantee about memory the runtime owns.
+func (m *sealedMaterial) clear() {
+	for _, b := range m.totp {
+		clear(b)
+	}
+	for _, b := range m.webauthn {
+		clear(b)
+	}
+}
 
 func (s *Service) resealSecrets(v *Verified) (*sealedMaterial, error) {
 	m := &sealedMaterial{totp: map[string][]byte{}, webauthn: map[string][]byte{}}

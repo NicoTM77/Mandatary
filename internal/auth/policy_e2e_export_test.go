@@ -113,21 +113,16 @@ func (p *PolicyE2E) Text(query string, args ...any) string {
 	return out
 }
 
-// RecoveryCeremony MODELS the host-authorized recovery that ends restore quarantine (a later card owns the real
-// ceremony; no web route can do it): the administrator account, its role and its factors are made effective again at the
-// current generations and the administrator's own session row is live again, so the SAME cookie and CSRF token work. It
-// approves nothing else: every other restored record stays inactive until named in an approval.
-func (p *PolicyE2E) RecoveryCeremony() {
+// RecoveryCeremony runs the REAL host-authorized restore-administrator recovery (S2.2.5, RESTORE-08; see
+// recovery_ceremony_fixture_test.go): a NEW administrator with a fresh password and TOTP is enrolled and quarantine ends in
+// that one transaction. The backup administrator's account, role, factors and revoked session are NOT revived, and nothing
+// else is approved. The fixture then holds the new administrator's AAL2 session instead of the old one: AdminSession and
+// AdminCSRF return the NEW cookie and token, so callers must re-read them.
+func (p *PolicyE2E) RecoveryCeremony() RecoveredAdmin {
 	p.T.Helper()
-	e := p.env
-	g := e.scalar(`SELECT authority_generation FROM installation_control`)
-	c := e.scalar(`SELECT credential_generation FROM installation_control`)
-	s := e.scalar(`SELECT session_generation FROM installation_control`)
-	e.exec(`UPDATE installation_control SET restore_quarantined=0`)
-	e.exec(`UPDATE users SET state='active',credential_generation=?,authority_generation=? WHERE id='u'`, c, g)
-	e.exec(`UPDATE administrative_roles SET state='active',authority_generation=? WHERE id='adm'`, g)
-	e.exec(`UPDATE authenticators SET state='active',credential_generation=? WHERE user_id='u'`, c)
-	e.exec(`UPDATE sessions SET state='active',revoked_at=NULL,credential_generation=?,session_generation=? WHERE id=?`, c, s, e.sessID)
+	r := p.env.hostRecoveryCeremony()
+	_, p.AdminCSRF = p.env.signInRecoveryAdmin(r)
+	return r
 }
 
 // AdminSession is the administrator's cookie value and CSRF token.

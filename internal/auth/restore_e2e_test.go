@@ -4,9 +4,11 @@ package auth_test
 // (SQLite store, the administrator's session through the real Browser boundary, the real Admin and backup services and routes,
 // the shared authz.Authorizer, ops.Service, the REST adapter and the official MCP server driven by the official go-sdk client),
 // with the backup service attached. The Docker daemon is the in-memory MockBackend behind a spy that counts every operational
-// call before delegating, so "must not reach Docker" is measured. The host recovery ceremony is MODELED (PolicyE2E.RecoveryCeremony):
-// a later card owns the real one. No Docker socket, container build, real mail or secret is involved; this is component and
-// integration evidence over a mock backend, not real Docker and not a NIST/FIPS claim.
+// call before delegating, so "must not reach Docker" is measured. The host recovery ceremony is the REAL one
+// (PolicyE2E.RecoveryCeremony, RESTORE-08): a NEW administrator is enrolled with a fresh password and TOTP, nothing the backup
+// carried is revived, and the scenarios continue as that new administrator. No Docker socket, container build, real mail or
+// secret is involved; this is component and integration evidence over a mock backend, not real Docker and not a NIST/FIPS
+// claim.
 
 import (
 	"encoding/json"
@@ -16,6 +18,19 @@ import (
 
 	"github.com/NicoTM77/Mandatary/internal/auth"
 )
+
+// hostRecover runs the real host recovery and switches the world to the NEW administrator's session. The backup administrator's
+// cookie, which the restore revoked, stays dead.
+func (w *world) hostRecover() auth.RecoveredAdmin {
+	w.t.Helper()
+	old := w.cookie
+	r := w.p.RecoveryCeremony()
+	w.cookie, w.csrf = w.p.AdminSession()
+	if w.cookie == old {
+		w.t.Fatal("the recovery administrator reused the backup administrator's session")
+	}
+	return r
+}
 
 // manifestItem is the slice of a manifest entry the scenario needs.
 type manifestItem struct {
@@ -133,7 +148,7 @@ func TestRestoreNeverRevivesAuthorityOverRESTAndMCP(t *testing.T) {
 		w.neverOK("old token under quarantine", oldToken)
 	})
 
-	w.p.RecoveryCeremony() // MODELED host recovery: ends quarantine, makes only the administrator effective again
+	w.hostRecover() // the REAL host recovery: a NEW administrator, fresh password and TOTP; nothing the backup carried is revived
 
 	t.Run("after the ceremony nothing imported is effective and the old token is still dead", func(t *testing.T) {
 		items := w.manifestItems()
@@ -150,7 +165,7 @@ func TestRestoreNeverRevivesAuthorityOverRESTAndMCP(t *testing.T) {
 
 	items := w.manifestItems()
 	identity := pick(items, func(m manifestItem) bool {
-		// The administrator's own account (id "u") is what the modeled ceremony made effective; it is not named in an approval.
+		// The BACKUP administrator (id "u") stays inactive after the ceremony and is not part of what these scenarios approve.
 		return m.Approvable && m.ID != "u" && (m.Kind == "endpoint" || m.Kind == "user" || m.Kind == "group" || m.Kind == "agent" || m.Kind == "agent_membership" || m.Kind == "user_membership")
 	})
 	if len(identity) < 4 {
@@ -258,7 +273,7 @@ func TestRestoreNeverDiscardsALocalDenyDuringPartialReview(t *testing.T) {
 	if c, out := w.p.Do(http.MethodPost, admin+"/restore", body, w.cookie, w.csrf); c != http.StatusOK {
 		t.Fatalf("restore: %d %s", c, out)
 	}
-	w.p.RecoveryCeremony()
+	w.hostRecover()
 
 	var items []struct {
 		manifestItem

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Alert, Badge, Button, CodeField, Icon, Panel, PasswordField, SecretReveal, TextField, type StepItem } from '../ui';
-import type { AccountFormValues, AddressRow, ProofState, SetupAccountProps, SetupAddressesProps, SetupClock, SetupCompleteProps, SetupExchangeProps, TotpEnrollmentProps } from './contract';
+import type { AccountFormValues, AddressRow, ProofState, SetupAccountProps, SetupAddressesProps, SetupClock, SetupCompleteProps, SetupExchangeProps, SetupPurpose, TotpEnrollmentProps } from './contract';
 import { Command, RejectionAlert, commonRejection, useRequiredForm, type Rejection } from './shared';
 
 export const SETUP_STEPS: readonly StepItem[] = [
@@ -12,9 +12,14 @@ export const SETUP_STEPS: readonly StepItem[] = [
 ];
 
 /** Absolute-deadline notice shown on every setup screen after the token exchange. */
-export function SetupClockNotice({ clock }: { clock: SetupClock }) {
+export function SetupClockNotice({ clock, purpose }: { clock: SetupClock; purpose?: SetupPurpose }) {
   if (clock.kind === 'expired') {
-    return (
+    return purpose === 'restore_recovery' ? (
+      <Alert tone="danger" title="This setup session has expired">
+        Nothing you entered was saved. On the host, run <Command>mandatary recovery restore-admin --acknowledge-restore-recovery</Command> and then <Command>mandatary recovery reveal --restore-admin</Command>{' '}
+        for a new token, and start again.
+      </Alert>
+    ) : (
       <Alert tone="danger" title="This setup session has expired">
         Nothing you entered was saved. On the host, run <Command>mandatary setup rotate</Command> and then <Command>mandatary setup reveal</Command> for a new token, and start again.
       </Alert>
@@ -110,7 +115,8 @@ const PASSWORD_HINT = 'Use 8 to 128 characters. Password managers and pasting ar
 const PASSWORD_ENDPOINT_NOTE = 'If you will sign in from other devices, note that accents and emoji can be typed differently on other keyboards.';
 
 export function SetupAccount({ purpose, targetUser, replacePassword, mailConfigured, maxAddresses, state, onSubmit }: SetupAccountProps) {
-  const initial = purpose === 'initial_setup';
+  const initial = purpose !== 'mfa_reset'; // creates a NEW account: first setup or the recovery administrator of a restore
+  const recovery = purpose === 'restore_recovery';
   const [addressCount, setAddressCount] = useState(1);
   const rejected = state.kind === 'rejected';
   const busy = state.kind === 'submitting';
@@ -137,8 +143,8 @@ export function SetupAccount({ purpose, targetUser, replacePassword, mailConfigu
     return (
       <Panel title="Mail relay isn’t configured">
         <Alert tone="warning" role="none" title="Setup can’t be completed yet">
-          Mandatary must email a confirmation code to prove at least one notification address. Configure the mail relay for this installation, then run <Command>mandatary setup rotate</Command> to get a
-          fresh setup window.
+          Mandatary must email a confirmation code to prove at least one notification address. Configure the mail relay for this installation, then run{' '}
+          <Command>{recovery ? 'mandatary recovery restore-admin --acknowledge-restore-recovery' : 'mandatary setup rotate'}</Command> to get a fresh setup window.
         </Alert>
       </Panel>
     );
@@ -147,10 +153,22 @@ export function SetupAccount({ purpose, targetUser, replacePassword, mailConfigu
 
   return (
     <Panel
-      title={initial ? 'Create the administrator account' : 'Choose a new password'}
-      description={initial ? 'This account manages users, groups, agents and policies. It has no access to containers by default.' : `Replacing the password for ${targetUser ?? 'the administrator'}.`}
+      title={recovery ? 'Create the recovery administrator' : initial ? 'Create the administrator account' : 'Choose a new password'}
+      description={
+        recovery
+          ? 'This installation was restored from a backup. This one new account ends the restore lock and manages users, groups, agents and policies. It has no access to containers by default.'
+          : initial
+            ? 'This account manages users, groups, agents and policies. It has no access to containers by default.'
+            : `Replacing the password for ${targetUser ?? 'the administrator'}.`
+      }
     >
-      <form {...form.formProps} aria-label={initial ? 'Create administrator' : 'Replace password'} className="space-y-4">
+      <form {...form.formProps} aria-label={recovery ? 'Create recovery administrator' : initial ? 'Create administrator' : 'Replace password'} className="space-y-4">
+        {recovery ? (
+          <Alert tone="warning" role="none" title="Nothing from the backup is switched back on">
+            Every account, role, sign-in method, saved code, address and session that came with the backup stay switched off. They are not reused, and this account does not approve them. After you sign in you review and approve
+            what to restore.
+          </Alert>
+        ) : null}
         {rejection ? <RejectionAlert rejection={rejection} active /> : null}
         {initial ? (
           <TextField name="username" label="Username" autoComplete="username" autoCapitalize="none" autoCorrect="off" spellCheck={false} required error={form.errorFor('username')} readOnly={busy} />
@@ -361,12 +379,15 @@ export function TotpEnrollment({ state, algorithmLabel, digits, periodSeconds, o
 
 // ───────────────────────── complete ─────────────────────────
 
-export function SetupComplete({ accountStaged, confirmedAddressCount, totpProven, state, onComplete, signInHref }: SetupCompleteProps) {
+export function SetupComplete({ accountStaged, confirmedAddressCount, totpProven, state, onComplete, signInHref, purpose }: SetupCompleteProps) {
+  const recovery = purpose === 'restore_recovery';
   if (state.kind === 'done') {
     return (
-      <Panel title="Setup is complete">
+      <Panel title={recovery ? 'Recovery is complete' : 'Setup is complete'}>
         <Alert tone="success" role="status" title={`${state.username} is ready`}>
-          Setup does not sign you in. Sign in with your password and authenticator code to continue.
+          {recovery
+            ? 'Nothing from the backup was switched on and no one is signed in. Sign in with the new password and authenticator code, then review what the backup carried and approve only what you trust.'
+            : 'Setup does not sign you in. Sign in with your password and authenticator code to continue.'}
         </Alert>
         <a href={signInHref} className="inline-flex min-h-11 w-full items-center justify-center rounded-control bg-accent px-4 font-medium text-accent-fg hover:bg-accent-hover">
           Go to sign in
@@ -375,13 +396,13 @@ export function SetupComplete({ accountStaged, confirmedAddressCount, totpProven
     );
   }
   const items = [
-    { done: accountStaged, label: 'Administrator account saved' },
+    { done: accountStaged, label: recovery ? 'Recovery administrator account saved' : 'Administrator account saved' },
     { done: confirmedAddressCount > 0, label: confirmedAddressCount > 0 ? `${confirmedAddressCount} notification ${confirmedAddressCount === 1 ? 'address' : 'addresses'} confirmed` : 'Confirm a notification address' },
     { done: totpProven, label: 'Authenticator app confirmed' },
   ];
   const ready = items.every((item) => item.done);
   return (
-    <Panel title="Finish setup" description="Mandatary stays locked until every item below is done.">
+    <Panel title={recovery ? 'Finish recovery' : 'Finish setup'} description={recovery ? 'The restored installation stays locked until every item below is done.' : 'Mandatary stays locked until every item below is done.'}>
       {state.kind === 'rejected' ? <RejectionAlert rejection={state.reason === 'denied' ? { title: 'Setup couldn’t be completed', body: 'A requirement is missing or the setup session ended. Review the list and try again.' } : commonRejection(state.reason)} active /> : null}
       <ul className="space-y-2">
         {items.map((item) => (
@@ -395,7 +416,7 @@ export function SetupComplete({ accountStaged, confirmedAddressCount, totpProven
         ))}
       </ul>
       <Button className="w-full" disabled={!ready && state.kind !== 'submitting'} busy={state.kind === 'submitting'} busyLabel="Finishing…" onClick={onComplete}>
-        Finish setup
+        {recovery ? 'Finish recovery' : 'Finish setup'}
       </Button>
     </Panel>
   );

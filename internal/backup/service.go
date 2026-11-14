@@ -384,6 +384,32 @@ type Verified struct {
 	archive    Archive
 	payload    secretPayload
 	provenance Provenance
+	wiped      bool
+}
+
+// Wipe zeroes the plaintext credential material that opening a full archive produced (TOTP seeds, WebAuthn records,
+// verifier and token hashes) and makes this value unusable for any further Restore. The caller calls it as soon as it is done
+// with the archive. Go gives no promise about copies the runtime made, so this limits how long the secrets stay reachable
+// from the application; it is not a memory-erasure guarantee. It is idempotent.
+func (v *Verified) Wipe() {
+	if v == nil {
+		return
+	}
+	v.wiped = true
+	for _, a := range v.payload.Authenticators {
+		for _, b := range [][]byte{a.TOTPSeed, a.VerifierHash, a.PublicKey, a.ExternalCredentialID} {
+			clear(b)
+		}
+	}
+	for _, b := range v.payload.AgentCredentials {
+		clear(b)
+	}
+	for _, b := range v.payload.WebauthnUsers {
+		clear(b)
+	}
+	for _, b := range v.payload.WebauthnRecords {
+		clear(b)
+	}
 }
 
 func (v *Verified) BackupID() string               { return v.archive.BackupID }

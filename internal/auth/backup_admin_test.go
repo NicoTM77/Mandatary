@@ -324,19 +324,14 @@ func TestAFailedImportAfterTheTransitionReportsQuarantineAndEndsSessions(t *test
 	}
 }
 
-// afterRecoveryCeremony models the HOST-authorized recovery that ends quarantine (a later card owns the
-// ceremony itself; no web route can do this): the administrator account, its role and its factors are
-// made effective again at the current generations and a fresh AAL2 session exists.
+// afterRecoveryCeremony runs the REAL host-authorized restore-administrator recovery (S2.2.5): a NEW administrator is
+// enrolled with a fresh password and TOTP and quarantine ends in that transaction. The backup administrator is NOT revived;
+// the fixture then holds the new administrator's fresh AAL2 session (cookie and CSRF token replaced).
 func (h *adminHTTP) afterRecoveryCeremony() {
 	h.t.Helper()
-	g := h.scalar(`SELECT authority_generation FROM installation_control`)
-	c := h.scalar(`SELECT credential_generation FROM installation_control`)
-	s := h.scalar(`SELECT session_generation FROM installation_control`)
-	h.exec(`UPDATE installation_control SET restore_quarantined=0`)
-	h.exec(`UPDATE users SET state='active',credential_generation=?,authority_generation=? WHERE id='u'`, c, g)
-	h.exec(`UPDATE administrative_roles SET state='active',authority_generation=? WHERE id='adm'`, g)
-	h.exec(`UPDATE authenticators SET state='active',credential_generation=? WHERE user_id='u'`, c)
-	h.exec(`UPDATE sessions SET state='active',revoked_at=NULL,credential_generation=?,session_generation=? WHERE id=?`, c, s, h.sessID)
+	r := h.hostRecoveryCeremony()
+	cookie, csrf := h.signInRecoveryAdmin(r)
+	h.cookie, h.csrf = cookie, csrf
 	h.refresh()
 }
 

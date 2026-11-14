@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"errors"
 	"io"
+	"sync/atomic"
 	"time"
 
 	"github.com/NicoTM77/Mandatary/internal/backup"
@@ -92,6 +93,8 @@ type Admin struct {
 	// backup is the optional logical backup service (backup_admin.go). Without it the backup and
 	// restore routes do not exist.
 	backup *backup.Service
+	// safetyReset drops the shared self-protection proof (backup_admin.go, WithSafetyReset).
+	safetyReset atomic.Pointer[func()]
 }
 
 // NewAdmin binds the service to the lifecycle's repository and clock. notify, when

@@ -32,6 +32,27 @@ func (a *Admin) SetBackup(s *backup.Service) error {
 	return nil
 }
 
+// WithSafetyReset installs the hook that drops the shared self-protection proof (the composition root passes the shared
+// authorizer's InvalidateSelfProtection; nil removes it). It runs after a restore commits (the quarantine transition
+// included, even if the import then failed) and after a reapproval that makes the endpoint effective again, so no
+// operation reaches the backend until a fresh, independent VerifySelf succeeds (RESTORE-06, S2.2.1/S2.2.6). An authenticated
+// archive says nothing about the daemon, its peers or Mandatary's own identity, and this service does not own the
+// proof. It is deployment wiring, not request input; without it the proof is whatever the backend holds.
+func (a *Admin) WithSafetyReset(fn func()) *Admin {
+	if fn == nil {
+		a.safetyReset.Store(nil)
+		return a
+	}
+	a.safetyReset.Store(&fn)
+	return a
+}
+
+func (a *Admin) resetSafety() {
+	if fn := a.safetyReset.Load(); fn != nil {
+		(*fn)()
+	}
+}
+
 // backupAuthorizer re-verifies the administrator inside the transaction that reads or changes state.
 func (a *Admin) backupAuthorizer(secret []byte) backup.Authorizer {
 	return func(ctx context.Context, q *store.Queries, _ store.InstallationControl, _ int64) error {
@@ -119,11 +140,14 @@ func (a *Admin) RestoreBackup(ctx context.Context, secret, archive []byte, ackno
 	if err != nil {
 		return RestoreResult{}, err
 	}
+	defer verified.Wipe() // the opened credential material lives no longer than this call
 	report, err := a.backup.Restore(ctx, verified, backup.RestoreOptions{Initiator: backup.InitiatorAdmin, Authorize: a.backupAuthorizer(secret), AcknowledgeUnauthenticated: acknowledgeUnauthenticated})
 	if err != nil && !backup.Quarantined(err) {
 		return RestoreResult{}, err
 	}
-	// Active decisions and streams must end now, whether or not the import completed.
+	// Active decisions and streams must end now, whether or not the import completed, and the self-protection proof
+	// must be rebuilt independently before anything dispatches again.
+	a.resetSafety()
 	notified := a.changed(ctx) == nil
 	if err != nil {
 		return RestoreResult{}, err
@@ -180,6 +204,12 @@ func (a *Admin) ReapproveRestored(ctx context.Context, secret []byte, refs []bac
 	}
 	if err != nil {
 		return nil, err
+	}
+	for _, r := range results {
+		if r.Kind == "endpoint" { // the endpoint becomes effective again: its safety must be proven again first
+			a.resetSafety()
+			break
+		}
 	}
 	if err = a.changed(ctx); err != nil {
 		return results, err

@@ -40,6 +40,14 @@ func (p SetupPurpose) valid() bool {
 	return p == PurposeInitialSetup || p == PurposeMFAReset || p == PurposeRestoreRecovery
 }
 
+// createsAccount: these purposes enroll a NEW administrator (username, password, notification address, second
+// factor). An MFA reset only re-binds a factor of one existing account. PurposeRestoreRecovery is the host-authorized
+// restore-administrator recovery (security-contracts.md S2.2.5, RESTORE-08): it never reuses a restored account, factor
+// or session, and it approves nothing that a backup carried.
+func (p SetupPurpose) createsAccount() bool {
+	return p == PurposeInitialSetup || p == PurposeRestoreRecovery
+}
+
 const (
 	// SetupTokenLifetime is the ABSOLUTE lifetime of one generation (TD §10.3).
 	// No retrieval, restart, retry or rotation of another generation extends it.
@@ -296,6 +304,21 @@ func setupEligible(ctx context.Context, q *store.Queries) error {
 		return err
 	}
 	if blockers != 0 {
+		return errSetupLogical
+	}
+	return nil
+}
+
+// restoreRecoveryEligible is the quarantine test of the restore-administrator recovery (S2.2.5): the installation is in a
+// persisted restore quarantine that a RESTORE produced. The restore transition rotates every control generation, so a
+// fresh installation (all zero, quarantined only because it is new) and an unquarantined one are both ineligible. It
+// reads nothing from any archive and creates, repairs and migrates nothing.
+func restoreRecoveryEligible(ctx context.Context, q *store.Queries) error {
+	c, err := q.GetInstallationControl(ctx)
+	if err != nil {
+		return err
+	}
+	if c.RestoreQuarantined != 1 || c.RestoreGeneration <= 0 || c.CredentialGeneration <= 0 || c.SessionGeneration <= 0 || c.AuthorityGeneration <= 0 {
 		return errSetupLogical
 	}
 	return nil

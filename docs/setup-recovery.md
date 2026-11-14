@@ -54,7 +54,8 @@ mandatary setup rotate
 mandatary setup reveal
 mandatary recovery reset-mfa --user NAME --acknowledge-all-factors-lost-risk [--replace-password]
 mandatary recovery reveal    --user NAME
-mandatary recovery restore-admin          # refuses: not available until the restore service (P1.18)
+mandatary recovery restore-admin --acknowledge-restore-recovery
+mandatary recovery reveal    --restore-admin
 flags: --data-dir PATH   --master-key-file PATH   --uid N --gid N
 ```
 
@@ -122,6 +123,56 @@ acceptance. Host/root/service-UID holders, Docker administrators and the host
 terminal are trusted (§S3.1b trust limit). A web/API administrator role cannot
 invoke it.
 
+### Restore-administrator recovery (RESTORE-08, S2.2.5)
+
+A restore ends in persisted restore quarantine with every session revoked and no
+imported record effective (`docs/backup-restore.md`). The quarantine is ended by
+exactly one thing: this host-authorized ceremony. It is the same mechanism as
+above (protected reveal to the controlling terminal, the shared control-state
+lock, a 30-minute single-use token) with its own purpose, `restore_recovery`.
+
+```
+mandatary recovery restore-admin --acknowledge-restore-recovery   # issues; prints no token
+mandatary recovery reveal --restore-admin                         # writes the token once to the terminal
+```
+
+* **Only inside a restore quarantine.** Issuing, revealing and completing each
+  re-read the persisted control state and refuse unless `restore_quarantined` is
+  set and the restore, credential, session and authority generations are all
+  non-zero (a restore rotates all of them; a fresh installation has none of them).
+  No archive is read. `status` prints `restore recovery eligible`.
+* **Deliberate.** The acknowledgement flag is required, `--user`,
+  `--replace-password` and the MFA-reset acknowledgement are refused, and it is
+  never issued automatically at startup. `reveal` accepts `--user` **or**
+  `--restore-admin`, never both.
+* **One new administrator.** The exchanged token opens the same web setup
+  surface (the page says it is a recovery of a restored installation): a **new**
+  username, a fresh password, a confirmed notification address and a **fresh**
+  authenticator. Completion creates that account with the administrator role and
+  ends quarantine in the **same transaction**. A second account, a second
+  authenticator or a replacement password is refused.
+* **It revives nothing.** No restored account, role, factor, saved code, address,
+  agent credential or session becomes effective, none is re-bound to the new
+  account, and no manifest entry or imported authority is approved. The restored
+  administrator's password and authenticator do not sign in. Control generations
+  are never lowered or reset.
+* **No session.** Completion issues no session. The new administrator signs in
+  through the ordinary password + authenticator login (AAL2) and then reapproves
+  restored records one by name (`docs/backup-restore.md` §10).
+* **Refused when the quarantine is gone.** A token whose quarantine ended (for
+  example an earlier completion or a competing recovery) completes nothing.
+
+Tests: `internal/auth/restore_recovery_test.go` (eligibility, exactly-one admin,
+nothing approved or revived, backup credentials cannot leave quarantine, the
+capability is not a session, one-time token/guess limits, a failed import, crash
+points), `restore_recovery_http_test.go` (the real HTTP surface),
+`cmd/mandatary/restore_admin_cli_test.go` and `cli_test.go` (the helper's
+protocol and refusals) and the `TestRecoveryUIBrowser` scenarios.
+
+This is an application-specific trusted-host procedure and is **not** NIST AAL2
+account recovery or identity proofing. Host/root/service-UID holders are trusted
+(§S3.1b trust limit).
+
 ## Security properties and where they are tested
 
 | Contract | Evidence (all executable in this change) |
@@ -149,8 +200,11 @@ invoke it.
 * The first administrator's mandatory MFA in this card is TOTP. WebAuthn-only
   accounts cannot use `reset-mfa`; WebAuthn registration stays in the normal
   post-login lifecycle.
-* Restore-administrator recovery is intentionally refused until the restore
-  service exists (P1.18).
+* Restore-administrator recovery is delivered by P1.18 (below). The helper only
+  issues and reveals; the web setup page drives the enrolment. Nothing here
+  verified it on a real host: it is exercised with the real services over a real
+  SQLite installation, a real loopback TLS mail receiver and real browsers, with
+  the host helper's terminal proof covered by its own protocol tests.
 * No SMTP credential can be stored by a command in this change.
 * The adapter uses the connection's own peer address and never a forwarded header.
   Behind a reverse proxy that address is the proxy, so the per-address traffic

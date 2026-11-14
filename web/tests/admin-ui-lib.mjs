@@ -165,6 +165,7 @@ export function control(base) {
     world: () => call('POST', '/world'),
     localChange: () => call('POST', '/local-change'),
     state: () => call('GET', '/state'),
+    /** Runs the REAL host recovery; returns the NEW administrator's synthetic credentials { username, password, seed }. */
     ceremony: () => call('POST', '/ceremony'),
     fault: (on) => call('POST', '/fault', { on }),
     ordinary: async () => (await call('POST', '/ordinary')).cookie,
