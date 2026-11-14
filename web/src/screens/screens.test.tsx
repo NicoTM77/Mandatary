@@ -192,6 +192,19 @@ test('the setup clock distinguishes active, expiring and expired and tells the o
     </ThemeProvider>,
   );
   expect(screen.getByRole('status').textContent).toContain('1 minute');
+  // One pluralisation rule for the whole UI (formatMinutes): the singular and a clamped zero read correctly on the active line too.
+  rerender(
+    <ThemeProvider>
+      <SetupClockNotice clock={{ kind: 'active', minutesLeft: 1 }} />
+    </ThemeProvider>,
+  );
+  expect(screen.getByText('Setup session ends in 1 minute.')).toBeTruthy();
+  rerender(
+    <ThemeProvider>
+      <SetupClockNotice clock={{ kind: 'active', minutesLeft: 0 }} />
+    </ThemeProvider>,
+  );
+  expect(screen.getByText('Setup session ends in 0 minutes.')).toBeTruthy();
   rerender(
     <ThemeProvider>
       <SetupClockNotice clock={{ kind: 'expired' }} />
