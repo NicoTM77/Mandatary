@@ -115,10 +115,35 @@ test('the auth-card carried items found by the sweep keep their source run ident
     'P103-R132-modelled-persistence-loss': 'run132',
     'P103-R132-soft-go-limits-no-oom-guarantee': 'run132',
     'C2-O1-session-revocation-leases': 'run442',
+    // Round-2 review sweep (comment 229): P1.09, P1.05 and P1.06 carried items.
+    'P109-R435-privdrop-success-never-executed': 'run436',
+    'P109-R435-SETUP-10-11-12-not-run': 'run432',
+    'P109-R434-S3.2-credential-records-revoked-deviation': 'run434',
+    'P109-limits-linux-only-and-webauthn-only-reset': 'run436',
+    'P105-R237-R238-argon2id-should-departures-db-theft-residual': 'run237',
+    'P106-notice-delivery-bounds': 'handoff-report',
+    'P106-no-malicious-host-rollback-guarantee': 'review-final',
   };
   for (const [id, run] of Object.entries(expected)) {
     const row = ledger.rows.find((r) => r.id === id);
     assert.ok(row, `${id}: missing`);
     assert.ok(row.source_refs.join(' ').includes(run), `${id}: source reference ${run} not kept`);
   }
+});
+
+test('the P1.09 deferred verifications are owned gates with concrete missing evidence, and the three cards list the new rows in the coverage table', () => {
+  const byId = (id) => ledger.rows.find((r) => r.id === id);
+  const drop = byId('P109-R435-privdrop-success-never-executed');
+  assert.equal(drop.status, 'future_gate');
+  assert.equal(drop.owner_task, 't_7f9cfaf3');
+  assert.match(drop.missing_evidence, /setuid/);
+  const setup = byId('P109-R435-SETUP-10-11-12-not-run');
+  assert.equal(setup.status, 'future_gate');
+  for (const id of ['SETUP-10', 'SETUP-11', 'SETUP-12']) assert.ok(setup.missing_evidence.includes(id), `${id} named in the missing evidence`);
+  const cardRows = (prefix) => ledger.cards.find((c) => c.title.startsWith(prefix)).finding_rows;
+  for (const id of ['P109-R435-privdrop-success-never-executed', 'P109-R435-SETUP-10-11-12-not-run', 'P109-R434-S3.2-credential-records-revoked-deviation', 'P109-limits-linux-only-and-webauthn-only-reset']) {
+    assert.ok(cardRows('P1.09').includes(id), `P1.09 coverage lists ${id}`);
+  }
+  assert.ok(cardRows('P1.05').includes('P105-R237-R238-argon2id-should-departures-db-theft-residual'));
+  for (const id of ['P106-notice-delivery-bounds', 'P106-no-malicious-host-rollback-guarantee']) assert.ok(cardRows('P1.06').includes(id), `P1.06 coverage lists ${id}`);
 });

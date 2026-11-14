@@ -10,8 +10,8 @@
  "status_counts": {
   "already_resolved": 56,
   "fixed_here": 37,
-  "bounded_limitation": 40,
-  "future_gate": 19
+  "bounded_limitation": 45,
+  "future_gate": 21
  },
  "excluded": [
   {
@@ -2979,6 +2979,150 @@
    ]
   },
   {
+   "id": "P109-R435-privdrop-success-never-executed",
+   "group": "gate",
+   "source_card": "P1.09",
+   "status": "future_gate",
+   "owner": "P1.19",
+   "owner_task": "t_7f9cfaf3",
+   "title": "The successful setgroups/setgid/setuid privilege drop of the host helper has never been executed; only its refusal rules are tested",
+   "source_refs": [
+    "P1.09 run432 not_run; run434 not_run; run436 not_run (a successful setuid drop)",
+    "P1.09 review run435 report: /opt/data/scratch/mandatary-p109-review435/review-report.md (Nonblocking, \"Not run\")",
+    "docs/setup-recovery.md Limits (privilege drop bullet)"
+   ],
+   "disposition": "cmd/mandatary/privdrop_linux.go dropPrivileges needs CAP_SETUID/CAP_SETGID, which an unprivileged hosted job or an approved local run does not have. TestDropPrivilegesRefusesPrivilegedIdentities covers only the refusal rules (uid/gid 0 and negative identities). docs/setup-recovery.md states that the successful drop is covered by the operator procedure and not by an automated test. No claim of a verified drop is made here, and no real Docker, host or privileged operation is run by this card.",
+   "missing_evidence": "An execution of the real helper in the approved isolated composition with the documented non-root identity that shows setgroups, setgid and setuid succeed, the process then runs as the unprivileged uid/gid with no supplementary groups and cannot regain root, and the reveal/issue protocol still works afterwards. Recorded in the P1.19 deployment acceptance (non-root hardening).",
+   "valid_earlier_evidence": "TestDropPrivilegesRefusesPrivilegedIdentities (refusal rules only) and the pty/protocol tests of the helper (TestHostTerminalAcceptsOnlyTheControllingTerminal, TestCLIIssueRevealStatusProtocol). They do not execute a successful drop.",
+   "current_source": [
+    "cmd/mandatary/privdrop_linux.go",
+    "cmd/mandatary/privdrop_test.go",
+    "docs/setup-recovery.md"
+   ]
+  },
+  {
+   "id": "P109-R435-SETUP-10-11-12-not-run",
+   "group": "gate",
+   "source_card": "P1.09",
+   "status": "future_gate",
+   "owner": "P1.19",
+   "owner_task": "t_7f9cfaf3",
+   "title": "SETUP-10 (real Compose, proxy and browser), SETUP-11 (Compose host runbook on each supported CPU) and SETUP-12 (Unraid) were not run",
+   "source_refs": [
+    "P1.09 run432 not_run; run434 not_run; run436 not_run (SETUP-10/11/12)",
+    "P1.09 review run435 report: /opt/data/scratch/mandatary-p109-review435/review-report.md (Nonblocking, \"Not run\")",
+    "docs/setup-recovery.md Limits (\"P1.19 owns the deployment artifacts and those runs\")"
+   ],
+   "disposition": "Unknown stays unknown: no real container runtime, proxy or Unraid host is used by this card (common contract: no live Docker, Unraid or real mail). The service, helper-protocol and browser behaviour of SETUP-01 to SETUP-09 is tested in this repository, but nothing here is evidence for SETUP-10, SETUP-11 or SETUP-12, and none is claimed.",
+   "missing_evidence": "SETUP-10: first-administrator setup through the real Compose service behind the real reverse proxy with a real browser, including the host-helper reveal. SETUP-11: the Compose host runbook executed on each supported CPU architecture. SETUP-12: the same flow on the supported Unraid environment. Each run recorded in P1.19 deployment acceptance and retained for the P1.20 release evidence pack.",
+   "valid_earlier_evidence": "The executable SETUP-01 to SETUP-09 suites listed in docs/setup-recovery.md (real SQLite store, real pty child, real loopback TLS mail receiver, real browsers in the Go fixture). They are not deployment evidence.",
+   "current_source": [
+    "docs/setup-recovery.md"
+   ]
+  },
+  {
+   "id": "P109-R434-S3.2-credential-records-revoked-deviation",
+   "group": "auth",
+   "source_card": "P1.09",
+   "status": "bounded_limitation",
+   "owner_card": "P1.09 accepted deviation, recorded in docs/setup-recovery.md",
+   "title": "Accepted deviation from security-contracts S3.2: MFA-reset issuance revokes the account's own credential records instead of moving a credential generation",
+   "source_refs": [
+    "P1.09 run434 deviation_for_reviewer; P1.09 coder comment 184",
+    "P1.09 review run435 report: /opt/data/scratch/mandatary-p109-review435/review-report.md (Accepted deviation, disclosed for the owner)"
+   ],
+   "disposition": "installation_control.credential_generation is installation-wide, and users.credential_generation must equal it for an account to be valid (internal/authz/principal.go), so bumping it would invalidate every account and a per-user move would deactivate the account. Instead the issuance transaction durably revokes the account's own factors, saved codes and batches, capabilities and sessions, so the affected credentials cannot authenticate or start recovery once issuance commits. Reviewer run435 judged this to meet the intent of S3.2. Issuance is deliberately disruptive: the account has no administrator login until completion or re-issue. Regression: TestHostMFAResetIssuanceInvalidatesOldCredentials.",
+   "rationale": "A generation move would need an architectural change to the credential-generation model (installation-wide validity). The accepted mechanism reaches the same observable result for the affected account, and the requirement (old credentials cannot authenticate or recover after issuance) is not weakened.",
+   "current_source": [
+    "internal/auth/setup_recovery_test.go",
+    "internal/authz/principal.go",
+    "docs/setup-recovery.md"
+   ]
+  },
+  {
+   "id": "P109-limits-linux-only-and-webauthn-only-reset",
+   "group": "auth",
+   "source_card": "P1.09",
+   "status": "bounded_limitation",
+   "owner_card": "P1.09 documented Limits in docs/setup-recovery.md",
+   "title": "The host helper's terminal proof and reveal protocol are Linux-only, and accounts whose only factor is WebAuthn cannot use reset-mfa",
+   "source_refs": [
+    "P1.09 run432/run434/run436 limitations",
+    "P1.09 review run435 report (Limits)",
+    "docs/setup-recovery.md Limits (Linux-only bullet; WebAuthn-only bullet)"
+   ],
+   "disposition": "Other platforms refuse to reveal and to drop privileges (cmd/mandatary/privdrop_other.go returns an unsupported-platform error), which is fail-closed; the supported deployment and development hosts are Linux. The first administrator's mandatory MFA is TOTP, so WebAuthn-only accounts are outside reset-mfa; WebAuthn registration stays in the normal post-login lifecycle. No weaker proof is offered to make either case work.",
+   "rationale": "Both are explicit scope statements of the approved Phase 1 setup design (Linux hosts per support-and-deployment-matrix.md; TOTP mandatory first MFA); lifting them would add a recovery path with less assurance.",
+   "current_source": [
+    "docs/setup-recovery.md",
+    "cmd/mandatary/privdrop_other.go"
+   ]
+  },
+  {
+   "id": "P105-R237-R238-argon2id-should-departures-db-theft-residual",
+   "group": "auth",
+   "source_card": "P1.05",
+   "status": "bounded_limitation",
+   "owner_card": "P1.05 approved departures, recorded in docs/password-authentication.md",
+   "title": "Approved Argon2id SHOULD departures (approved-scheme and keyed-iteration), no pepper or hardware custody, and the residual database-theft offline-guessing exposure",
+   "source_refs": [
+    "P1.05 run237 limitations",
+    "P1.05 run238 report: /opt/data/scratch/mandatary-p105-review238/review-report.md (line 89, \"Approved SHOULD departures, DB-theft residual ... remain mandatory\")",
+    "docs/password-authentication.md (final paragraph)"
+   ],
+   "disposition": "The authorized departures stay as approved: Argon2id v19 with m=65536 KiB, t=3, p=4 and a random 16-byte salt, no NIST-approved-scheme or FIPS claim, no keyed iteration/pepper and no hardware custody. An attacker who obtains the database can attempt offline guessing; the exposure is bounded only by the Argon2id cost and the memorized-secret rules, and it is a stated residual, not a closed risk. Linux getrandom/Go crypto/rand use and correct salt length are implementation facts, not proof of a validated approved RBG. Validated-RBG, provider and federal evidence stays in GATE-QUALIFICATION. docs/password-authentication.md says all of this; nothing is waived.",
+   "rationale": "Recorded approved departure of the Phase 1 password design; a pepper or hardware custody would be a new key-custody architecture and is out of Phase 1 scope.",
+   "current_source": [
+    "docs/password-authentication.md"
+   ],
+   "see_rows": [
+    "GATE-QUALIFICATION"
+   ]
+  },
+  {
+   "id": "P106-notice-delivery-bounds",
+   "group": "auth",
+   "source_card": "P1.06",
+   "status": "bounded_limitation",
+   "owner_card": "P1.06 documented bounds in docs/authenticator-lifecycle.md",
+   "title": "Notice delivery is at least once; SMTP 250 is relay acceptance only; mail already handed over cannot be recalled; unmatched minimal protective incidents need operator investigation and manual notification",
+   "source_refs": [
+    "P1.06 implementation handoff report: /opt/data/scratch/mandatary-p106/handoff-report.md (Remaining integration/release boundaries)",
+    "P1.06 final review report: /opt/data/scratch/mandatary-p106-review-final/review-report.md (line 95)",
+    "P1.06 review277 report: /opt/data/scratch/mandatary-p106-review277/review-report.md (line 57)",
+    "docs/authenticator-lifecycle.md (SMTP 250 paragraph; protective snapshot with no usable destinations)"
+   ],
+   "disposition": "Stated in docs/authenticator-lifecycle.md and not weakened: SMTP 250 only means that the relay accepted the message; ambiguous DATA/send/ack crashes can duplicate a message with its stable identity, so delivery is at least once and never exactly once; a message already handed to a relay cannot be recalled when quarantine begins (restore stops new claims and stale acknowledgements, quarantines old outbox work and requires explicit address reapproval); a protective snapshot with no usable destination stays in the quarantined intent state, counted by NoticeHealth, and is never called sent or silently retargeted, so the operator investigates and notifies the account holder independently. No bounce ingestion or human-receipt detection exists.",
+   "rationale": "Email is not a recallable or exactly-once channel; a stronger claim would be false. The bounds keep revocation authoritative and make a failed or unmatched notice visible rather than hidden.",
+   "current_source": [
+    "docs/authenticator-lifecycle.md",
+    "docs/backup-restore.md"
+   ]
+  },
+  {
+   "id": "P106-no-malicious-host-rollback-guarantee",
+   "group": "auth",
+   "source_card": "P1.06",
+   "status": "bounded_limitation",
+   "owner_card": "P1.06 documented bound in docs/authenticator-lifecycle.md",
+   "title": "Durable-before-acknowledge relies on honest sync; there is no guarantee against a malicious host rolling back state or against arbitrary broken hardware",
+   "source_refs": [
+    "P1.06 implementation handoff report: /opt/data/scratch/mandatary-p106/handoff-report.md",
+    "P1.06 final review report: /opt/data/scratch/mandatary-p106-review-final/review-report.md (line 95)",
+    "docs/authenticator-lifecycle.md (durable-before-ack paragraph)"
+   ],
+   "disposition": "Documented: durable-before-acknowledge relies on the real filesystem and hardware honoring sync, and a host that can roll the database back is outside what this layer can detect. The restore path's explicit no-freshness-proof/default-quarantine posture (C4-restore07-no-external-ledger) is the safe boundary; no external anti-rollback ledger is implemented or claimed. Storage-hardware qualification stays in GATE-QUALIFICATION and P103-R132-modelled-persistence-loss.",
+   "rationale": "A same-host rollback adversary controls the storage the service trusts; defending against it needs an external trust anchor, which would be a new architecture and is not part of Phase 1.",
+   "current_source": [
+    "docs/authenticator-lifecycle.md"
+   ],
+   "see_rows": [
+    "C4-restore07-no-external-ledger",
+    "P103-R132-modelled-persistence-loss",
+    "GATE-QUALIFICATION"
+   ]
+  },
+  {
    "id": "AUTH-09-L4-L5",
    "group": "auth",
    "source_card": "P1.09",
@@ -3159,6 +3303,7 @@
     "GATE-CODEQL-INVENTORY",
     "GATE-QUALIFICATION",
     "HIST-local-scanner-allocation-failures",
+    "P105-R237-R238-argon2id-should-departures-db-theft-residual",
     "P105-R238-normalizer-advisory-ownership",
     "P105-R238-repository-poison"
    ]
@@ -3194,7 +3339,9 @@
     "DEP-SQLC-CEL-GO",
     "GATE-CODEQL-INVENTORY",
     "GATE-QUALIFICATION",
-    "HIST-local-scanner-allocation-failures"
+    "HIST-local-scanner-allocation-failures",
+    "P106-no-malicious-host-rollback-guarantee",
+    "P106-notice-delivery-bounds"
    ]
   },
   {
@@ -3250,7 +3397,11 @@
     "DEP-ESLINT-MINIMATCH",
     "DEP-GO-X-NET-CRYPTO",
     "GATE-QUALIFICATION",
-    "HIST-local-scanner-allocation-failures"
+    "HIST-local-scanner-allocation-failures",
+    "P109-R434-S3.2-credential-records-revoked-deviation",
+    "P109-R435-SETUP-10-11-12-not-run",
+    "P109-R435-privdrop-success-never-executed",
+    "P109-limits-linux-only-and-webauthn-only-reset"
    ]
   },
   {
@@ -3893,6 +4044,8 @@
     "OPS-P119-composition",
     "OPS-production-restart-runtime",
     "P108-R425-tls-retention",
+    "P109-R435-SETUP-10-11-12-not-run",
+    "P109-R435-privdrop-success-never-executed",
     "P112-event-reconnect-contract",
     "P113-N1-session-push",
     "P115-D4",
