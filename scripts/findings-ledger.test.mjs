@@ -147,3 +147,41 @@ test('the P1.09 deferred verifications are owned gates with concrete missing evi
   assert.ok(cardRows('P1.05').includes('P105-R237-R238-argon2id-should-departures-db-theft-residual'));
   for (const id of ['P106-notice-delivery-bounds', 'P106-no-malicious-host-rollback-guarantee']) assert.ok(cardRows('P1.06').includes(id), `P1.06 coverage lists ${id}`);
 });
+
+// Round-3 review sweep (comment 230): the run metadata items that the report-level rows did not cover.
+test('the round-3 carried items keep their source run identifiers and are disposed with owners, evidence and coverage', () => {
+  const byId = (id) => ledger.rows.find((r) => r.id === id);
+  const expected = {
+    'P114-R452-I4-stream-cap-test-timeout-only': 'run452',
+    'P116-R462-sign-in-needs-notice-relay': 'run462',
+    'P116-R462-R461-docs-sessions-browser-security-stale': 'comment 230',
+    'P116-R461-SetupClockNotice-pluralisation': 'run461',
+    'P116-R461-R462-slice-outstanding-items': 'run461',
+    'C3-R473-O4-production-safety-reverify-loop': 'run473',
+  };
+  for (const [id, run] of Object.entries(expected)) {
+    const row = byId(id);
+    assert.ok(row, `${id}: missing`);
+    assert.ok(row.source_refs.join(' ').includes(run), `${id}: source reference ${run} not kept`);
+  }
+  // The report's own Info I4 (cosmetic wrongCSRF) is a different item and keeps its own row.
+  assert.ok(byId('P114-I4-redundant-CSRF-check'));
+  const stream = byId('P114-R452-I4-stream-cap-test-timeout-only');
+  assert.equal(stream.status, 'fixed_here');
+  assert.ok(stream.tests.some((t) => t.startsWith('tests/adapters/stream_test.go::')));
+  assert.match(stream.red, /1\.27 s/, 'the red evidence records the prompt failure');
+  assert.match(readFileSync('tests/adapters/stream_test.go', 'utf8'), /an open follow stream was granted/, 'the helper fails promptly on an unexpected 200');
+  const relay = byId('P116-R462-sign-in-needs-notice-relay');
+  assert.equal(relay.status, 'bounded_limitation');
+  assert.match(relay.disposition, /MANDATARY_SMTP_RELAY/, 'the operator-visible recovery is named');
+  const gate = byId('C3-R473-O4-production-safety-reverify-loop');
+  assert.equal(gate.status, 'future_gate');
+  assert.equal(gate.owner_task, 't_7f9cfaf3');
+  assert.match(gate.missing_evidence, /re-verification loop/);
+  const cardRows = (prefix) => ledger.cards.find((c) => c.title.startsWith(prefix)).finding_rows;
+  assert.ok(cardRows('P1.14').includes('P114-R452-I4-stream-cap-test-timeout-only'));
+  assert.ok(cardRows('C3').includes('C3-R473-O4-production-safety-reverify-loop'));
+  for (const prefix of ['P1.16.2', 'P1.16.3']) {
+    for (const id of ['P116-R461-R462-slice-outstanding-items', 'P116-R462-sign-in-needs-notice-relay']) assert.ok(cardRows(prefix).includes(id), `${prefix} coverage lists ${id}`);
+  }
+});

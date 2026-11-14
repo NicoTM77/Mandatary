@@ -9,9 +9,9 @@
  },
  "status_counts": {
   "already_resolved": 56,
-  "fixed_here": 38,
-  "bounded_limitation": 45,
-  "future_gate": 21
+  "fixed_here": 41,
+  "bounded_limitation": 47,
+  "future_gate": 22
  },
  "excluded": [
   {
@@ -3143,6 +3143,155 @@
    ]
   },
   {
+   "id": "P114-R452-I4-stream-cap-test-timeout-only",
+   "group": "auth",
+   "source_card": "P1.14",
+   "status": "fixed_here",
+   "title": "The follow-stream cap mutant was killed only by a two-minute test-timeout panic: the deny helper read the body of an unexpected 200 follow stream, which never ends",
+   "source_refs": [
+    "P1.14 reviewer run452 metadata nonblocking_findings I4 (\"nostreamcap mutant killed only by test timeout (deny helper blocks in io.ReadAll on an unexpected 200 stream)\"); not the report's own Info I4 (cosmetic wrongCSRF), which is P114-I4-redundant-CSRF-check",
+    "P1.18.4 review round 3, comment 230, item 1: /opt/data/scratch/mandatary-p1184-review-r3/review-report.md (section 1)"
+   ],
+   "disposition": "tests/adapters/stream_test.go: the deny helper of TestFollowRequestsAreAuthorizedAndBoundedLikeEveryOtherRequest now checks the response status BEFORE it reads the body. An unexpected 200 fails immediately with \"an open follow stream was granted, want 429 too_many_streams\"; any other unexpected status reads at most 4 KiB of body for the message. Every existing assertion and control is unchanged (unauthenticated, no-grant, wrong container, malformed follow, cap-exceeded, the per-credential and overall stream caps and the slot release). Product code is unchanged: the per-credential and global caps in internal/api/rest.go serveFollow were already enforced and are now guarded by a prompt, readable failure rather than the package timeout budget.",
+   "commit": "bf9ec04",
+   "tests": [
+    "tests/adapters/stream_test.go::TestFollowRequestsAreAuthorizedAndBoundedLikeEveryOtherRequest"
+   ],
+   "docs": [],
+   "files": [
+    "tests/adapters/stream_test.go"
+   ],
+   "red": "red-P114-I4-streamcap.log (local mutation run, not CI): with internal/api/rest.go serveFollow acquire replaced by `release, ok := func() {}, true` the test now fails in 1.27 s with stream_test.go:262 \"...follow=true&tail=1: 200 (an open follow stream was granted), want 429 too_many_streams/\" (whole command 5 s). Before the change the same mutant was killed only by `panic: test timed out after 2m0s` (reviewer run, 124 s). green-P114-I4-streamcap.log: the unmutated tests/adapters package passes under -race (59.5 s)."
+  },
+  {
+   "id": "P116-R462-sign-in-needs-notice-relay",
+   "group": "auth",
+   "source_card": "P1.16/P1.16.3",
+   "status": "bounded_limitation",
+   "title": "Sign-in, step-up, factor and recovery routes exist only when a verified-TLS notice relay is configured; a finished installation that loses its relay settings cannot sign in",
+   "source_refs": [
+    "P1.16.3 coder run462 outstanding_issues[1] (\"Login routes are mounted only when a notice relay is configured ... a finished installation without relay cannot sign in. Existing architecture, not changed.\")",
+    "docs/ui/p1.16.3-setup-login-integration.md section 6",
+    "P1.18.4 review round 3, comment 230, item 2"
+   ],
+   "owner_card": "P1.16.3 documented consequence, corrected in docs/sessions-browser-security.md by P1.18.4",
+   "disposition": "Still true and intended: cmd/mandatary/main.go builds auth.Lifecycle (and with it Sessions, the password and factor services) only when MANDATARY_SMTP_RELAY is set, and mounts AccountPaths(), SecurityPaths() and the admin API only when the Lifecycle exists. Operator-visible consequence: with no relay settings the login, step-up, factor, recovery and agent-credential routes fall through to the static 404/405 (nothing is half-mounted), and the setup log says so for first issuance (AUTH-09-L4-L5). Recovery: restore the verified-TLS relay settings (MANDATARY_SMTP_RELAY, MANDATARY_SMTP_TLS, MANDATARY_SMTP_SENDER, MANDATARY_NOTICE_CONTACT with MANDATARY_PUBLIC_ORIGIN) and restart; no password-only, unnotified or otherwise weaker sign-in is offered. docs/sessions-browser-security.md now states the condition and the recovery, and scripts/docs-mounted-surface.test.mjs fails if either main.go or the document stops saying it.",
+   "rationale": "The notice relay is mandatory in the approved design: sensitive credential changes must notify the account holder, and an unnotified sign-in/lifecycle path would weaken the approved assurance and notice contract. Mounting login without it would be a security-architecture change that this card must not make.",
+   "current_source": [
+    "cmd/mandatary/main.go",
+    "docs/sessions-browser-security.md",
+    "docs/setup-recovery.md",
+    "scripts/docs-mounted-surface.test.mjs"
+   ],
+   "see_rows": [
+    "AUTH-09-L4-L5",
+    "P116-R462-R461-docs-sessions-browser-security-stale"
+   ]
+  },
+  {
+   "id": "P116-R462-R461-docs-sessions-browser-security-stale",
+   "group": "auth",
+   "source_card": "P1.08/P1.16",
+   "status": "fixed_here",
+   "title": "docs/sessions-browser-security.md still said the step-up, security-key-login and factor/recovery routes were not mounted and that the P1.16 contribution was not independently reviewed",
+   "source_refs": [
+    "P1.18.4 review round 3, comment 230, item 5 (docs/sessions-browser-security.md lines 12-18)",
+    "P1.16 independent review run 472; cmd/mandatary/main.go mounts SecurityPaths()"
+   ],
+   "disposition": "The paragraph now describes the mounted surface that cmd/mandatary/main.go actually registers (AccountPaths, SecurityPaths and the admin API prefix with the agent-credential reveal-once routes), states that P1.16 was independently reviewed (run 472) and merged, and carries the notice-relay condition and recovery of P116-R462-sign-in-needs-notice-relay. The historical slice-1 record docs/ui/p1.16.3-setup-login-integration.md is marked superseded rather than rewritten. A guard test ties the document to main.go so it cannot go stale in either direction.",
+   "commit": "d3ad336",
+   "tests": [
+    "scripts/docs-mounted-surface.test.mjs::the document does not claim the step-up, factor or recovery routes are unmounted or the contribution unreviewed",
+    "scripts/docs-mounted-surface.test.mjs::every route group main.go mounts on the browser boundary is named by the document",
+    "scripts/docs-mounted-surface.test.mjs::the relay condition is stated on both sides: the code builds the Lifecycle only with a relay and the document says sign-in then does not exist"
+   ],
+   "docs": [
+    "docs/sessions-browser-security.md",
+    "docs/ui/p1.16.3-setup-login-integration.md"
+   ],
+   "files": [
+    "scripts/docs-mounted-surface.test.mjs"
+   ],
+   "red": "red-docs-mounted-surface.log (local run, not CI): against the previous document 2 of 3 guard assertions fail (\"the document does not describe auth.AccountPaths()\", \"stale: the security routes are mounted\", and the relay-condition test); green-docs-mounted-surface.log: 3 of 3 pass with the corrected document."
+  },
+  {
+   "id": "P116-R461-SetupClockNotice-pluralisation",
+   "group": "auth",
+   "source_card": "P1.16/P1.16.2",
+   "status": "fixed_here",
+   "title": "SetupClockNotice kept its own inline minute pluralisation instead of the shared formatMinutes",
+   "source_refs": [
+    "P1.16.2 coder run461 outstanding_issues (\"setup.tsx still has its own inline minute pluralisation (SetupClockNotice)\")",
+    "P1.18.4 review round 3, comment 230, item 3"
+   ],
+   "disposition": "web/src/screens/setup.tsx now uses formatMinutes from web/src/ui/format.ts (the rule the rest of the UI uses: pluralisation by Intl.PluralRules, truncation, clamp at zero), so there is one pluralisation rule. Rendered text for the supported whole-minute values is unchanged. This is a duplicate-rule removal, not a behaviour defect: the screens test now also pins the active line at 1 minute and 0 minutes.",
+   "commit": "bf9ec04",
+   "tests": [
+    "web/src/screens/screens.test.tsx::the setup clock distinguishes active, expiring and expired and tells the operator how to restart",
+    "web/src/ui/format.test.ts::formatMinutes"
+   ],
+   "docs": [],
+   "files": [
+    "web/src/screens/setup.tsx",
+    "web/src/screens/screens.test.tsx"
+   ],
+   "red": "Characterization, not a red/green fix: the old inline expression and formatMinutes render the same text for the integer minute counts the clock produces (1 -> \"1 minute\", 24 -> \"24 minutes\"), so no failing mutant exists for the visible text. vitest src/screens/screens.test.tsx passes 43 of 43 after the change (local run, not CI)."
+  },
+  {
+   "id": "P116-R461-R462-slice-outstanding-items",
+   "group": "auth",
+   "source_card": "P1.16/P1.16.2/P1.16.3",
+   "status": "bounded_limitation",
+   "title": "Remaining slice outstanding items of P1.16.2 (run461) and P1.16.3 (run462): primitives had no browser run, jsdom key-activation limits, Skeleton no-layout-shift convention, SyntheticBadge strings in the bundle",
+   "source_refs": [
+    "P1.16.2 coder run461 outstanding_issues (no screen imports the primitives yet; no Chromium run; keyboard.test.tsx jsdom limits; Skeleton no-layout-shift convention; docs/ui section 12 record not updated; no Go tests; no accessibility scanner)",
+    "P1.16.3 coder run462 outstanding_issues (SyntheticBadge label strings ship in the bundle; Chromium only; container tests use a fake server)",
+    "P1.18.4 review round 3, comment 230, item 3"
+   ],
+   "owner_card": "P1.16 integration and review (run 472), P1.16.4, and the OPS-SUP04/OPS-A11Y gates",
+   "disposition": "(a) Primitives not adopted / no browser run: superseded. P1.16.3, P1.16.4, P1.17 and P1.18 screens import them, and the Chromium browser suites (TestAdminUIBrowser, TestSecurityUIBrowser, TestRecoveryUIBrowser and TestRecoveryUIBrowserPhone, light and dark) exercise them in a real browser; the Firefox/WebKit regression runs and the unverified branded-browser/device limits stay under OPS-SUP04-real-matrix. (b) jsdom does not synthesise Enter/Space/arrow activation: kept as a documented test-environment limit. Every control is a native element and the keyboard.test.tsx preconditions plus the handlers React wires are asserted; the custom key handlers that exist (ConfirmPanel Escape, restore and agent-identity form handlers) are covered by their own tests and the Chromium recovery suite presses Escape with a real key. The Tab-order and focus-indicator walk (web/tests/a11y-audit.mjs) is an on-demand tool, not a CI job, and no screen-reader or conformance claim is made (OPS-A11Y-no-conformance). (c) Skeleton no-layout-shift is a fixed-height-line convention asserted by markup in Skeleton.test.tsx; it is not measured against the content it stands for. (d) SyntheticBadge: the production bundle contains two inert label strings (\"Synthetic\" and \"Synthetic value, not a real secret\") because SecretReveal can render the badge when a synthetic prop is set; the prop is never set in production, the gallery and fixtures are excluded from the production build, and no secret or fixture data ships. (e) SetupClockNotice pluralisation is fixed (P116-R461-SetupClockNotice-pluralisation). (f) The docs/ui section 12 record, the no-Go-test and no-scanner statements were scope statements of that slice and are superseded by the P1.16 review and OPS-A11Y-no-conformance.",
+   "rationale": "Each item is either superseded by later merged and reviewed work, a documented limit of the jsdom test environment, or an inert static string; none weakens a requirement, and removing the two badge strings would need a SecretReveal API change with no security benefit.",
+   "current_source": [
+    "web/src/ui/keyboard.test.tsx",
+    "web/src/ui/Skeleton.test.tsx",
+    "web/src/ui/SecretReveal.tsx",
+    "web/tests/a11y-audit.mjs",
+    "web/tests/recovery-ui-browser.mjs"
+   ],
+   "see_rows": [
+    "OPS-A11Y-no-conformance",
+    "OPS-SUP04-real-matrix",
+    "P116-R461-SetupClockNotice-pluralisation"
+   ]
+  },
+  {
+   "id": "C3-R473-O4-production-safety-reverify-loop",
+   "group": "auth",
+   "source_card": "C3",
+   "status": "future_gate",
+   "title": "After an authorized backend fault drops the global safety proof, nothing in the production composition re-verifies it (403 safety_unverified until a re-verification that the composition must run)",
+   "source_refs": [
+    "C3 reviewer run473 nonblocking_observations O4 (owner \"P1.19 real adapter\", Info): \"An authorized backend fault drops the global safety proof (403 safety_unverified) until re-verification; documented fail-closed\"",
+    "C3 comment 213 O4",
+    "P1.18.4 review round 3, comment 230, item 4"
+   ],
+   "disposition": "Retained as an explicit P1.19 obligation, not implemented here (the composition root is held and out of phase). The fail-closed behaviour is the intended and documented one: until re-verified, every operation is refused with safety_unverified and follow streams end with safety_unverified. P113-N3-revocation-cancel and P117-L1-inventory-deadline carry the related limits of when the proof is dropped.",
+   "owner": "P1.19",
+   "owner_task": "t_7f9cfaf3",
+   "missing_evidence": "In the composed service, a production re-verification loop that restores the global safety proof after an authorized backend fault, after an event-stream discontinuity and after a lost or expired verification deadline, with evidence that (a) operations and follow streams stay refused (safety_unverified) until the proof is re-established, (b) the proof is restored without operator action once the backend is healthy, and (c) the loop does not mask a genuine shared fault or revocation.",
+   "valid_earlier_evidence": "Package-level and mock-backend tests that prove the fail-closed contract the loop must serve (for example TestFollowStreamEndsOnEveryRevocationOrExpiryCauseOverREST, case safety-proof-lost/backend-ends-stream-first, and the P1.13/P1.15 safety-proof tests); they use mock backends and are not evidence of the production loop.",
+   "current_source": [
+    "tests/adapters/stream_test.go",
+    "internal/ops"
+   ],
+   "see_rows": [
+    "P113-N3-revocation-cancel",
+    "P117-L1-inventory-deadline",
+    "OPS-P119-composition",
+    "GATE-PRODUCTION-PACKAGING"
+   ]
+  },
+  {
    "id": "AUTH-09-L4-L5",
    "group": "auth",
    "source_card": "P1.09",
@@ -3398,7 +3547,8 @@
     "P108-R428-ambiguous-revoked-floor",
     "P108-R428-down-migration-provenance",
     "P108-R431-authorizer-revalidation-end-to-end",
-    "P108-R431-stranded-AAL1-session"
+    "P108-R431-stranded-AAL1-session",
+    "P116-R462-R461-docs-sessions-browser-security-stale"
    ]
   },
   {
@@ -3533,7 +3683,8 @@
     "P114-I3-MCP-dupkey-test",
     "P114-I4-redundant-CSRF-check",
     "P114-L1",
-    "P114-L2"
+    "P114-L2",
+    "P114-R452-I4-stream-cap-test-timeout-only"
    ]
   },
   {
@@ -3576,7 +3727,11 @@
     "P116-L4-unverifiable-contrast",
     "P116-L5-address-storage-fault",
     "P116-L6-postcommit-recovery-view",
-    "P116-O4-TOTP-provisioning"
+    "P116-O4-TOTP-provisioning",
+    "P116-R461-R462-slice-outstanding-items",
+    "P116-R461-SetupClockNotice-pluralisation",
+    "P116-R462-R461-docs-sessions-browser-security-stale",
+    "P116-R462-sign-in-needs-notice-relay"
    ]
   },
   {
@@ -3658,6 +3813,7 @@
    "comments": 1,
    "runs": 1,
    "finding_rows": [
+    "C3-R473-O4-production-safety-reverify-loop",
     "OPS-O1-arm64-budget",
     "OPS-P119-composition",
     "OPS-WebKit-select-CSP",
@@ -3702,7 +3858,11 @@
     "P116-L4-unverifiable-contrast",
     "P116-L5-address-storage-fault",
     "P116-L6-postcommit-recovery-view",
-    "P116-O4-TOTP-provisioning"
+    "P116-O4-TOTP-provisioning",
+    "P116-R461-R462-slice-outstanding-items",
+    "P116-R461-SetupClockNotice-pluralisation",
+    "P116-R462-R461-docs-sessions-browser-security-stale",
+    "P116-R462-sign-in-needs-notice-relay"
    ]
   },
   {
@@ -3723,7 +3883,11 @@
     "P116-L4-unverifiable-contrast",
     "P116-L5-address-storage-fault",
     "P116-L6-postcommit-recovery-view",
-    "P116-O4-TOTP-provisioning"
+    "P116-O4-TOTP-provisioning",
+    "P116-R461-R462-slice-outstanding-items",
+    "P116-R461-SetupClockNotice-pluralisation",
+    "P116-R462-R461-docs-sessions-browser-security-stale",
+    "P116-R462-sign-in-needs-notice-relay"
    ]
   },
   {
@@ -3745,7 +3909,11 @@
     "P116-L5-address-storage-fault",
     "P116-L6-postcommit-recovery-view",
     "P116-O4-TOTP-provisioning",
-    "P116-R2-preauth-display-timer-test-race"
+    "P116-R2-preauth-display-timer-test-race",
+    "P116-R461-R462-slice-outstanding-items",
+    "P116-R461-SetupClockNotice-pluralisation",
+    "P116-R462-R461-docs-sessions-browser-security-stale",
+    "P116-R462-sign-in-needs-notice-relay"
    ]
   },
   {
@@ -3766,7 +3934,11 @@
     "P116-L4-unverifiable-contrast",
     "P116-L5-address-storage-fault",
     "P116-L6-postcommit-recovery-view",
-    "P116-O4-TOTP-provisioning"
+    "P116-O4-TOTP-provisioning",
+    "P116-R461-R462-slice-outstanding-items",
+    "P116-R461-SetupClockNotice-pluralisation",
+    "P116-R462-R461-docs-sessions-browser-security-stale",
+    "P116-R462-sign-in-needs-notice-relay"
    ]
   },
   {
@@ -4061,6 +4233,7 @@
    "comments": 2,
    "runs": 0,
    "finding_rows": [
+    "C3-R473-O4-production-safety-reverify-loop",
     "GATE-PRODUCTION-PACKAGING",
     "OPS-P119-composition",
     "OPS-production-restart-runtime",
