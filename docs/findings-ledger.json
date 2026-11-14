@@ -1173,7 +1173,7 @@
    ],
    "status": "fixed_here",
    "disposition": "Permanent phone-viewport (390x844, light and dark) scenario for BOTH recovery reveals. Before the harness focuses anything it asserts that the PRODUCT moved focus to the reveal region (the documented target, labelled by the heading) and that the heading and the first warning are fully visible below the sticky header (where one exists) and inside the viewport; it then checks that the heading, copy button, acknowledgement checkbox and Hide button are reachable by keyboard focus, not covered by the header and cause no sideways scroll (html scroll-padding-top 6.5rem from P1.17 is the existing mitigation, now proven).",
-   "commit": "22aff87",
+   "commit": "22aff87, f3cf07a",
    "tests": [
     "web/tests/security-ui-browser.mjs::assertProductFocusAndFirstWarning",
     "web/tests/security-ui-browser.mjs::recoveryRevealPhone",
@@ -1568,7 +1568,7 @@
    ],
    "status": "fixed_here",
    "disposition": "Permanent test for a failure injected after the quarantine commit: the self-protection proof is dropped and reaches no backend, a live lease held before the restore has ended when the call returns, partial import stays rolled back. A control for the other side of the boundary: a restore refused BEFORE the transition (an unverifiable-origin clean archive without the acknowledgement) keeps the proof Verified, the live lease, the administrator session, the generation and the quarantine state unchanged, and never calls the safety reset.",
-   "commit": "cb4d624",
+   "commit": "cb4d624, f3cf07a",
    "tests": [
     "internal/auth/restore_failed_import_test.go::TestAFailedImportAfterTheTransitionStillDropsTheSelfProtectionProofAndReachesNoBackend",
     "internal/auth/restore_failed_import_test.go::TestARestoreRefusedBeforeTheTransitionKeepsTheProofTheLeaseAndTheSession",
@@ -1791,7 +1791,7 @@
    ],
    "status": "fixed_here",
    "disposition": "The authorized manifest resolves every rule and membership by stable ID to effect, operation, subject kind/name/ID, endpoint, selector, constraints and effective values (internal/backup/detail.go); membership names principal and group; approval may carry a digest of the reviewed detail and a mismatch is refused as stale_details; the UI shows the exact authority in both the checkbox and the confirmation and offers no checkbox for a record without identifying detail. Record kind+ID selection, quarantine, step-up, dependency validation and atomic approval are unchanged.",
-   "commit": "cb4d624, 5a5df6f, 22aff87",
+   "commit": "cb4d624, 5a5df6f, 22aff87, f3cf07a",
    "tests": [
     "internal/backup/detail_test.go::TestManifestNamesTheExactAuthorityOfEveryRuleAndMembership",
     "internal/backup/detail_test.go::TestDetailFallsBackToStableIDsWhenARecordIsMissing",
