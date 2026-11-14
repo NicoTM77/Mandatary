@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
+	"errors"
 	"time"
 )
 
@@ -59,7 +60,17 @@ func (e *adminEnv) hostRecoveryCeremony() RecoveredAdmin {
 		e.t.Fatalf("exchange: %v", err)
 	}
 	secret := session.Secret()
-	addresses, err := s.StageAccount(ctx, secret, AccountRequest{Username: fixtureRecoveryUser, Password: []byte(fixtureRecoveryPassword), Addresses: []string{fixtureRecoveryAddress}})
+	// Password hashing is bounded to one at a time PROCESS-WIDE and a second caller is refused (ErrSetupBusy) instead of queued.
+	// This fixture runs inside parallel tests that hash too, so it waits its turn, as a person pressing "Save account" again
+	// would. Nothing is consumed by a refusal; any other error is final.
+	var addresses []SetupAddress
+	for deadline := time.Now().Add(2 * time.Minute); ; {
+		addresses, err = s.StageAccount(ctx, secret, AccountRequest{Username: fixtureRecoveryUser, Password: []byte(fixtureRecoveryPassword), Addresses: []string{fixtureRecoveryAddress}})
+		if !errors.Is(err, ErrSetupBusy) || time.Now().After(deadline) {
+			break
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
 	if err != nil {
 		e.t.Fatalf("stage: %v", err)
 	}
