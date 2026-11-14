@@ -131,7 +131,7 @@ func TestMCPDuplicateObjectKeysAreRejectedOnTheWireWithZeroBackendAndUsageEffect
 			// The adapter reports it as the common invalid_request tool error; a JSON-RPC
 			// invalid params error is the other sanitized rejection and is equally accepted
 			// as long as nothing was dispatched.
-			if !((isToolErr && code == api.CodeInvalidRequest && st == 400) || rpcCode == -32602 || rpcCode == -32600) {
+			if (!isToolErr || code != api.CodeInvalidRequest || st != 400) && rpcCode != -32602 && rpcCode != -32600 {
 				t.Fatalf("want sanitized invalid_request/invalid_params, got tool=%v code=%q status=%d rpc=%d: %q", isToolErr, code, st, rpcCode, raw)
 			}
 			if n := e.spy.total(); n != 0 {

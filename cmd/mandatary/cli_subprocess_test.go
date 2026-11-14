@@ -161,8 +161,11 @@ func (in *childInstall) runAll(n int, args string, crash bool) []childResult {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			done := make(chan error, 1)
-			go func() { done <- p.cmd.Wait() }()
+			done := make(chan struct{})
+			go func() {
+				_ = p.cmd.Wait() // the exit code is read from ProcessState below
+				close(done)
+			}()
 			select {
 			case <-done:
 			case <-time.After(60 * time.Second):
@@ -173,9 +176,7 @@ func (in *childInstall) runAll(n int, args string, crash bool) []childResult {
 			res := childResult{exit: p.cmd.ProcessState.ExitCode(), stdout: p.out.String(), stderr: p.err.String()}
 			// The production terminal protocol writes a banner, the token and a footer. What matters is how many TOKENS the process was asked to display.
 			if raw, err := os.ReadFile(p.shownPath); err == nil {
-				for _, token := range cliToken.FindAllString(string(raw), -1) {
-					res.shown = append(res.shown, token)
-				}
+				res.shown = append(res.shown, cliToken.FindAllString(string(raw), -1)...)
 			}
 			results[i] = res
 		}()
