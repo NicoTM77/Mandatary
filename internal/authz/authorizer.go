@@ -664,6 +664,53 @@ func (a *Authorizer) ValidateDecision(ctx context.Context, dec Decision) error {
 // churn fails closed instead of livelocking.
 const maxValidationAttempts = 16
 
+// maxErrorTreeNodes bounds onlyContextCauses so a pathological or cyclic error
+// graph is treated as "not pure" (shared) instead of walking unboundedly.
+const maxErrorTreeNodes = 64
+
+// onlyContextCauses reports whether err is NON-nil and every leaf of its entire
+// error tree is context.Canceled or context.DeadlineExceeded. It walks both
+// Unwrap() error and Unwrap() []error (errors.Join, multi-%w) with a node bound
+// and never inspects error strings. Any independent leaf, an empty/unknown
+// multi-wrapper or an exhausted bound is conservatively NOT pure, so the fault
+// is handled as shared and affected peers are canceled.
+func onlyContextCauses(err error) bool {
+	if err == nil {
+		return false
+	}
+	budget := maxErrorTreeNodes
+	var pure func(error) bool
+	pure = func(e error) bool {
+		budget--
+		if budget < 0 {
+			return false
+		}
+		if e == context.Canceled || e == context.DeadlineExceeded {
+			return true
+		}
+		switch u := e.(type) {
+		case interface{ Unwrap() []error }:
+			real := 0
+			for _, c := range u.Unwrap() {
+				if c == nil {
+					continue // a nil child carries no fault
+				}
+				real++
+				if !pure(c) {
+					return false
+				}
+			}
+			return real > 0
+		case interface{ Unwrap() error }:
+			inner := u.Unwrap()
+			return inner != nil && pure(inner)
+		default:
+			return false
+		}
+	}
+	return pure(err)
+}
+
 // backendSafe reports whether backend is ready and self/peer verified.
 func backendSafe(backend docker.DockerBackend) bool {
 	return backend != nil && backend.Ready() && backend.VerificationState() == docker.StateVerified
@@ -701,13 +748,16 @@ func (a *Authorizer) validateDecisionOnce(ctx context.Context, dec Decision) (re
 	// Resolve target strictly by immutable 64-hex ContainerID.
 	currentTarget, err := backend.ResolveTarget(ctx, string(dec.Target.ContainerID))
 	if err != nil {
-		// A co-observed shared fault (protected/unverified/missing target or a
-		// backend that is no longer safe) is never masked by this caller's own
-		// cancellation: only a pure cancellation with no shared fault is local.
+		// A co-observed shared fault (protected/unverified/missing target, a
+		// backend that is no longer safe, or ANY other independent fault in the
+		// error tree such as a joined generic metadata failure) is never masked by
+		// this caller's own cancellation: only a pure cancellation (every leaf of
+		// the error tree is a context cancellation/deadline cause) with a still
+		// verified backend is local to the caller (P1.18.4 P111-L2).
 		protected := errors.Is(err, docker.ErrProtectedTarget)
 		unverified := errors.Is(err, docker.ErrUnverified) || !backendSafe(backend)
 		shared := protected || unverified || errors.Is(err, docker.ErrTargetNotFound)
-		a.cancelLeases(dec, ctx.Err() != nil && !shared)
+		a.cancelLeases(dec, ctx.Err() != nil && !shared && onlyContextCauses(err))
 		if protected {
 			return false, newForbidden(ReasonSelfProtected)
 		}
@@ -867,6 +917,15 @@ func (a *Authorizer) AcquireLease(ctx context.Context, req AuthorizeRequest) (*L
 
 // NotifyPolicyChange advances the policy epoch and revalidates all active Leases,
 // immediately canceling any Lease whose authorization is no longer valid (TD §3.4).
+//
+// ctx is the notification's OWN bound, not a request context. No-op and
+// unrelated notifications preserve healthy leases only while ctx is live: a
+// notification whose context has already ended (an un-detached request context
+// or an expired bound) still advances the epoch but every revalidation then
+// fails closed and cancels the lease. Direct callers must therefore detach
+// request cancellation and keep a finite bound (context.WithoutCancel +
+// context.WithTimeout); internal/ops.Service.NotifyAuthorityChange is the
+// supported bridge. This never skips epoch/revocation work.
 func (a *Authorizer) NotifyPolicyChange(ctx context.Context) error {
 	// Serialize notifications. If ctx ends first we still advance the epoch and
 	// revalidate under the ended context, which fails closed by canceling the

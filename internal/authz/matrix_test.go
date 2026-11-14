@@ -281,6 +281,11 @@ func TestAuthorizationCrossProductMatrix(t *testing.T) {
 	type policyMatrixCase struct {
 		name         string
 		directEffect string // "", "ALLOW", "DENY", "ALLOW_QUARANTINED", "ALLOW_DISABLED"
+		// directDeny seeds an additional direct DENY for the same principal as directEffect.
+		directDeny bool
+		// denyKind is the subject kind of the DENY rows the fixture must contain: "direct" (user/agent
+		// subject), "group" or "" (none expected). It makes the row name and its semantics checkable.
+		denyKind     string
 		groupAEffect string // "", "ALLOW", "DENY"
 		groupBEffect string // "", "ALLOW", "DENY", "DENY_QUARANTINED"
 		disabledGrp  string // "", "ALLOW"
@@ -292,12 +297,15 @@ func TestAuthorizationCrossProductMatrix(t *testing.T) {
 	policyCases := []policyMatrixCase{
 		{name: "no_policy_default_deny", wantAllow: false, wantReason: authz.ReasonDefaultDeny},
 		{name: "direct_allow_only", directEffect: "ALLOW", wantAllow: true},
-		{name: "direct_deny_only", directEffect: "DENY", wantAllow: false, wantReason: authz.ReasonExplicitDeny},
-		{name: "direct_allow_and_direct_deny", directEffect: "ALLOW", groupAEffect: "DENY", wantAllow: false, wantReason: authz.ReasonExplicitDeny},
+		{name: "direct_deny_only", directEffect: "DENY", denyKind: "direct", wantAllow: false, wantReason: authz.ReasonExplicitDeny},
+		// P1.18.4 P111-NIT-matrix-row: the former "direct_allow_and_direct_deny" seeded a GROUP deny. It
+		// is renamed to what it does and the true direct ALLOW + direct DENY row is added beside it.
+		{name: "direct_allow_and_groupA_deny", directEffect: "ALLOW", groupAEffect: "DENY", denyKind: "group", wantAllow: false, wantReason: authz.ReasonExplicitDeny},
+		{name: "direct_allow_and_direct_deny", directEffect: "ALLOW", directDeny: true, denyKind: "direct", wantAllow: false, wantReason: authz.ReasonExplicitDeny},
 		{name: "groupA_allow_only", groupAEffect: "ALLOW", wantAllow: true},
 		{name: "groupA_allow_and_groupB_allow", groupAEffect: "ALLOW", groupBEffect: "ALLOW", wantAllow: true},
-		{name: "groupA_allow_overridden_by_groupB_deny", groupAEffect: "ALLOW", groupBEffect: "DENY", wantAllow: false, wantReason: authz.ReasonExplicitDeny},
-		{name: "direct_deny_overrides_groupA_allow", directEffect: "DENY", groupAEffect: "ALLOW", wantAllow: false, wantReason: authz.ReasonExplicitDeny},
+		{name: "groupA_allow_overridden_by_groupB_deny", groupAEffect: "ALLOW", groupBEffect: "DENY", denyKind: "group", wantAllow: false, wantReason: authz.ReasonExplicitDeny},
+		{name: "direct_deny_overrides_groupA_allow", directEffect: "DENY", groupAEffect: "ALLOW", denyKind: "direct", wantAllow: false, wantReason: authz.ReasonExplicitDeny},
 		{name: "quarantined_direct_allow_never_grants", directEffect: "ALLOW_QUARANTINED", wantAllow: false, wantReason: authz.ReasonDefaultDeny},
 		{name: "disabled_direct_allow_never_grants", directEffect: "ALLOW_DISABLED", wantAllow: false, wantReason: authz.ReasonDefaultDeny},
 		{name: "disabled_group_allow_never_grants", disabledGrp: "ALLOW", wantAllow: false, wantReason: authz.ReasonDefaultDeny},
@@ -352,6 +360,12 @@ func TestAuthorizationCrossProductMatrix(t *testing.T) {
 			addRule(4, "", "", groupB, pc.groupBEffect)
 			addRule(5, "", "", groupDisabled, pc.disabledGrp)
 			addRule(6, "", "", groupQuarantined, pc.quarGrp)
+			if pc.directDeny {
+				addRule(7, activeUserID, "", "", "DENY")
+				addRule(8, "", activeAgentID, "", "DENY")
+			}
+			assertDenySubjectKinds(t, env, pc.name, op, pc.denyKind)
+			opsBefore := env.backend.Counters().TotalOperational()
 
 			endpoints := []struct {
 				name    string
@@ -405,6 +419,35 @@ func TestAuthorizationCrossProductMatrix(t *testing.T) {
 					})
 				}
 			}
+			// Authorize is decision-only: no row (direct or group DENY, ALLOW or refusal) may
+			// reach the backend operational surface.
+			if got := env.backend.Counters().TotalOperational(); got != opsBefore {
+				t.Errorf("%s/%s: %d operational backend attempts during authorization-only matrix rows", pc.name, op, got-opsBefore)
+			}
+		}
+	}
+}
+
+// assertDenySubjectKinds proves the seeded fixture really contains the DENY subject kind the row
+// name claims: "direct" = a user or agent subject, "group" = a group subject, "" = no DENY at all.
+func assertDenySubjectKinds(t *testing.T, env *testEnv, row string, op docker.Operation, want string) {
+	t.Helper()
+	var direct, group int
+	err := env.rawDB.QueryRowContext(context.Background(),
+		`SELECT COALESCE(SUM(CASE WHEN user_id IS NOT NULL OR agent_id IS NOT NULL THEN 1 ELSE 0 END),0),
+		        COALESCE(SUM(CASE WHEN group_id IS NOT NULL THEN 1 ELSE 0 END),0)
+		   FROM policies WHERE effect='DENY' AND state='active' AND operation=?`, string(op)).Scan(&direct, &group)
+	if err != nil {
+		t.Fatalf("%s: deny subject-kind query: %v", row, err)
+	}
+	switch want {
+	case "direct":
+		if direct == 0 || group != 0 {
+			t.Fatalf("%s: row claims direct DENY but fixture has direct=%d group=%d", row, direct, group)
+		}
+	case "group":
+		if group == 0 || direct != 0 {
+			t.Fatalf("%s: row claims group DENY but fixture has direct=%d group=%d", row, direct, group)
 		}
 	}
 }
@@ -670,5 +713,61 @@ func TestAssuranceAndPurposeBoundaries(t *testing.T) {
 		RequireAAL2: true,
 	}); !errors.Is(err, authz.ErrUnauthenticated) {
 		t.Fatalf("expected 401 when RequireAAL2=true for password-only session, got %v", err)
+	}
+}
+
+// P1.18.4 P111-NIT-missing-credential-row: a verified, ACTIVE agent that holds an explicit ALLOW for
+// every operation is still refused (401, no decision) when the presented credential is absent from
+// storage or revoked, for all six operation keys, with zero operational backend attempts. The
+// control row proves the same agent+policy succeeds with its real credential, so the credential is
+// the only varied input. (Complements the C1 wrong-token fixture in c1_substrate_test.go.)
+func TestMissingAgentCredentialRefusedAcrossAllOperations(t *testing.T) {
+	env := newTestEnv(t)
+	ctx := context.Background()
+	now := env.clock.Now().Unix()
+	env.seedSelector(store.ContainerSelector{ID: string(testSelectorID1), EndpointID: testLocalEndpointID, ContainerName: "edge-proxy"})
+	env.seedUser(seedUserOpts{ID: testUserID1, Username: "agent_owner"})
+	env.seedAgent(seedAgentOpts{ID: testAgentID1, Name: "cred-less-agent", OwnerUserID: sql.NullString{String: string(testUserID1), Valid: true}})
+	liveToken := env.seedAgentCredential(seedAgentCredentialOpts{ID: testCredID1, AgentID: testAgentID1})
+	revokedToken := env.seedAgentCredential(seedAgentCredentialOpts{ID: testCredID2, AgentID: testAgentID1, State: "revoked", RevokedAt: sql.NullInt64{Int64: now - 10, Valid: true}})
+	for i, op := range authz.AllOperations() {
+		env.seedPolicy(store.Policy{
+			ID: fmt.Sprintf("72000000-0000-4000-8000-%012d", i+1), AgentID: sql.NullString{String: string(testAgentID1), Valid: true},
+			EndpointID: testLocalEndpointID, SelectorID: string(testSelectorID1), Operation: string(op), Effect: "ALLOW", State: "active", AuthorityGeneration: 1,
+		})
+	}
+	if got := len(authz.AllOperations()); got != 6 {
+		t.Fatalf("expected the six Phase 1 operation keys, got %d", got)
+	}
+	cases := []struct {
+		name  string
+		creds authz.PrincipalCredentials
+		ok    bool
+	}{
+		{"control_live_credential", authz.PrincipalCredentials{AgentCredentialID: testCredID1, AgentToken: liveToken}, true},
+		{"absent_credential_id", authz.PrincipalCredentials{AgentCredentialID: "50000000-0000-4000-8000-0000000000ff", AgentToken: "mdt_p1184_synthetic_absent_credential_0123456789"}, false},
+		{"absent_credential_token_only", authz.PrincipalCredentials{AgentToken: "mdt_p1184_synthetic_absent_credential_abcdef0123"}, false},
+		{"revoked_credential", authz.PrincipalCredentials{AgentCredentialID: testCredID2, AgentToken: revokedToken}, false},
+		{"live_id_with_absent_token", authz.PrincipalCredentials{AgentCredentialID: testCredID1, AgentToken: "mdt_p1184_synthetic_wrong_secret_0123456789"}, false},
+	}
+	for _, tc := range cases {
+		for _, op := range authz.AllOperations() {
+			t.Run(tc.name+"/"+string(op), func(t *testing.T) {
+				before := env.backend.Counters().TotalOperational()
+				_, err := env.authorizer.Authorize(ctx, authz.AuthorizeRequest{Principal: tc.creds, EndpointID: testLocalEndpointID, TargetRef: "edge-proxy", Operation: op})
+				if tc.ok {
+					if err != nil {
+						t.Fatalf("control must be allowed: %v", err)
+					}
+					return
+				}
+				if !errors.Is(err, authz.ErrUnauthenticated) || authz.StatusCode(err) != http.StatusUnauthorized {
+					t.Fatalf("expected 401 ErrUnauthenticated, got %v", err)
+				}
+				if got := env.backend.Counters().TotalOperational(); got != before {
+					t.Fatalf("%d operational backend attempts for a credential-less agent", got-before)
+				}
+			})
+		}
 	}
 }

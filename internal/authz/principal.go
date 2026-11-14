@@ -39,7 +39,15 @@ type AgentCredentialID string
 type PolicyID string
 
 // PrincipalCredentials carries credential lookup references for authorization.
-// Secret fields are redacted in all string and log formatting.
+// Direct formatting of a PrincipalCredentials VALUE (every fmt verb applied to the
+// value itself) and slog through LogValue redact the secret fields. That is the
+// whole guarantee of this type: fmt does not call methods on values nested in
+// UNEXPORTED fields of a containing struct, so formatting an arbitrary holder
+// with fmt is prohibited and outside the guarantee. The supported boundary for
+// anything logged is internal/logging.New, which drops every unknown slog value
+// (including nested holders, groups, WithAttrs values and dynamic messages)
+// before Resolve/String/JSON/reflection can run; it is not a second sanitizer
+// here (TestSafeLoggerDropsCredentialHoldersBeforeAnyFormattingHook).
 // Caller-supplied fields never establish assurance or administrative authority;
 // all assurance, purpose, role, and generation attributes are loaded from trusted storage.
 type PrincipalCredentials struct {
