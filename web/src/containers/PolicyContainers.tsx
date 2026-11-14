@@ -4,11 +4,12 @@ import type { ApiResult } from '../api/http';
 import { PolicyApi } from '../api/policy';
 import { SecurityApi } from '../api/security';
 import { AgentsScreen } from '../screens/policy/agentIdentity';
-import type { AgentAction, AgentsData, GroupsData, Load, LifecycleAction, Mutation, MutationReason, PendingAction, PendingAgentAction, PendingGroupAction, PreviewState, RuleDraft, RuleEditorState, RulesData, SelectorDraft, UserRow } from '../screens/policy/contract';
+import type { AgentAction, AgentsData, GroupsData, Load, LifecycleAction, Mutation, MutationReason, PendingAction, PendingAgentAction, PendingGroupAction, PreviewState, RuleDraft, RuleEditorState, RulesData, SelectorDraft, SubjectRef, UserRow } from '../screens/policy/contract';
 import { GroupsScreen } from '../screens/policy/groups';
 import { AGENT_TOKENS_ROUTE } from '../screens/policy/nav';
 import { RulesScreen } from '../screens/policy/rules';
 import { selectorKey } from '../screens/policy/selector';
+import { parseSubjectHash, rulesHrefFor } from '../screens/policy/subjectFilter';
 import { UsersScreen } from '../screens/policy/users';
 import type { Navigate } from './LoginContainer';
 import { outcomeOf } from './outcome';
@@ -162,6 +163,7 @@ function UsersPage(context: SignedInContext) {
     <>
       {commands.gate}
       <UsersScreen
+        rulesHref={rulesHrefFor}
         load={load}
         mutation={commands.mutation}
         pending={pending}
@@ -208,6 +210,7 @@ function GroupsPage(context: SignedInContext) {
     <>
       {commands.gate}
       <GroupsScreen
+        rulesHref={rulesHrefFor}
         load={load}
         mutation={commands.mutation}
         pending={pending}
@@ -268,6 +271,7 @@ function PolicyAgentsPage(context: SignedInContext) {
     <>
       {commands.gate}
       <AgentsScreen
+        rulesHref={rulesHrefFor}
         load={load}
         mutation={commands.mutation}
         pending={pending}
@@ -312,6 +316,18 @@ function RulesPage(context: SignedInContext) {
   const [editor, setEditor] = useState<RuleEditorState>({ kind: 'closed' });
   const [pending, setPending] = useState<PendingAction | null>(null);
   const [preview, setPreview] = useState<PreviewState>({ kind: 'idle' });
+  // The "View rules" link of the user, group and agent pages: `#subject=<kind>:<id>`. Read from the fragment (never sent to the server), allowlisted,
+  // and cleared on request or when the fragment changes to anything else, so a stale filter never outlives its link (P1.18.4 P117-note-rule-link).
+  const [subjectFilter, setSubjectFilter] = useState<SubjectRef | null>(() => parseSubjectHash(globalThis.location?.hash ?? ''));
+  useEffect(() => {
+    const onHash = () => setSubjectFilter(parseSubjectHash(globalThis.location?.hash ?? ''));
+    globalThis.addEventListener?.('hashchange', onHash);
+    return () => globalThis.removeEventListener?.('hashchange', onHash);
+  }, []);
+  const clearSubjectFilter = () => {
+    globalThis.history?.replaceState(null, '', `${globalThis.location.pathname}${globalThis.location.search}`);
+    setSubjectFilter(null);
+  };
   const checked = useRef(0);
   const data: RulesData | null = load.kind === 'ready' ? load.data : null;
 
@@ -355,6 +371,8 @@ function RulesPage(context: SignedInContext) {
     <>
       {commands.gate}
       <RulesScreen
+        subjectFilter={subjectFilter}
+        onClearSubjectFilter={clearSubjectFilter}
         load={load}
         mutation={commands.mutation}
         editor={editor}

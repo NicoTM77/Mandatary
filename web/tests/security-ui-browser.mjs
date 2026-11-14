@@ -6,7 +6,7 @@ import { engineName, launchEngine, viewport } from './engine.mjs';
 import { _collectViolationsForTest, auditAccessibility } from './a11y-audit.mjs';
 import { allowsAppRequest, appOrigin, control, controlBase, rawRequest, scanSurfaces, totpCode } from './admin-ui-lib.mjs';
 
-/* global console, document */
+/* global console, document, window, getComputedStyle, requestAnimationFrame */
 
 // Account-security browser tests (P1.16.4) against the REAL services (internal/auth/security_ui_browser_test.go
 // starts them behind synthetic loopback TLS and a loopback SMTP receiver). One scenario per invocation, in one
