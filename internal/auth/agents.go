@@ -95,6 +95,10 @@ type Admin struct {
 	backup *backup.Service
 	// safetyReset drops the shared self-protection proof (backup_admin.go, WithSafetyReset).
 	safetyReset atomic.Pointer[func()]
+	// afterVerify is a test-only observation seam (nil in production): it receives the opened
+	// archive this Admin owns, right after Verify, so a test can prove it is wiped on every exit
+	// path (P1.18.4 P118-L3). It never sees secrets the Verified value does not already export.
+	afterVerify func(*backup.Verified)
 }
 
 // NewAdmin binds the service to the lifecycle's repository and clock. notify, when

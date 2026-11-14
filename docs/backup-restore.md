@@ -92,10 +92,35 @@ transition committed even though the import did not.
 | administrative role | inactive | not approvable here (`single_administrator`): the recovery ceremony owns it |
 | notification address | inactive, unverified | not approvable here (`needs_reverification`) |
 | authenticator / agent credential | retained inactive for provenance; token issue/expiry kept exactly | never approvable; reissue through the credential flows (RESTORE-04 historical expiry never becomes a fresh lifetime) |
-| compromised principal | — | refused (`compromised`) |
+| compromised principal | — | refused (`compromised`); listed with that reason, **not selectable** in the interface (P1.18.4), and a crafted approval is still refused by the server |
 
-Refusal reasons are fixed codes: `not_in_manifest`, `already_approved`, `subject_not_active`, `compromised`,
-`single_administrator`, `needs_reverification`, `unsupported`.
+Refusal reasons are fixed codes, each with a safe, input-free meaning:
+
+| Code | Meaning |
+| --- | --- |
+| `not_in_manifest` | The named kind and ID are not in the latest restore's manifest. |
+| `already_approved` | The entry was approved earlier; approving it again grants nothing more. |
+| `subject_not_active` | A rule or membership names a principal or group that has not been approved yet; approve that first (dependencies are applied in order inside one request). |
+| `owner_not_active` | An agent's owner (user or group) has not been approved yet; approve the owner first. An agent never becomes effective without an active owner. |
+| `not_quarantined` | The record is no longer in the quarantined state the approval expects (it changed after the restore, for example a local change or an earlier approval), so nothing is activated; reload the manifest and review what is in force. |
+| `stale_details` | The approval named the digest of what was reviewed (see below) and the stored record changed since; nothing is approved. Reload and review again. |
+| `compromised` | The principal is known compromised; it is never approved by this flow. |
+| `single_administrator` | Roles are not approvable: the recovery ceremony owns the administrator. |
+| `needs_reverification` | A notification address is proven by its owner again, never approved. |
+| `unsupported` | The kind cannot be approved in Phase 1. |
+
+**What an approval identifies (P1.18.4 FC4-1).** Each rule and membership entry of the manifest carries a `detail` resolved
+from the stored rows by their stable IDs (never by display name or position): for a rule the effect, operation, subject
+(kind, ID, display name), endpoint (ID and slug), and the selector with every constraint (exact or glob name, compose project
+and service, image pattern, pinned container and image digest) and any limits; for a membership **both** the named user or
+agent and the group. A record that cannot be found falls back to its ID and is flagged `missing`. The entry also carries the
+imported and effective claims (an imported ALLOW over a kept local DENY shows both) and a `digest` that fingerprints exactly
+what was shown. The interface sends that digest with each selected record; an approval whose stored state no longer matches is
+refused as `stale_details` and changes nothing. The digest is optional on the API (record kind plus ID selection, quarantine,
+fresh step-up, dependency validation and atomic approval are unchanged). No detail contains a credential, verifier, token hash or
+secret configuration. Tests: `TestManifestNamesTheExactAuthorityOfEveryRuleAndMembership`,
+`TestDetailFallsBackToStableIDsWhenARecordIsMissing`, `TestApprovalBoundToAReviewedDigestIsRefusedWhenTheRecordChangedSinceReview`,
+`TestACompromisedPrincipalIsShownButNeverSelectableAndStillRefusedByTheServer`.
 
 ## 6. HTTP contract (routes exist only when `Admin.SetBackup` was called)
 
@@ -109,7 +134,7 @@ raise its bound only for an unsafe session route up to 32 MiB (`RoutePolicy.MaxB
 | `POST /api/v1/admin/backup/export` | `backup-export`, fresh AAL2 | `{"mode":"full"\|"clean"}` | archive as an attachment (`Content-Disposition`, `X-Backup-Id`, `X-Backup-Mode`, `no-store`) | 400 `invalid_request`, 403 `step_up_required`/`forbidden` |
 | `POST /api/v1/admin/restore` | `backup-restore`, fresh AAL2 | `{"archive":{…},"confirm":"RESTORE","acknowledge_unauthenticated_provenance":bool}` | 200 `{"report":Report,"authorizer_notified":bool,"session_ended":true}` | 400, 403, 409 `provenance_unverified`/`restore_superseded`, 422 `archive_malformed`/`archive_unsupported_version`/`archive_integrity_failed`/`archive_inconsistent`, 503 `unavailable` (+ `installation_state:"restore_quarantine"` after the transition) |
 | `GET /api/v1/admin/restore/manifest` | session only | — | 200 `ManifestView` | 404 `no_restore`, 401/403 while quarantined |
-| `POST /api/v1/admin/restore/approvals` | `security-policy-change`, fresh AAL2 | `{"items":[{"kind","id"}…]}` (≤ 500, no duplicates) | 200 `{"approved":[…]}` | 409 `conflict` with `items:[{kind,id,reason}]`, 400 |
+| `POST /api/v1/admin/restore/approvals` | `security-policy-change`, fresh AAL2 | `{"items":[{"kind","id","digest"?}…]}` (≤ 500, no duplicates by kind+ID) | 200 `{"approved":[…]}` | 409 `conflict` with `items:[{kind,id,reason}]`, 400 |
 
 No response contains a credential, verifier, token hash, ciphertext, archive content, key or the text of
 the failing check. `ManifestView` carries labels (names, the endpoint slug) and imported/effective
@@ -238,7 +263,11 @@ changes anything**.
    says nothing was changed, and you stay signed in. Fix the cause or use another file.
 3. **Restore complete**: the installation is in restore quarantine. Nothing from the file is effective.
 4. **The restore didn't finish**: quarantine is already in force but nothing from the file was kept. Run the
-   host recovery, then restore the same file again; that is safe.
+   host recovery, then restore the same file again; that is safe. After this host recovery the **Rules** and **Agents**
+   pages can still show records that existed before the restore as active at older generations. That display is **not
+   evidence of current effective authority**: those records are inert (their generations no longer match), nothing was
+   reactivated or rewritten to match the display, and retrying the same restore is safe. Only what the new manifest shows
+   as approved is in force (P1.18.4 P118-Oa).
 5. **Couldn't confirm what happened** (the connection ended with no answer): do not assume either result.
    Reload; if the sign-in page is closed, a restore began. Run the host recovery and read the manifest.
 
@@ -262,7 +291,9 @@ reference and guarantees: [setup-recovery.md](setup-recovery.md), "Restore-admin
 1. Sign in as the administrator and open **Review restored access**. Every record is listed as switched off, with
    what the file held beside what is in force. Records that were in this installation but not in the file are
    kept switched off and marked "Not in the file".
-2. Approve **by name, one record at a time**; the confirmation lists exactly what will become effective. There
+2. Approve **by name, one record at a time**; the confirmation lists exactly what will become effective: for a rule the
+   effect, operation, subject, endpoint and selector; for a membership both the principal and the group. A record that
+   changed since you looked is refused as stale. Known-compromised records are listed with their reason and cannot be selected. There
    is no approve-everything. A rule is approved only after you have looked at it; approving a group makes no rule
    effective, and approving an agent grants no credential. Refused records show a fixed reason.
 3. **Reissue credentials** through their own flows: issue a new token for each agent that needs one (**Agents**,

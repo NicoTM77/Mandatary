@@ -15,6 +15,10 @@ import (
 type ItemRef struct {
 	Kind string `json:"kind"`
 	ID   string `json:"id"`
+	// Digest is the optional detail digest the administrator was shown (ManifestItem.Digest). When
+	// present, an approval whose stored state no longer matches it is refused as "stale_details",
+	// so a record that changed after review is never approved on the strength of the old view.
+	Digest string `json:"digest,omitempty"`
 }
 
 // ItemResult is the outcome of an approved entry.
@@ -72,6 +76,10 @@ type ManifestItem struct {
 	Approvable    bool            `json:"approvable"`
 	BlockedReason string          `json:"blocked_reason,omitempty"`
 	Needs         string          `json:"needs"`
+	// Detail names the exact authority this entry would restore (FC4-1); Digest fingerprints what
+	// was shown and is echoed back in ItemRef.Digest so a stale review cannot be approved.
+	Detail *ItemDetail `json:"detail,omitempty"`
+	Digest string      `json:"digest"`
 }
 
 // ManifestView is the redacted authority manifest of the latest restore.
@@ -112,8 +120,18 @@ func Manifest(ctx context.Context, q *store.Queries) (ManifestView, error) {
 		InactiveCredentials: map[string]int{"authenticators": int(counts.Authenticators), "agent_credentials": int(counts.AgentCredentials)}}
 	for _, r := range rows {
 		ok, why := approvableKind(r.Kind)
+		detail, err := DetailOf(ctx, q, r.Kind, r.ItemID)
+		if err != nil {
+			return ManifestView{}, err
+		}
+		if detail != nil && detail.Compromised && r.Kind == "user" {
+			// A known-compromised principal is shown with its reason but is not selectable; the
+			// server refuses a crafted approval of it as well (activate: "compromised").
+			ok, why = false, "compromised"
+		}
 		it := ManifestItem{Kind: r.Kind, ID: r.ItemID, Label: r.Label, Origin: r.Origin, Imported: json.RawMessage(r.Imported), Effective: json.RawMessage(r.Effective),
-			Decision: r.Decision, Approvable: ok && r.Decision == "pending", BlockedReason: why, Needs: needsOf(r.Kind)}
+			Decision: r.Decision, Approvable: ok && r.Decision == "pending", BlockedReason: why, Needs: needsOf(r.Kind), Detail: detail,
+			Digest: DetailDigest(r.Kind, r.ItemID, detail, []byte(r.Imported), []byte(r.Effective))}
 		if r.SourceState.Valid {
 			s := r.SourceState.String
 			it.SourceState = &s
@@ -126,6 +144,18 @@ func Manifest(ctx context.Context, q *store.Queries) (ManifestView, error) {
 		view.Items = append(view.Items, it)
 	}
 	return view, nil
+}
+
+func validDigest(s string) bool {
+	if len(s) != 64 {
+		return false
+	}
+	for _, c := range s {
+		if !(c >= '0' && c <= '9' || c >= 'a' && c <= 'f') {
+			return false
+		}
+	}
+	return true
 }
 
 func splitPair(id string) (string, string, bool) {
@@ -149,7 +179,7 @@ func Approve(ctx context.Context, q *store.Queries, c store.InstallationControl,
 	if c.RestoreQuarantined != 0 || c.CredentialGeneration <= 0 || c.SessionGeneration <= 0 || c.AuthorityGeneration <= 0 || c.RestoreGeneration <= 0 {
 		return nil, ErrQuarantined
 	}
-	seen := map[ItemRef]bool{}
+	seen := map[[2]string]bool{}
 	for _, r := range refs {
 		if _, ok := kindOrder[r.Kind]; !ok && r.Kind != "role" && r.Kind != "address" {
 			return nil, ErrInvalid
@@ -158,10 +188,14 @@ func Approve(ctx context.Context, q *store.Queries, c store.InstallationControl,
 		if r.Kind == "user_membership" || r.Kind == "agent_membership" {
 			_, _, valid = splitPair(r.ID)
 		}
-		if !valid || seen[r] {
+		if r.Digest != "" && !validDigest(r.Digest) {
+			valid = false
+		}
+		key := [2]string{r.Kind, r.ID}
+		if !valid || seen[key] {
 			return nil, ErrInvalid
 		}
-		seen[r] = true
+		seen[key] = true
 	}
 	rep, err := q.LatestRestoreReport(ctx)
 	if err == sql.ErrNoRows {
@@ -189,6 +223,16 @@ func Approve(ctx context.Context, q *store.Queries, c store.InstallationControl,
 		}
 		if err != nil {
 			return nil, err
+		}
+		if r.Digest != "" {
+			detail, derr := DetailOf(ctx, q, r.Kind, r.ID)
+			if derr != nil {
+				return nil, derr
+			}
+			if DetailDigest(r.Kind, r.ID, detail, []byte(item.Imported), []byte(item.Effective)) != r.Digest {
+				fail("stale_details")
+				continue
+			}
 		}
 		if item.Decision != "pending" {
 			fail("already_approved")
