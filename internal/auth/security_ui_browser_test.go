@@ -220,7 +220,7 @@ func startSecurityUIFixture(t *testing.T) uiFixture {
 }
 
 func TestSecurityUIBrowser(t *testing.T) {
-	scenarios := []string{"a11y-selfcheck", "security-flows", "recovery-flow", "key-flows", "denial-matrix", "policy-flows"}
+	scenarios := []string{"a11y-selfcheck", "security-flows", "recovery-flow", "recovery-reveal-phone", "key-flows", "denial-matrix", "policy-flows"}
 	for _, engine := range browserEngines(t) {
 		for _, scheme := range []string{"light", "dark"} {
 			for _, scenario := range scenarios {

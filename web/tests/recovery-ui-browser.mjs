@@ -406,8 +406,21 @@ async function restoreFlows() {
   for (const checkbox of checkboxes) assert.equal(await checkbox.isChecked(), false, 'nothing is ticked by default');
   assert.equal(await page.getByRole('button', { name: /approve all|select all/i }).count(), 0, 'there is no approve-everything');
 
-  await page.getByRole('checkbox', { name: 'User browser-alice' }).check();
-  await page.getByRole('checkbox', { name: 'Group browser-ops' }).check();
+  // P1.18.4 FC4-1: a rule's checkbox identifies the exact authority: effect, subject (kind, name, stable ID), operation, endpoint, selector and
+  // limits. The post-backup DENY (same subject, operation and selector, different effect) is a lookalike and is told apart in its name.
+  const allowRule = page.getByRole('checkbox', { name: /^Rule Allow group browser-ops \(ID [0-9A-Za-z-]+\) to read logs of “browser-proxy” on endpoint local \(ID [0-9a-f-]{36}\), only with at most 25 log lines\. Operation container:logs, selector [0-9A-Za-z-]+\.$/ });
+  const denyRule = page.getByRole('checkbox', { name: /^Rule Deny group browser-ops \(ID [0-9A-Za-z-]+\) from reading logs of “browser-proxy” on endpoint local \(ID [0-9a-f-]{36}\)\. Operation container:logs, selector [0-9A-Za-z-]+\.$/ });
+  assert.equal(await allowRule.count(), 1, 'the imported ALLOW names its exact authority');
+  assert.equal(await denyRule.count(), 1, 'the retained DENY is a different, distinctly named record');
+  const detailBlock = page.locator('li[data-record^="policy:"] dl[aria-label="Exactly what approving this restores"]').first();
+  await detailBlock.waitFor();
+  const facts = (await detailBlock.locator('dt').allTextContents()).join('|');
+  assert.match(facts, /Effect\|Operation\|Applies to\|Endpoint\|Container name\|/, 'the row lists the facts an approval restores');
+  await shot(page, 'review-exact');
+  await auditAccessibility(page, 'review exact detail');
+
+  await page.getByRole('checkbox', { name: 'User browser-alice', exact: true }).check();
+  await page.getByRole('checkbox', { name: 'Group browser-ops', exact: true }).check();
   await button(page, 'Approve 2 selected…').click();
   const confirm = page.getByRole('group', { name: /^Approve 2 records\?/ });
   await confirm.waitFor();
@@ -419,14 +432,21 @@ async function restoreFlows() {
   assert.equal(approved.activeGroups, 1);
   assert.equal(approved.activePolicies, 0, 'no rule became effective by approving its group');
   assert.equal(approved.activeCredentials, 0, 'approval grants no credential');
-  await page.getByRole('checkbox', { name: 'User browser-alice' }).waitFor({ state: 'detached' }); // the list is re-read: an approved record is not offered again
+  await page.getByRole('checkbox', { name: 'User browser-alice', exact: true }).waitFor({ state: 'detached' }); // the list is re-read: an approved record is not offered again
 
   // The agent and then one rule, each by name. The restored agent's token page is linked, never reimplemented.
-  await page.getByRole('checkbox', { name: 'Agent browser-bot' }).check();
+  await page.getByRole('checkbox', { name: 'Agent browser-bot', exact: true }).check();
   const rules = page.getByRole('checkbox', { name: /^(Rule|Policy).*(ALLOW|Allow).*logs/i });
   await rules.first().check();
   await button(page, 'Approve 2 selected…').click();
-  await page.getByRole('group', { name: /^Approve 2 records\?/ }).getByRole('button', { name: 'Approve 2 records' }).click();
+  const second = page.getByRole('group', { name: /^Approve 2 records\?/ });
+  await second.waitFor();
+  // The confirmation says the same exact thing as the checkbox that was ticked, and not the lookalike DENY.
+  const confirmText = (await second.getByRole('list', { name: 'Records to approve' }).textContent()) ?? '';
+  assert.match(confirmText, /Allow group browser-ops \(ID [0-9A-Za-z-]+\) to read logs of “browser-proxy” on endpoint local \(ID [0-9a-f-]{36}\)/, 'the confirmation names the exact rule');
+  assert.doesNotMatch(confirmText, /Deny group/, 'the lookalike DENY is not part of this approval');
+  await shot(page, 'review-exact-confirm');
+  await second.getByRole('button', { name: 'Approve 2 records' }).click();
   await page.getByText('Approved 2 records').waitFor();
   const final = await host.state();
   assert.equal(final.activeAgents, 1);
