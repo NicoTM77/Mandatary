@@ -88,6 +88,18 @@ credential/control generations. No ordinary session-creation method exists here.
   required afterward. Lost response does not undo consumption or allow
   redisplay: use an independently held code/factor, or later P1.09 trusted-host
   recovery when all factors are lost. There is no email-only recovery or KBA.
+* The HTTP response of a successful recovery (cookie, capability-derived CSRF token,
+  expiry, permitted methods, the one replacement code) is derived ONLY from the
+  in-memory `RecoveryResult` of the transaction that consumed the saved code: the
+  capability's identifier, expiry and whether TOTP is permitted (`Meta()`) are captured
+  in that same transaction, and WebAuthn availability is deployment configuration. There
+  is no second storage read between consumption and reveal, so a storage fault in that
+  window can no longer lose the replacement code (P1.18.4 P116-L6,
+  `TestRecoveryHTTPResponseNeverNeedsASecondStorageReadAfterTheCodeIsConsumed`,
+  `TestRecoveryHTTPMethodsForAWebAuthnOnlyAccountComeFromTheConsumingTransaction`). Only
+  hashes are persisted; the raw capability and replacement code stay export-once. The
+  remaining unavoidable case is a network-lost response after the commit: the code is
+  spent and never redisplayed, so continue with another saved code or host recovery.
 
 ## N1 delivery, capacity and operational repair
 

@@ -49,3 +49,16 @@ WHERE id=sqlc.arg(id) AND worker_token=sqlc.arg(token) AND delivery_state='pendi
 -- name: FailExhaustedNotice :execrows
 UPDATE security_notice_outbox SET delivery_state='failed',failure_code='permanent',lease_until=0,worker_token=NULL
 WHERE id=sqlc.arg(id) AND delivery_state='pending';
+
+-- name: GetAccountNoticeHealth :one
+-- Account-scoped counterpart of GetNoticeHealth (P1.18.4 P116-L3): the same states counted
+-- over ONE user's own records only. No recipient, event content or other account's count.
+SELECT
+ (SELECT count(*) FROM security_notice_outbox n WHERE n.user_id=sqlc.arg(account) AND n.delivery_state='pending') AS pending,
+ (SELECT count(*) FROM security_notice_outbox n WHERE n.user_id=sqlc.arg(account) AND n.delivery_state='failed') AS failed,
+ (SELECT count(*) FROM security_notice_outbox n WHERE n.user_id=sqlc.arg(account) AND n.delivery_state='bounced') AS bounced,
+ (SELECT count(*) FROM security_notice_outbox n WHERE n.user_id=sqlc.arg(account) AND n.dispatch_state='quarantined') AS quarantined,
+ CAST(((SELECT count(*) FROM protective_notice_intents p WHERE p.user_id=sqlc.arg(account) AND p.state IN ('pending','quarantined')) +
+  (SELECT count(*) FROM security_events e WHERE e.user_id=sqlc.arg(account) AND e.event_type IN ('authenticator_removed','authenticator_suspended')
+   AND NOT EXISTS (SELECT 1 FROM security_notice_outbox o WHERE o.event_id=e.id)
+   AND NOT EXISTS (SELECT 1 FROM protective_notice_intents i WHERE i.id=e.id))) AS INTEGER) AS protective;

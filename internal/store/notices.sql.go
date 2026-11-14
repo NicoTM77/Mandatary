@@ -100,6 +100,41 @@ func (q *Queries) FinishNotice(ctx context.Context, arg FinishNoticeParams) (int
 	return result.RowsAffected()
 }
 
+const getAccountNoticeHealth = `-- name: GetAccountNoticeHealth :one
+SELECT
+ (SELECT count(*) FROM security_notice_outbox n WHERE n.user_id=?1 AND n.delivery_state='pending') AS pending,
+ (SELECT count(*) FROM security_notice_outbox n WHERE n.user_id=?1 AND n.delivery_state='failed') AS failed,
+ (SELECT count(*) FROM security_notice_outbox n WHERE n.user_id=?1 AND n.delivery_state='bounced') AS bounced,
+ (SELECT count(*) FROM security_notice_outbox n WHERE n.user_id=?1 AND n.dispatch_state='quarantined') AS quarantined,
+ CAST(((SELECT count(*) FROM protective_notice_intents p WHERE p.user_id=?1 AND p.state IN ('pending','quarantined')) +
+  (SELECT count(*) FROM security_events e WHERE e.user_id=?1 AND e.event_type IN ('authenticator_removed','authenticator_suspended')
+   AND NOT EXISTS (SELECT 1 FROM security_notice_outbox o WHERE o.event_id=e.id)
+   AND NOT EXISTS (SELECT 1 FROM protective_notice_intents i WHERE i.id=e.id))) AS INTEGER) AS protective
+`
+
+type GetAccountNoticeHealthRow struct {
+	Pending     int64
+	Failed      int64
+	Bounced     int64
+	Quarantined int64
+	Protective  int64
+}
+
+// Account-scoped counterpart of GetNoticeHealth (P1.18.4 P116-L3): the same states counted
+// over ONE user's own records only. No recipient, event content or other account's count.
+func (q *Queries) GetAccountNoticeHealth(ctx context.Context, account string) (GetAccountNoticeHealthRow, error) {
+	row := q.db.QueryRowContext(ctx, getAccountNoticeHealth, account)
+	var i GetAccountNoticeHealthRow
+	err := row.Scan(
+		&i.Pending,
+		&i.Failed,
+		&i.Bounced,
+		&i.Quarantined,
+		&i.Protective,
+	)
+	return i, err
+}
+
 const getNotice = `-- name: GetNotice :one
 SELECT id, event_id, user_id, address_id, address_version, recipient_snapshot, delivery_state, dispatch_state, authority_generation, attempts, next_attempt_at, last_attempt_at, failure_code, retain_until, lease_until, worker_token, total_attempts, repair_count, retry_started_at FROM security_notice_outbox WHERE id=?
 `

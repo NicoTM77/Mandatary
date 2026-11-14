@@ -279,7 +279,7 @@ type keyRow struct {
 }
 
 // inventory returns the signed-in account's own factor, recovery-code and address
-// state plus the AGGREGATE security-notice health. It carries no secret, verifier,
+// state plus the AGGREGATE security-notice health of THIS account's own notices. It carries no secret, verifier,
 // recipient of anyone else, SMTP diagnostic or message content.
 func (h *securityHTTP) inventory(w http.ResponseWriter, r *http.Request) {
 	session, ok := h.session(w, r)
@@ -326,8 +326,10 @@ func (h *securityHTTP) inventory(w http.ResponseWriter, r *http.Request) {
 		h.readFault(w, err)
 		return
 	}
-	// Notice health is aggregate-only; an unreadable status is "unknown", never healthy.
-	health, healthErr := h.s.l.NoticeHealth(r.Context())
+	// Notice health is aggregate-only AND scoped to the signed-in account's own notices: the
+	// installation-wide counts are never an ordinary user's data (P1.18.4 P116-L3). An
+	// unreadable status is "unknown", never healthy.
+	health, healthErr := h.s.l.AccountNoticeHealth(r.Context(), session.UserID)
 	notices := map[string]any{"pending": health.Pending, "failed": health.Failed, "bounced": health.Bounced, "quarantined": health.Quarantined, "protective": health.Protective, "unknown": healthErr != nil}
 	sort.Slice(totp, func(i, j int) bool {
 		return totp[i].AddedAt < totp[j].AddedAt || (totp[i].AddedAt == totp[j].AddedAt && totp[i].ID < totp[j].ID)
