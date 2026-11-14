@@ -4,6 +4,16 @@ import type { RecoveryCodesProps, RestrictedRecoveryProps, SignInMethodsProps, W
 import { Command, RejectionAlert, commonRejection, useRequiredForm, type Rejection } from './shared';
 import { TotpEnrollment } from './setup';
 
+/**
+ * Shown when a recovery session that existed has ended. Fixed and neutral: the ten minutes passed or the server discarded it, a saved code that
+ * was already accepted can't be used again, and the next step is another saved code or the host recovery. It never says whether any particular
+ * code was valid or spent (P1.18.4 P116-L2).
+ */
+const RECOVERY_SESSION_ENDED: Rejection = {
+  title: 'Your recovery session ended',
+  body: 'The ten-minute recovery session is over, so nothing was changed by it. A saved code that was already accepted can’t be used again. Start again with another saved code, or ask whoever runs this server to use the host recovery.',
+};
+
 // ───────────────────────── sign-in methods list ─────────────────────────
 
 function RemoveConfirm({ label, busy, onCancel, onConfirm }: { label: string; busy: boolean; onCancel: () => void; onConfirm: () => void }) {
@@ -250,6 +260,7 @@ export function RestrictedRecovery({ state, onSubmit, onBeginTotp, onConfirmTotp
     <Panel title="Recover with a saved code" description="For when you can’t use your authenticator app or security key. You need your password and one unused recovery code.">
       <form {...form.formProps} aria-label="Recover access" className="space-y-4">
         {state.kind === 'rejected' ? <RejectionAlert rejection={state.reason === 'denied' ? { title: 'Recovery failed', body: 'The username, password or code is incorrect, or the code was already used. Check them and try again.' } : commonRejection(state.reason)} active /> : null}
+        {state.kind === 'expired' ? <RejectionAlert rejection={RECOVERY_SESSION_ENDED} active /> : null}
         <TextField name="username" label="Username" autoComplete="username" autoCapitalize="none" autoCorrect="off" spellCheck={false} required error={form.errorFor('username')} readOnly={busy} />
         <PasswordField name="password" label="Password" autoComplete="current-password" required error={form.errorFor('password')} readOnly={busy} />
         <CodeField kind="saved-code" name="code" label="Recovery code" required error={form.errorFor('code')} readOnly={busy} />

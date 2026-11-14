@@ -378,6 +378,31 @@ describe.each(themes)('restricted recovery (%s theme)', (theme) => {
     expect(screen.queryByText('Your authenticator key')).toBeNull();
   });
 
+  test('an ended capability says the session ended, never that the code or password was wrong, and reveals nothing about any code', async () => {
+    const server = recoveryWorld((s) =>
+      s
+        .route('POST', '/api/v1/recovery', () => json(200, { step: 'capability', csrf_token: 'synthetic-capability-csrf', expires_at: Math.floor(Date.now() / 1000) + 600, methods: ['totp'], replacement_code: REPLACEMENT }))
+        .route('POST', '/api/v1/recovery/totp', () => json(401, { error: 'unauthenticated' })),
+    );
+    mountRecovery(server, theme);
+    await screen.findByRole('form', { name: 'Recover access' });
+    recover();
+    await screen.findByText(/Recovery code accepted/);
+    click('Create authenticator key');
+    await screen.findByRole('form', { name: 'Recover access' });
+    const alert = screen.getByRole('alert');
+    expect(alert.textContent).toContain('Your recovery session ended');
+    expect(alert.textContent).toContain('A saved code that was already accepted can’t be used again');
+    expect(alert.textContent).toContain('host recovery');
+    expect(alert.textContent).not.toMatch(/incorrect|wrong|Recovery failed|was already used\. Check/);
+    expect(document.body.textContent).not.toContain('Recovery failed');
+    expectNoLeak(REPLACEMENT, 'synthetic-capability-csrf');
+    // A genuine wrong guess keeps its own, different message.
+    server.route('POST', '/api/v1/recovery', () => json(403, { error: 'denied' }));
+    recover();
+    await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('Recovery failed'));
+  });
+
   test('the ten-minute deadline ends the capability on this page as a display only', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     const server = recoveryWorld((s) =>

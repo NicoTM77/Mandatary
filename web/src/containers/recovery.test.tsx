@@ -462,7 +462,8 @@ test('a file that cannot be read sends nothing and says so', async () => {
 
 // ───────────────────────── review ─────────────────────────
 
-const rowOf = (over: Record<string, unknown>) => ({ kind: 'group', id: 'g-1', label: 'sample-ops', origin: 'imported', source_state: 'active', imported: {}, effective: {}, decision: 'pending', approvable: true, needs: 'approval', ...over });
+const DIGEST = 'b2'.repeat(32);
+const rowOf = (over: Record<string, unknown>) => ({ kind: 'group', id: 'g-1', label: 'sample-ops', origin: 'imported', source_state: 'active', imported: {}, effective: {}, decision: 'pending', approvable: true, needs: 'approval', digest: DIGEST, ...over });
 function manifestJson(items: unknown[] = defaultItems()) {
   return {
     backup_id: 'bk-0001',
@@ -521,7 +522,7 @@ describe.each(themes)('Review page (%s theme)', (theme) => {
     expect(w.server.calls('POST', APPROVALS)).toHaveLength(0); // naming and confirming first
     fireEvent.click(within(screen.getByRole('group', { name: /^Approve 2 records\?/ })).getByRole('button', { name: 'Approve 2 records' }));
     expect(await screen.findByText('Approved 2 records')).toBeTruthy();
-    expect(w.server.calls('POST', APPROVALS)[0]?.body).toEqual({ items: [{ kind: 'user', id: 'u-1' }, { kind: 'group', id: 'g-1' }] });
+    expect(w.server.calls('POST', APPROVALS)[0]?.body).toEqual({ items: [{ kind: 'user', id: 'u-1', digest: DIGEST }, { kind: 'group', id: 'g-1', digest: DIGEST }] });
     await waitFor(() => expect(w.server.calls('GET', MANIFEST).length).toBeGreaterThanOrEqual(2));
     expect(consoleCalls).toEqual([]);
   });

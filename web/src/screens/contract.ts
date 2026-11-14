@@ -264,6 +264,11 @@ export type RestrictedRecoveryState =
   | Phase
   | { kind: 'rejected'; reason: 'denied' | CommonReason }
   /**
+   * A recovery session that existed has ended (ten minutes passed, or the server discarded it). A fixed neutral outcome: it says nothing about
+   * whether any saved code was valid or already spent (P1.18.4 P116-L2), so it is never the credential-guess message of `rejected`.
+   */
+  | { kind: 'expired' }
+  /**
    * Code accepted: a 10-minute capability exists; a replacement authenticator must now be proven.
    * `replacementCode` is the ONE replacement saved code, shown exactly once (the container drops it in
    * `onReplacementHidden`); it is absent when the capability is resumed after a reload.

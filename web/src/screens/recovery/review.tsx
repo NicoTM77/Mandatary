@@ -4,6 +4,7 @@ import { formatDate } from '../../ui/format';
 import { AccountStateBadge, AdminOnlyNotice, Fact, Facts } from '../policy/shared';
 import { RejectionAlert, commonRejection, useFocusWhen, type Rejection } from '../shared';
 import { MAX_APPROVALS, type ApprovalFailure, type ApprovalRefusal, type ApprovalState, type Comparison, type ItemRef, type ManifestData, type ManifestKind, type ManifestRow, type ReviewScreenProps } from './contract';
+import { DetailBlock, exactText, reviewable, reviewableCopy } from './detail';
 import { Ident, KIND_LABEL, MODE_NAME, countsSentence } from './shared';
 
 const keyOf = (item: ItemRef): string => `${item.kind}\u0000${item.id}`;
@@ -23,6 +24,8 @@ function refusalCopy(reason: ApprovalRefusal): string {
       return 'Its owner isn’t approved yet. Approve the owner first, or select it in the same request.';
     case 'not_quarantined':
       return 'It changed since this page loaded. Reload the page.';
+    case 'stale_details':
+      return 'It changed after you reviewed it, so it was not approved. Reload the list and review it again.';
     case 'compromised':
       return 'It is marked compromised, so it can’t be approved.';
     case 'single_administrator':
@@ -42,6 +45,8 @@ function blockedCopy(row: ManifestRow): string {
       return 'Can’t be approved here. This installation has one administrator, and the host recovery sets who it is.';
     case 'needs_reverification':
       return 'Can’t be approved. The address has to be verified again by the person it belongs to.';
+    case 'compromised':
+      return 'Marked compromised, so it can’t be approved. Mandatary also refuses any attempt to approve it.';
     case 'unsupported':
     case null:
       return 'Can’t be approved in this version.';
@@ -93,6 +98,13 @@ function Outcome({ approval, data, onRetry }: { approval: ApprovalState; data: M
           ))}
         </ul>
         <p className="mt-1.5">Your selection is kept. Change it and try again.</p>
+        {approval.failures.some((failure) => failure.reason === 'stale_details' || failure.reason === 'not_quarantined' || failure.reason === 'not_in_manifest') ? (
+          <div className="mt-2">
+            <Button variant="secondary" onClick={onRetry}>
+              Reload the list
+            </Button>
+          </div>
+        ) : null}
       </Alert>
     );
   }
@@ -184,15 +196,19 @@ function followUp(row: ManifestRow, credentialsHref: ReviewScreenProps['credenti
 }
 
 function RecordRow({ row, selectable, checked, failure, inspectHref, credentialsHref, onToggle }: RowProps) {
+  // For a rule or membership the heading IS the exact sentence (effect, operation, subject, endpoint, selector, or principal and group): the
+  // same text is the checkbox's accessible name, the row and the confirmation (FC4-1). Other kinds keep the service's label.
+  const exact = exactText(row);
   const heading = (
     <>
-      <span className="text-sm text-muted">{KIND_LABEL[row.kind]}</span> <span className="font-medium">{row.label}</span>
+      <span className="text-sm text-muted">{KIND_LABEL[row.kind]}</span> <span className="font-medium">{exact ?? row.label}</span>
     </>
   );
+  const blockedByDetail = row.decision === 'pending' && row.approvable ? reviewable(row) : ({ ok: true } as const);
   const href = inspectHref?.(row.kind, row.id);
   const note = followUp(row, credentialsHref);
   return (
-    <li className="py-4 first:pt-0 last:pb-0">
+    <li className="py-4 first:pt-0 last:pb-0" data-record={`${row.kind}:${row.id}`}>
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
           {selectable ? <CheckboxField label={heading} checked={checked} onChange={onToggle} /> : <p className="break-words">{heading}</p>}
@@ -221,8 +237,15 @@ function RecordRow({ row, selectable, checked, failure, inspectHref, credentials
         {row.origin === 'local_retained' ? <p className="mt-1 text-sm text-muted">It was here before the restore and has been switched off. A restore never deletes anything.</p> : null}
         {/* Only an unusual source state is worth a line: "active" in the file would read as if it were active now. It is reference only. */}
         {row.origin === 'imported' && row.sourceState && row.sourceState !== 'active' ? <p className="mt-1 text-sm text-muted">In the file it was {row.sourceState}. That is for reference only and grants nothing.</p> : null}
+        {exact !== null ? <DetailBlock row={row} /> : null}
         {row.comparison.kind !== 'none' && row.decision === 'pending' ? <CompareBlock comparison={row.comparison} /> : null}
         {note ? <p className="mt-1 text-sm text-muted">{note}</p> : null}
+        {!blockedByDetail.ok ? (
+          <p className="mt-1 flex items-start gap-1.5 text-sm font-medium">
+            <Icon name="lock" className="mt-0.5 size-4 text-muted" />
+            <span>{reviewableCopy(blockedByDetail.why)}</span>
+          </p>
+        ) : null}
         {row.decision === 'pending' && !row.approvable ? (
           <p className="mt-1 flex items-start gap-1.5 text-sm font-medium">
             <Icon name="lock" className="mt-0.5 size-4 text-muted" />
@@ -295,7 +318,8 @@ function Review({ data, approval, inspectHref, credentialsHref, initial, onRetry
 
   const pending = data.items.filter((row) => row.decision === 'pending');
   const approved = data.items.filter((row) => row.decision === 'approved');
-  const selectableRows = pending.filter((row) => row.approvable);
+  // Selectable = the server says approvable AND the page can describe exactly what approving it restores (FC4-1).
+  const selectableRows = pending.filter((row) => row.approvable && reviewable(row).ok);
   const chosen = selectableRows.filter((row) => selected.has(keyOf(row)));
   const blocked = pending.filter((row) => !row.approvable);
   const working = approval.kind === 'working';
@@ -356,13 +380,13 @@ function Review({ data, approval, inspectHref, credentialsHref, initial, onRetry
                     busy={working}
                     returnFocusId={triggerId}
                     onCancel={() => setConfirming(false)}
-                    onConfirm={() => onApprove(chosen.map(({ kind, id }) => ({ kind, id })))}
+                    onConfirm={() => onApprove(chosen.map(({ kind, id, digest }) => ({ kind, id, digest })))}
                   >
                     <p>These become effective straight away. Approval is all-or-nothing: if any one can’t be approved, none is. It never restores a sign-in method or an agent token.</p>
-                    <ul tabIndex={0} aria-label="Records to approve" className="mt-2 max-h-48 list-disc space-y-0.5 overflow-y-auto rounded-control pl-5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus">
+                    <ul tabIndex={0} aria-label="Records to approve" className="mt-2 max-h-64 list-disc space-y-0.5 overflow-y-auto rounded-control pl-5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus">
                       {chosen.map((row) => (
                         <li key={keyOf(row)} className="break-words">
-                          {KIND_LABEL[row.kind]} <span className="font-medium">{row.label}</span>
+                          {KIND_LABEL[row.kind]} <span className="font-medium">{exactText(row) ?? row.label}</span>
                         </li>
                       ))}
                     </ul>
@@ -376,7 +400,7 @@ function Review({ data, approval, inspectHref, credentialsHref, initial, onRetry
               return (
                 <section key={title} aria-label={title}>
                   <h3 className="mb-2 text-base font-semibold">{title}</h3>
-                  <ul className="divide-y divide-line">{rows.map((row) => rowFor(row, true))}</ul>
+                  <ul className="divide-y divide-line">{rows.map((row) => rowFor(row, reviewable(row).ok))}</ul>
                 </section>
               );
             })}

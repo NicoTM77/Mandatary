@@ -18,6 +18,7 @@
  * archive content, a verifier, a token or a key, so none can reach a screen by accident. `source.test.ts` asserts that.
  */
 import type { Load } from '../policy/contract';
+import type { Operation } from '../policy/selector';
 
 export type { Load };
 
@@ -147,7 +148,7 @@ export type ManifestKind = 'endpoint' | 'user' | 'group' | 'agent' | 'user_membe
 export const MANIFEST_KINDS: readonly ManifestKind[] = ['endpoint', 'user', 'group', 'agent', 'user_membership', 'agent_membership', 'policy', 'role', 'address'];
 
 /** Why the service will never approve an entry here (`blocked_reason`). `approvable: false` is the server's decision and the only thing that hides the checkbox. */
-export type BlockedReason = 'single_administrator' | 'needs_reverification' | 'unsupported';
+export type BlockedReason = 'single_administrator' | 'needs_reverification' | 'unsupported' | 'compromised';
 
 /** What an entry still needs, besides approval, before it works (`needs`). Approval never issues a credential. */
 export type ManifestNeeds = 'approval' | 'credential_enrollment' | 'token_reissue' | 'reverification' | 'none_in_phase_1';
@@ -168,6 +169,51 @@ export type Comparison =
   | { kind: 'mfa'; imported: MfaRequirement; effective: MfaRequirement; compromised: boolean }
   | { kind: 'rule'; imported: 'allow' | 'deny'; effective: 'allow' | 'deny'; localDenyKept: boolean };
 
+/**
+ * A record the service names by its stable id (P1.18.4 FC4-1). `name` is the display name and equals `id` when the record could not be found
+ * (`missing`). Names are resolved by the service from stored ids, never by this page, never by display-name equality and never by order.
+ */
+export interface NamedRef {
+  kind: 'user' | 'group' | 'agent' | 'endpoint';
+  id: string;
+  name: string;
+  missing: boolean;
+}
+
+/** The exact container selector of a rule, every constraint as the service stored it (empty string: not set). */
+export interface SelectorDetail {
+  id: string;
+  /** `glob`: the name is a pattern. `exact`: it is a literal name. */
+  nameType: 'exact' | 'glob';
+  containerName: string;
+  composeProject: string;
+  composeService: string;
+  imagePattern: string;
+  pinnedContainerId: string;
+  pinnedImageDigest: string;
+}
+
+/** What approving a rule would make effective: effect, operation, subject, endpoint, selector and any limits. */
+export interface RuleDetail {
+  kind: 'rule';
+  effect: 'allow' | 'deny';
+  operation: Operation;
+  subject: NamedRef;
+  endpoint: NamedRef;
+  selector: SelectorDetail;
+  logTailMax: number | null;
+  stopTimeoutMax: number | null;
+}
+
+/** What approving a membership would make effective: BOTH the named principal and the group. */
+export interface MembershipDetail {
+  kind: 'membership';
+  member: NamedRef;
+  group: NamedRef;
+}
+
+export type RowDetail = RuleDetail | MembershipDetail;
+
 export interface ManifestRow {
   kind: ManifestKind;
   /** The service's item id. Memberships are `<member id>:<group id>`. Sent back verbatim in an approval; never parsed or displayed. */
@@ -186,6 +232,13 @@ export interface ManifestRow {
   blockedReason: BlockedReason | null;
   needs: ManifestNeeds;
   comparison: Comparison;
+  /**
+   * The exact authority a rule or membership would restore (FC4-1). Null for every other kind. A rule or membership whose detail is null,
+   * or names a record that no longer exists, is NOT selectable: the page never asks for an approval it cannot describe exactly.
+   */
+  detail: RowDetail | null;
+  /** The service's fingerprint of what was shown for this record. Sent back with the approval; a record that changed since is refused as stale. */
+  digest: string;
 }
 
 export interface ManifestData {
@@ -211,6 +264,7 @@ export type ApprovalRefusal =
   | 'subject_not_active'
   | 'owner_not_active'
   | 'not_quarantined'
+  | 'stale_details'
   | 'compromised'
   | 'single_administrator'
   | 'needs_reverification'
@@ -226,6 +280,8 @@ export interface ApprovalFailure {
 export interface ItemRef {
   kind: ManifestKind;
   id: string;
+  /** The digest the person reviewed (`ManifestRow.digest`). Optional on the wire; the review screen always sends it. */
+  digest?: string;
 }
 
 /**
