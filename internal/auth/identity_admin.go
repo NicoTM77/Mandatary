@@ -19,7 +19,7 @@ import (
 // Cascades (the owner-state rule). An agent is accountable to exactly one owner (a user XOR a group) and
 // ownership is accountability only (TD §3.1), but an agent whose accountable party has been disabled must
 // not keep working. So disabling a user or a group disables every ACTIVE agent that party owns, revoking all
-// of its credentials first (the schema forbids a live credential behind a non-active agent). Disabling
+// of its credentials first (the order is defence in depth: migration 00012 has no trigger coupling agent state to credential state, the shared verifier rejects such a credential at runtime). Disabling
 // never deletes anything: memberships and rules are kept and simply grant nothing while their subject is
 // inactive. The reverse is deliberately NOT automatic: enabling an owner never re-enables its agents or
 // revives a revoked token, because that would be an authority grant nobody asked for. Re-enabling an agent
