@@ -36,11 +36,40 @@ func (e *adminEnv) adminCalls(secret []byte, agent string) (mutations, reads map
 		},
 		"revoke":  func() error { return e.a.RevokeCredential(ctx, secret, agent, "any") },
 		"disable": func() error { return e.a.DisableAgent(ctx, secret, agent) },
+		// P1.17: every policy, rule and identity-lifecycle mutation answers to exactly the same authority.
+		"disable user":  func() error { return e.a.DisableUser(ctx, secret, "u") },
+		"enable user":   func() error { return e.a.EnableUser(ctx, secret, "u") },
+		"disable group": func() error { return e.a.DisableGroup(ctx, secret, "grp") },
+		"enable group":  func() error { return e.a.EnableGroup(ctx, secret, "grp") },
+		"delete group":  func() error { return e.a.DeleteGroup(ctx, secret, "grp") },
+		"enable agent":  func() error { return e.a.EnableAgent(ctx, secret, agent) },
+		"transfer agent": func() error {
+			return e.a.TransferAgent(ctx, secret, agent, AgentOwner{UserID: "u"})
+		},
+		"create rules": func() error {
+			_, err := e.a.CreateRules(ctx, secret, RuleRequest{Subject: RuleSubject{Kind: "agent", ID: agent}, Effect: "ALLOW", Operations: []string{"container:logs"}, Selector: SelectorSpec{ContainerName: "web"}})
+			return err
+		},
+		"update rule": func() error {
+			_, err := e.a.UpdateRule(ctx, secret, "any", RuleEdit{Effect: "DENY", Selector: SelectorSpec{ContainerName: "web"}})
+			return err
+		},
+		"enable rule":  func() error { return e.a.EnableRule(ctx, secret, "any") },
+		"disable rule": func() error { return e.a.DisableRule(ctx, secret, "any") },
+		"delete rule":  func() error { return e.a.DeleteRule(ctx, secret, "any") },
 	}
 	reads = map[string]func() error{
 		"list agents": func() error { _, err := e.a.ListAgents(ctx, secret); return err },
 		"list groups": func() error { _, err := e.a.ListGroups(ctx, secret); return err },
 		"list users":  func() error { _, err := e.a.ListUsers(ctx, secret); return err },
+		"users page":  func() error { _, err := e.a.UsersPage(ctx, secret); return err },
+		"groups page": func() error { _, err := e.a.GroupsPage(ctx, secret); return err },
+		"agents page": func() error { _, err := e.a.AgentsPage(ctx, secret); return err },
+		"rules page":  func() error { _, err := e.a.RulesPage(ctx, secret); return err },
+		"preview": func() error {
+			_, err := e.a.PreviewSelector(ctx, secret, SelectorSpec{ContainerName: "web"})
+			return err
+		},
 	}
 	return mutations, reads
 }

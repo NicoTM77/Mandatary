@@ -1,5 +1,6 @@
 import { lazy, Suspense } from 'react';
 import { AgentsContainer } from './containers/AgentsContainer';
+import { GroupsContainer, PolicyAgentsContainer, RulesContainer, UsersContainer } from './containers/PolicyContainers';
 import { LoginContainer } from './containers/LoginContainer';
 import { RecoveryContainer } from './containers/RecoveryContainer';
 import { SecurityContainer } from './containers/SecurityContainer';
@@ -18,7 +19,7 @@ function galleryView(): string | null {
   return new URLSearchParams(globalThis.location?.search ?? '').get('synthetic');
 }
 
-export type AppRoute = 'home' | 'setup' | 'login' | 'security' | 'recovery' | 'agents' | 'unknown';
+export type AppRoute = 'home' | 'setup' | 'login' | 'security' | 'recovery' | 'agents' | 'policy-rules' | 'policy-users' | 'policy-groups' | 'policy-agents' | 'unknown';
 
 /**
  * The server serves this shell only at the exact document routes `/`, `/setup` and `/login` (D-ROUTE-1);
@@ -39,6 +40,14 @@ export function routeFor(pathname: string): AppRoute {
       return 'recovery';
     case '/agents':
       return 'agents';
+    case '/policy':
+      return 'policy-rules';
+    case '/policy/users':
+      return 'policy-users';
+    case '/policy/groups':
+      return 'policy-groups';
+    case '/policy/agents':
+      return 'policy-agents';
     default:
       return 'unknown';
   }
@@ -58,6 +67,14 @@ function View({ path }: { path: string }) {
       return <RecoveryContainer />;
     case 'agents':
       return <AgentsContainer />;
+    case 'policy-rules':
+      return <RulesContainer />;
+    case 'policy-users':
+      return <UsersContainer />;
+    case 'policy-groups':
+      return <GroupsContainer />;
+    case 'policy-agents':
+      return <PolicyAgentsContainer />;
     case 'unknown':
       return (
         <CenteredFrame>

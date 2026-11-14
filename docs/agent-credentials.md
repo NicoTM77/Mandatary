@@ -17,7 +17,7 @@
 | --- | --- |
 | Mounting any route in the static server (it still has no login, session, administration or API route) | P1.16 composes login/step-up adapters and the UI; P1.14 the API/MCP surface |
 | REST/MCP Bearer adapters. The shared acceptance path they must call (`authz.Authorizer`) exists and is exercised end-to-end here | P1.14 |
-| Policy rule CRUD, user/group *disabling*, deletion, ownership transfer | P1.17 |
+| Policy rule CRUD, user/group disabling, group deletion, ownership transfer | P1.17 (delivered: `docs/policy-administration.md`) |
 | Account credential enrolment for administratively created users (they cannot sign in until enrolled) | P1.16 |
 | Restore import/reactivation/reissue approval of quarantined credentials and memberships | P1.18 |
 | Multiple or endpoint-scoped administrators, own-session visibility, policy audit | Phase 3 |

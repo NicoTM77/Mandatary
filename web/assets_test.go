@@ -59,7 +59,7 @@ func TestStaticSurfaceRejectsUnknownRoutesAndMethods(t *testing.T) {
 func TestApplicationDocumentRoutesAreAnExactAllowlist(t *testing.T) {
 	index := httptest.NewRecorder()
 	Handler().ServeHTTP(index, httptest.NewRequest(http.MethodGet, "/", nil))
-	for _, path := range []string{"/setup", "/login", "/security", "/recovery", "/agents"} {
+	for _, path := range []string{"/setup", "/login", "/security", "/recovery", "/agents", "/policy", "/policy/users", "/policy/groups", "/policy/agents"} {
 		t.Run(path, func(t *testing.T) {
 			w := httptest.NewRecorder()
 			Handler().ServeHTTP(w, httptest.NewRequest(http.MethodGet, path, nil))
@@ -88,7 +88,7 @@ func TestApplicationDocumentRoutesAreAnExactAllowlist(t *testing.T) {
 	}
 	for _, path := range []string{
 		"/setup/", "/login/", "/Setup", "/LOGIN", "/setup/x", "/login/totp", "/setup/exchange", "/login/..%2f", "/setup%2f", "/setup.html", "//setup", "/setup;x", "/logout", "/session", "/account", "/admin",
-		"/security/", "/Security", "/security/totp", "/recovery/", "/recovery/state", "/agents/", "/agents/x", "/stepup", "/api/v1/security", "/security.html", "//recovery",
+		"/security/", "/Security", "/security/totp", "/recovery/", "/recovery/state", "/agents/", "/agents/x", "/policy/", "/policy/x", "/policy/rules", "/policy/users/", "/policy/groups/x", "/policy/agents/x", "/Policy", "/policy%2fusers", "/stepup", "/api/v1/security", "/security.html", "//recovery",
 	} {
 		t.Run("closed "+path, func(t *testing.T) {
 			w := httptest.NewRecorder()
@@ -104,7 +104,7 @@ func TestApplicationDocumentRoutesAreAnExactAllowlist(t *testing.T) {
 // else beyond the original strict policy: exactly one directive changed.
 func TestStaticCSPAllowsOnlySameOriginConnect(t *testing.T) {
 	const want = "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'"
-	for _, path := range []string{"/", "/setup", "/login", "/security", "/recovery", "/agents", "/assets/missing.js", "/other"} {
+	for _, path := range []string{"/", "/setup", "/login", "/security", "/recovery", "/agents", "/policy", "/policy/users", "/policy/groups", "/policy/agents", "/assets/missing.js", "/other"} {
 		w := httptest.NewRecorder()
 		Handler().ServeHTTP(w, httptest.NewRequest(http.MethodGet, path, nil))
 		if got := w.Header().Get("Content-Security-Policy"); got != want {

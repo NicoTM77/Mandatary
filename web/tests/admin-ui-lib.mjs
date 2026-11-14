@@ -30,8 +30,37 @@ export function controlBase(value) {
   return url;
 }
 
-const DOCUMENTS = new Set(['/', '/setup', '/login', '/security', '/recovery', '/agents']);
-const API_GET = new Set(['/api/v1/session', '/api/v1/setup/session', '/api/v1/account/security', '/api/v1/recovery/state', '/api/v1/admin/agents']);
+const DOCUMENTS = new Set(['/', '/setup', '/login', '/security', '/recovery', '/agents', '/policy', '/policy/users', '/policy/groups', '/policy/agents']);
+const API_GET = new Set([
+  '/api/v1/session',
+  '/api/v1/setup/session',
+  '/api/v1/account/security',
+  '/api/v1/recovery/state',
+  '/api/v1/admin/agents',
+  // Policy administration (P1.17): the four management pages' lists.
+  '/api/v1/admin/policy/users',
+  '/api/v1/admin/policy/groups',
+  '/api/v1/admin/policy/agents',
+  '/api/v1/admin/policy/rules',
+]);
+// Policy administration commands (P1.17), by method. Identifiers are server-issued path segments; nothing else is open.
+const ID = '[A-Za-z0-9._-]+';
+const POLICY_COMMANDS = new Map([
+  [
+    'POST',
+    [
+      /^\/api\/v1\/admin\/(users|groups|agents)$/,
+      new RegExp(`^/api/v1/admin/(users|groups|agents)/${ID}/(disable|enable)$`),
+      /^\/api\/v1\/admin\/policy\/rules(\/preview)?$/,
+      new RegExp(`^/api/v1/admin/policy/rules/${ID}/(enable|disable)$`),
+    ],
+  ],
+  ['PUT', [new RegExp(`^/api/v1/admin/groups/${ID}/members/(user|agent)/${ID}$`), new RegExp(`^/api/v1/admin/agents/${ID}/owner$`), new RegExp(`^/api/v1/admin/policy/rules/${ID}$`)]],
+  ['DELETE', [new RegExp(`^/api/v1/admin/groups/${ID}$`), new RegExp(`^/api/v1/admin/groups/${ID}/members/(user|agent)/${ID}$`), new RegExp(`^/api/v1/admin/policy/rules/${ID}$`)]],
+]);
+function allowsPolicyCommand(method, pathname) {
+  return (POLICY_COMMANDS.get(method) ?? []).some((pattern) => pattern.test(pathname));
+}
 // Account-security, step-up, recovery and agent-credential routes (P1.16.4).
 const API_POST_SECURITY = new Set([
   '/api/v1/stepup/password',
@@ -87,7 +116,7 @@ export function allowsAppRequest(origin, value, method) {
   const url = new URL(value);
   if (url.origin !== origin.origin || url.username || url.password || url.search || url.hash) return false;
   if (method === 'GET') return DOCUMENTS.has(url.pathname) || API_GET.has(url.pathname) || /^\/assets\/[A-Za-z0-9._-]+$/.test(url.pathname);
-  return method === 'POST' && (API_POST.has(url.pathname) || API_POST_SECURITY.has(url.pathname) || allowsAgentPost(url.pathname));
+  return (method === 'POST' && (API_POST.has(url.pathname) || API_POST_SECURITY.has(url.pathname) || allowsAgentPost(url.pathname))) || allowsPolicyCommand(method, url.pathname);
 }
 
 // ───────────────────────── control channel (fixture host actions) ─────────────────────────

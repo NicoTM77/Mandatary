@@ -30,7 +30,8 @@ const PASSWORD = 'a unique synthetic public phrase';
 const WRONG_PASSWORD = 'definitely not the right one';
 
 const browser = await launchEngine();
-const observed = { blocked: [], console: [], errors: [], requests: [], responses: [] };
+const WEBKIT_SELECT_NOTE = "Refused to apply a stylesheet because its hash, its nonce, or 'unsafe-inline' does not appear in the style-src directive of the Content Security Policy.";
+const observed = { blocked: [], console: [], errors: [], requests: [], responses: [], selectNotes: [] };
 const pending = [];
 const canaries = new Set();
 
@@ -45,7 +46,24 @@ async function newContext() {
   context.on('request', (request) => pending.push(request.allHeaders().then((headers) => observed.requests.push({ method: request.method(), url: request.url(), headers }))));
   context.on('response', (response) => pending.push(response.allHeaders().then((headers) => observed.responses.push({ url: response.url(), status: response.status(), headers }))));
   context.on('page', (page) => {
-    page.on('console', (message) => observed.console.push({ type: message.type(), text: message.text() }));
+    page.on('console', (message) => {
+      const entry = { type: message.type(), text: message.text() };
+      // Playwright's WebKit (27.2) reports this style-src note for ANY native <select>, with no application code
+      // involved (reproduced on a bare page under the product CSP; Chromium and Firefox report nothing; C3
+      // observation O3; docs/ui/p1.17-policy-management-ux-contract.md §9.3). The CSP itself is asserted unchanged
+      // below and nothing is relaxed: only this exact message, only on WebKit, and only while the page really
+      // contains a native <select>, is counted apart; anything else still fails the run.
+      if (engineName === 'webkit' && entry.type === 'error' && entry.text === WEBKIT_SELECT_NOTE) {
+        pending.push(
+          page
+            .evaluate(() => document.querySelector('select') !== null)
+            .catch(() => false)
+            .then((hasSelect) => (hasSelect ? observed.selectNotes.push(entry.text) : observed.console.push(entry))),
+        );
+        return;
+      }
+      observed.console.push(entry);
+    });
     page.on('pageerror', (error) => observed.errors.push(error.name));
   });
   return context;
@@ -89,7 +107,7 @@ async function finish(extraSecrets) {
     const url = new URL(request.url);
     assert.equal(url.search, '', 'no request carries a query string');
     assert.ok(!('authorization' in request.headers), 'no Authorization header');
-    if (request.method === 'POST' && !/\/api\/v1\/(login|recovery)$/.test(url.pathname)) assert.ok(request.headers['x-csrf-token'], `CSRF header on ${url.pathname}`);
+    if (['POST', 'PUT', 'DELETE'].includes(request.method) && !/\/api\/v1\/(login|recovery)$/.test(url.pathname)) assert.ok(request.headers['x-csrf-token'], `CSRF header on ${request.method} ${url.pathname}`);
     if (request.method === 'POST' && /\/api\/v1\/(login|recovery)$/.test(url.pathname)) assert.equal(request.headers['x-csrf-token'], undefined, 'no CSRF token before a session or capability exists');
     if (request.method === 'POST') assert.equal(request.headers['content-type'], 'application/json');
   }
@@ -189,7 +207,7 @@ async function securityFlows() {
   await page.getByText('first@example.invalid').waitFor();
   await page.getByText('second@example.invalid').waitFor();
   await openMenu(page); // a phone-sized viewport collapses the navigation behind the Menu button
-  await page.getByRole('link', { name: 'Agents' }).first().waitFor(); // the server said this account administers
+  await page.getByRole('link', { name: 'Agent tokens' }).first().waitFor(); // the server said this account administers
   await step('security page').scan(page, [PASSWORD, first.value]);
   await shot(page, 'security');
 
@@ -294,7 +312,7 @@ async function securityFlows() {
 
   // ── agents: reveal-once token, accepted by the shared verifier, revoked
   await openMenu(page); // a phone-sized viewport collapses the navigation behind the Menu button
-  await page.getByRole('link', { name: 'Agents' }).first().click();
+  await page.getByRole('link', { name: 'Agent tokens' }).first().click();
   await page.getByRole('heading', { name: 'Agents', level: 1 }).waitFor();
   await page.getByRole('heading', { name: 'Credentials for synthetic-agent' }).waitFor();
   await button(page, 'Issue token').click();
@@ -607,6 +625,10 @@ async function denialMatrix() {
   }
   assert.equal((await rawRequest(origin, { method: 'GET', path: '/api/v1/account/security', cookie: preauthCookie })).status, 401);
   assert.equal((await rawRequest(origin, { method: 'GET', path: '/api/v1/admin/agents', cookie: preauthCookie })).status, 401);
+  for (const route of ['users', 'groups', 'agents', 'rules']) {
+    assert.equal((await rawRequest(origin, { method: 'GET', path: `/api/v1/admin/policy/${route}`, cookie: preauthCookie })).status, 401, `policy/${route}: a preauth capability is not a session`);
+  }
+  assert.equal((await rawRequest(origin, { method: 'POST', path: '/api/v1/admin/policy/rules', cookie: preauthCookie, csrf: preauth.json.csrf_token, body: {} })).status, 401);
 
   // Step-up: a password alone does not satisfy an MFA account, and a replayed code is refused.
   const spent = totpCode(seed, await host.now());
@@ -647,6 +669,22 @@ async function denialMatrix() {
     assert.equal(response.json.error, 'step_up_required');
   }
   assert.equal((await rawRequest(origin, { method: 'GET', path: '/api/v1/admin/agents', cookie: lowerCookie })).status, 403, 'a password-only session cannot administer agents');
+  // The policy pages and commands are refused to the same session before any service runs, and nothing is shown for them.
+  for (const route of ['users', 'groups', 'agents', 'rules']) {
+    assert.equal((await rawRequest(origin, { method: 'GET', path: `/api/v1/admin/policy/${route}`, cookie: lowerCookie })).status, 403, `policy/${route}: a password-only session cannot read policy administration`);
+  }
+  for (const [method, route] of [
+    ['POST', '/api/v1/admin/users'],
+    ['POST', '/api/v1/admin/policy/rules'],
+    ['POST', '/api/v1/admin/policy/rules/preview'],
+    ['POST', '/api/v1/admin/groups/g/disable'],
+  ]) {
+    const response = await rawRequest(origin, { method, path: route, cookie: lowerCookie, csrf: lowerCsrf, body: {} });
+    assert.equal(response.status, 403, `${route}: password-only evidence cannot administer policy`);
+  }
+  await page.goto(new URL('/policy', origin).href);
+  await page.getByText('Policy administration isn’t available to this session').waitFor();
+  assert.equal(await page.getByRole('button', { name: 'Add a rule' }).count(), 0, 'nothing that could change access is offered');
   await openSecurity(page);
   await page.getByText('This session can’t show your security settings').waitFor();
   assert.equal((await rawRequest(origin, { method: 'GET', path: '/api/v1/account/security', cookie: lowerCookie })).status, 403, 'the inventory is withheld from a password-only session');
@@ -656,6 +694,122 @@ async function denialMatrix() {
   await step('forbidden agents').scan(page, [PASSWORD]);
 
   await finish([PASSWORD, WRONG_PASSWORD, seed]);
+  await context.close();
+}
+
+// ───────────────────────── scenario: policy administration (P1.17) ─────────────────────────
+
+async function openPolicy(page, link, heading) {
+  await openMenu(page); // a phone-sized viewport collapses the navigation behind the Menu button
+  await page.getByRole('navigation', { name: 'Primary' }).getByRole('link', { name: link, exact: true }).click();
+  await page.getByRole('heading', { name: heading, level: 1 }).waitFor();
+}
+
+async function policyFlows() {
+  const seed = await host.seed();
+  canaries.add(seed);
+  const context = await newContext();
+  const page = await context.newPage();
+  await signIn(page, seed);
+  await theme(page);
+
+  // ── the authority note is on every management page, and the pages offer no operations console
+  const audits = [];
+  async function audit(name) {
+    await page.getByText('Managing access isn’t the same as having it').waitFor();
+    assert.equal(await page.getByRole('button', { name: /^(Start|Stop|Restart|Read logs|Inspect)\b/ }).count(), 0, `${name}: no container operation is offered`);
+    audits.push(await auditAccessibility(page, name));
+  }
+
+  // ── users: add one (the session is fresh, so no step-up), then the page lists it
+  await openPolicy(page, 'Users', 'Users');
+  await audit('users');
+  await field(page, 'Username').fill('browser-robin');
+  await button(page, 'Add user').click();
+  await page.getByText(/Added browser-robin\./).waitFor();
+  await page.getByRole('heading', { level: 3, name: 'browser-robin' }).waitFor();
+  await shot(page, 'policy-users');
+  assert.equal(await page.getByRole('button', { name: /^Delete/ }).count(), 0, 'no user deletion exists');
+
+  // ── a change after fifteen minutes needs a fresh verification; the blocked request is NOT replayed
+  await host.advance(16 * 60);
+  await openPolicy(page, 'Groups', 'Groups');
+  await audit('groups');
+  await field(page, 'Group name').fill('browser-ops');
+  await button(page, 'Add group').click();
+  await page.getByRole('heading', { name: 'Confirm it’s you to add a group' }).waitFor();
+  assert.equal(await page.getByRole('heading', { level: 3, name: 'browser-ops' }).count(), 0, 'the blocked request created nothing');
+  await shot(page, 'policy-step-up');
+  await step('policy step-up').scan(page, [PASSWORD]);
+  await stepUp(page, seed, 'add a group');
+  await field(page, 'Group name').fill('browser-ops');
+  await button(page, 'Add group').click();
+  await page.getByRole('heading', { level: 3, name: 'browser-ops' }).waitFor();
+
+  // ── membership and an agent owned by the user
+  const addMember = page.getByRole('form', { name: 'Add a member to browser-ops' });
+  await addMember.getByLabel('Add a member').selectOption({ label: 'browser-robin' });
+  await addMember.getByRole('button', { name: 'Add to browser-ops' }).click();
+  await page.getByText('Added browser-robin to browser-ops.').waitFor();
+  await openPolicy(page, 'Agents', 'Agents');
+  await audit('agents');
+  await field(page, 'Agent name').fill('browser-bot');
+  await page.getByLabel('Owning user').selectOption({ label: 'browser-robin' });
+  await button(page, 'Add agent').click();
+  await page.getByRole('heading', { level: 3, name: 'browser-bot' }).waitFor();
+  const tokenLink = page.getByRole('link', { name: /browser-bot/ }).filter({ hasText: /token/i }).first();
+  if ((await tokenLink.count()) > 0) assert.match((await tokenLink.getAttribute('href')) ?? '', /^\/agents#agent=/, 'the token page is linked, never reimplemented');
+  assert.equal(await page.locator('input[type="password"]').count(), 0, 'no secret is handled on the agents page');
+
+  // ── a rule: the only thing that grants. With no Docker backend in this fixture the endpoint is "unverified",
+  //    and the page says so instead of listing anything as a match.
+  await openPolicy(page, 'Rules', 'Rules');
+  await audit('rules');
+  await page.getByText('Mandatary can’t verify its own container').first().waitFor();
+  await button(page, 'Add a rule').first().click();
+  const form = page.getByRole('form', { name: 'Add a rule' });
+  const option = form.locator('select[name="subject"] option', { hasText: 'browser-bot' });
+  await form.locator('select[name="subject"]').selectOption(await option.getAttribute('value'));
+  await form.getByRole('checkbox', { name: /Read logs/ }).check();
+  await form.getByLabel('Container name', { exact: true }).fill('browser-proxy');
+  await form.getByLabel('Most log lines per request').fill('25');
+  await shot(page, 'policy-rule-editor');
+  await audit('rule editor');
+  await form.getByRole('button', { name: 'Add rule' }).click();
+  await page.getByText('Added the rule.').waitFor();
+  await page.getByText('Target status unknown').first().waitFor();
+  assert.equal(await page.getByText(/Matches \d+ container/).count(), 0, 'an unverified endpoint never reports a match');
+  await shot(page, 'policy-rules');
+  // The page's own account of the rule, and the server's: one ALLOW logs rule with its cap.
+  const listed = await apiAs(context, await sessionCookie(context), { method: 'GET', path: '/api/v1/admin/policy/rules' });
+  assert.equal(listed.status, 200);
+  assert.equal(listed.json.rules.length, 1);
+  assert.deepEqual([listed.json.rules[0].effect, listed.json.rules[0].operation, listed.json.rules[0].log_tail_max, listed.json.rules[0].target.status], ['ALLOW', 'container:logs', 25, 'unknown']);
+
+  // ── disabling asks first, and the rule stays listed as disabled; deleting asks too
+  await page.getByRole('button', { name: /^Disable: / }).first().click();
+  await page.getByRole('group', { name: /^Disable “/ }).getByRole('button', { name: /^Disable/ }).click();
+  await page.getByText(/Disabled the rule for browser-bot\./).waitFor();
+  await page.getByText('Disabled', { exact: true }).first().waitFor();
+  await page.getByRole('button', { name: /^Delete: / }).first().click();
+  await page.getByRole('group', { name: /^Delete “/ }).getByRole('button', { name: 'Delete rule' }).click();
+  await page.getByText(/Deleted the rule for browser-bot\./).waitFor();
+  assert.equal((await apiAs(context, await sessionCookie(context), { method: 'GET', path: '/api/v1/admin/policy/rules' })).json.rules.length, 0);
+
+  // ── disabling the owner revokes the agent it owns, and the Agents page shows it
+  await openPolicy(page, 'Users', 'Users');
+  await button(page, 'Disable browser-robin').click();
+  await page.getByRole('group', { name: 'Disable browser-robin?' }).getByRole('button', { name: 'Disable browser-robin' }).click();
+  await page.getByText('Disabled browser-robin.').waitFor();
+  await openPolicy(page, 'Agents', 'Agents');
+  const agents = (await apiAs(context, await sessionCookie(context), { method: 'GET', path: '/api/v1/admin/policy/agents' })).json.agents;
+  assert.equal(agents.find((a) => a.name === 'browser-bot').state, 'disabled', 'the owner’s disabling cascaded to its agent');
+  await openMenu(page); // a phone-sized viewport collapses the navigation behind the Menu button
+  await page.getByRole('link', { name: 'Agent tokens' }).first().waitFor();
+  await step('policy pages').scan(page, [PASSWORD, seed]);
+  assert.ok(audits.length >= 5);
+
+  await finish([PASSWORD, seed]);
   await context.close();
 }
 
@@ -689,6 +843,14 @@ async function auditSelfCheck() {
   assert.deepEqual(good.violations, [], 'well-formed markup passes');
   const walked = await auditAccessibility(page, 'good markup');
   assert.equal(walked.tabStops, 2, 'the keyboard walk reaches both controls');
+  // Controls inside a closed disclosure are not rendered and cannot take focus, so they are not "unreachable";
+  // once it is open they are expected and reached.
+  await page.setContent(GOOD_PAGE.replace('</main>', '<details id="d"><summary>More</summary><label for="x">Extra</label><input id="x" type="text"></details></main>'));
+  assert.equal((await auditAccessibility(page, 'closed disclosure')).tabStops, 3, 'summary is a stop; its closed content is not expected');
+  await page.evaluate(() => {
+    document.getElementById('d').open = true;
+  });
+  assert.equal((await auditAccessibility(page, 'open disclosure')).tabStops, 4, 'an open disclosure’s controls are expected and reached');
   await context.close();
 }
 
@@ -698,8 +860,9 @@ try {
   else if (scenario === 'recovery-flow') await recoveryFlow();
   else if (scenario === 'key-flows') await keyFlows();
   else if (scenario === 'denial-matrix') await denialMatrix();
+  else if (scenario === 'policy-flows') await policyFlows();
   else throw new Error(`unknown scenario ${scenario}`);
-  console.log(JSON.stringify({ scenario, scheme, engine: engineName, browser: browser.version(), requests: observed.requests.length, blockedEgress: 0, secretsInConsole: 0 }));
+  console.log(JSON.stringify({ scenario, scheme, engine: engineName, browser: browser.version(), requests: observed.requests.length, blockedEgress: 0, secretsInConsole: 0, webkitSelectNotes: observed.selectNotes.length }));
 } catch (error) {
   // Diagnostics for a failed run: what the page showed and what it asked, never a secret-bearing value
   // (every credential in this suite is synthetic and the server never echoes one).

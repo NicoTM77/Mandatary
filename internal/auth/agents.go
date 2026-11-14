@@ -86,6 +86,8 @@ type Admin struct {
 	settings AdminSettings
 	random   io.Reader
 	notify   func(context.Context) error
+	// targets is the optional read-only container source for the policy pages (policy_admin.go).
+	targets targetHolder
 }
 
 // NewAdmin binds the service to the lifecycle's repository and clock. notify, when

@@ -177,6 +177,9 @@ async function keyboardWalk(page) {
       for (let node = el; node && node.nodeType === Node.ELEMENT_NODE; node = node.parentElement) {
         const style = getComputedStyle(node);
         if (style.display === 'none' || style.visibility === 'hidden' || node.hasAttribute('hidden')) return false;
+        // The content of a closed <details> (everything but its summary) is not rendered and cannot take focus.
+        const parent = node.parentElement;
+        if (parent && parent.tagName === 'DETAILS' && !parent.open && node.tagName !== 'SUMMARY') return false;
       }
       const rect = el.getBoundingClientRect();
       return rect.width > 0 && rect.height > 0;

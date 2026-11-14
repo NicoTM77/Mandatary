@@ -75,6 +75,11 @@ func (h *AdminHTTP) Register(b *Browser) error {
 			return err
 		}
 	}
+	for _, r := range h.policyRoutes(read, policy) { // P1.17 policy, rule and identity-lifecycle routes
+		if err := b.Handle(r.pattern, r.policy, r.handler); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

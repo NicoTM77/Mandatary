@@ -119,9 +119,13 @@ export class AccountApi {
     this.#csrf = '';
   }
 
-  /** Sends a same-origin POST carrying the current CSRF token. `path` is always a constant of the caller. */
-  request<T = null>(path: string, options: Omit<RequestOptions<T>, 'csrf'> = {}): Promise<ApiResult<T>> {
-    return send(this.#fetcher, 'POST', path, { ...options, csrf: this.#csrf });
+  /**
+   * Sends a same-origin state-changing request (POST unless the caller names PUT or DELETE) carrying the current
+   * CSRF token. `path` is always a constant of the caller plus identifiers validated by `safeSegment`.
+   */
+  request<T = null>(path: string, options: Omit<RequestOptions<T>, 'csrf'> & { method?: 'POST' | 'PUT' | 'DELETE' } = {}): Promise<ApiResult<T>> {
+    const { method = 'POST', ...rest } = options;
+    return send(this.#fetcher, method, path, { ...rest, csrf: this.#csrf });
   }
 
   read<T>(path: string, decode: (value: unknown) => T | null): Promise<ApiResult<T>> {
