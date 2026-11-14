@@ -230,10 +230,10 @@ func TestParallelRestoreRequestsOverHTTPLeaveOneConsistentInactiveState(t *testi
 	wg.Wait()
 	ok := 0
 	for i, w := range results {
-		switch {
-		case w.Code == http.StatusOK:
+		switch w.Code {
+		case http.StatusOK:
 			ok++
-		case w.Code == http.StatusUnauthorized || w.Code == http.StatusForbidden || w.Code == http.StatusConflict || w.Code == http.StatusServiceUnavailable:
+		case http.StatusUnauthorized, http.StatusForbidden, http.StatusConflict, http.StatusServiceUnavailable:
 			// Overtaken: refused by the in-transaction check, superseded, or failed after the transition. Never a success.
 		default:
 			t.Errorf("request %d: %d %s", i, w.Code, w.Body.String())
