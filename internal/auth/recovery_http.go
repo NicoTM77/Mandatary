@@ -196,15 +196,29 @@ func (h *recoveryHTTP) recover(w http.ResponseWriter, r *http.Request) {
 		fault(w, err)
 		return
 	}
+	// The response is derived ONLY from the in-memory result of the transaction that consumed the
+	// saved code. There is deliberately no further storage read here: after the consumption has
+	// committed, a failing read would lose the one replacement code (P1.18.4 P116-L6). The
+	// capability metadata was captured in that same transaction.
+	if h.s.afterRecover != nil {
+		h.s.afterRecover()
+	}
+	meta := result.Meta()
 	secret, codes := result.ExportOnce()
 	defer clear(secret)
-	view, err := h.view(r, secret)
-	if err != nil || len(codes) != 1 {
+	if len(secret) == 0 || len(codes) != 1 || meta.ID == "" {
 		writeJSONError(w, http.StatusServiceUnavailable, "unavailable")
 		return
 	}
+	methods := []string{}
+	if meta.TOTP {
+		methods = append(methods, "totp")
+	}
+	if h.s.webauthnReady() {
+		methods = append(methods, "webauthn")
+	}
 	h.setCookie(w, secret)
-	writeJSON(w, http.StatusOK, map[string]any{"step": "capability", "csrf_token": recoveryCSRF(secret, view.id), "expires_at": view.expiresAt, "methods": view.methods, "replacement_code": codes[0]})
+	writeJSON(w, http.StatusOK, map[string]any{"step": "capability", "csrf_token": recoveryCSRF(secret, meta.ID), "expires_at": meta.ExpiresAt, "methods": methods, "replacement_code": codes[0]})
 }
 
 func (h *recoveryHTTP) state(w http.ResponseWriter, _ *http.Request, secret []byte, view recoveryView) {

@@ -1,10 +1,14 @@
 package auth
 
 import (
+	"bytes"
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -263,4 +267,89 @@ func TestRecoveryHTTPCapabilityExpires(t *testing.T) {
 	if w := h.capDo(capCall{method: "GET", path: RecoveryStatePath, cookies: dup}); w.Code != http.StatusUnauthorized {
 		t.Fatalf("duplicate cookies: %d", w.Code)
 	}
+}
+
+// P1.18.4 P116-L6: the recovery response is derived from the in-memory result of the very
+// transaction that consumed the saved code. A storage read that fails AFTER that commit (the
+// recovery capability table made unreadable here, between consumption and response) must not
+// lose the one replacement code: the caller still receives the cookie, the capability-derived
+// CSRF token, the expiry, the permitted methods and the replacement code, exactly once, and
+// every later request consistently resolves the same capability.
+func TestRecoveryHTTPResponseNeverNeedsASecondStorageReadAfterTheCodeIsConsumed(t *testing.T) {
+	h := newSecurityHarness(t)
+	codes := h.savedCodes()
+	h.e.clock.Advance(time.Minute)
+	reads := 0
+	h.e.s.afterRecover = func() {
+		reads++
+		h.e.exec(`ALTER TABLE recovery_capabilities RENAME TO recovery_capabilities_unreadable`)
+	}
+	w, start, capability := h.startRecovery(codes[0])
+	h.e.s.afterRecover = nil
+	h.e.exec(`ALTER TABLE recovery_capabilities_unreadable RENAME TO recovery_capabilities`)
+	if reads != 1 {
+		t.Fatalf("the post-consumption seam ran %d times", reads)
+	}
+	if w.Code != http.StatusOK || capability == nil || start.Step != "capability" || start.CSRF == "" || len(start.ReplacementCode) == 0 || strings.Join(start.Methods, ",") != "totp,webauthn" || start.ExpiresAt != h.e.clock.Now().Unix()+600 {
+		t.Fatalf("a read fault after consumption lost the replacement code: %d %s", w.Code, w.Body.String())
+	}
+	if len(strings.Split(w.Body.String(), start.ReplacementCode)) != 2 {
+		t.Fatal("the replacement code must appear exactly once")
+	}
+	// The consumed code is spent, and the capability the response described is the live one.
+	if w2, _, c2 := h.startRecovery(codes[0]); w2.Code != http.StatusForbidden || c2 != nil {
+		t.Fatalf("a consumed saved code was accepted again: %d", w2.Code)
+	}
+	rec := h.capDo(capCall{method: "GET", path: RecoveryStatePath, cookies: []*http.Cookie{capability}})
+	var state recoveryStart
+	_ = json.Unmarshal(rec.Body.Bytes(), &state)
+	if rec.Code != http.StatusOK || state.CSRF != start.CSRF || state.ExpiresAt != start.ExpiresAt || strings.Join(state.Methods, ",") != strings.Join(start.Methods, ",") {
+		t.Fatalf("the response and the stored capability disagree: %d %s", rec.Code, rec.Body.String())
+	}
+	if strings.Contains(rec.Body.String(), start.ReplacementCode) {
+		t.Fatal("the state route re-displayed the replacement code")
+	}
+	// No raw secret is persisted: neither the capability cookie value nor the replacement code.
+	if bytes.Contains(rawStoreBytes(h.e.t, h.e.db), []byte(start.ReplacementCode)) || bytes.Contains(rawStoreBytes(h.e.t, h.e.db), []byte(capability.Value)) {
+		t.Fatal("a raw capability or replacement code reached the store")
+	}
+}
+
+// A WebAuthn-only account is offered only the WebAuthn method, taken from the same transaction.
+func TestRecoveryHTTPMethodsForAWebAuthnOnlyAccountComeFromTheConsumingTransaction(t *testing.T) {
+	h := newSecurityHarness(t)
+	codes := h.savedCodes()
+	h.e.exec(`UPDATE users SET mfa_requirement='webauthn'`)
+	h.e.clock.Advance(time.Minute)
+	w, start, capability := h.startRecovery(codes[0])
+	if w.Code != http.StatusOK || capability == nil || strings.Join(start.Methods, ",") != "webauthn" {
+		t.Fatalf("webauthn-only methods: %d %s", w.Code, w.Body.String())
+	}
+	rec := h.capDo(capCall{method: "GET", path: RecoveryStatePath, cookies: []*http.Cookie{capability}})
+	var state recoveryStart
+	_ = json.Unmarshal(rec.Body.Bytes(), &state)
+	if rec.Code != http.StatusOK || strings.Join(state.Methods, ",") != "webauthn" {
+		t.Fatalf("state disagrees: %d %s", rec.Code, rec.Body.String())
+	}
+}
+
+// rawStoreBytes returns the database, WAL and shm bytes for plaintext-exposure scans.
+func rawStoreBytes(t *testing.T, db *sql.DB) []byte {
+	t.Helper()
+	var all []byte
+	var path string
+	if err := db.QueryRow(`SELECT file FROM pragma_database_list WHERE name='main'`).Scan(&path); err != nil {
+		t.Fatal(err)
+	}
+	for _, suffix := range []string{"", "-wal", "-shm"} {
+		b, err := os.ReadFile(path + suffix)
+		if err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				continue
+			}
+			t.Fatal(err)
+		}
+		all = append(all, b...)
+	}
+	return all
 }

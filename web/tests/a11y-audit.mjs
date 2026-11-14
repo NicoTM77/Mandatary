@@ -107,11 +107,46 @@ function collectViolations() {
   }
 
   // Colour contrast on resolved colours (opaque ancestors composited; background images are reported as unverifiable).
+  //
+  // Computed colours are not always rgb(): `color-mix(in oklab, ...)` (every Tailwind opacity utility), `oklch()`, `color(display-p3 ...)` and
+  // the like are returned in their own colour space. Those used to be skipped silently (P1.18.4 P116-L4). They are now normalised through the
+  // browser itself: a 1x1 canvas paints the computed value and reads back the sRGB pixel, so the conversion is the engine's, not a hand-written
+  // approximation. A value the engine cannot parse is NOT skipped: it is counted as unverifiable and the audit fails unless the caller named
+  // an explicit, bounded allowance.
+  const canvas = document.createElement('canvas');
+  canvas.width = 1;
+  canvas.height = 1;
+  const painter = canvas.getContext('2d', { willReadFrequently: true });
+  const converted = new Map();
+  const viaCanvas = (value) => {
+    if (converted.has(value)) return converted.get(value);
+    let result = null;
+    if (painter) {
+      // An invalid assignment leaves the previous fillStyle, so two different sentinels tell "unparseable" from "parsed to the sentinel".
+      let probe = null;
+      for (const sentinel of ['#010203', '#fdfcfb']) {
+        painter.fillStyle = sentinel;
+        painter.fillStyle = value;
+        probe = probe === null ? painter.fillStyle : probe === painter.fillStyle ? probe : 'invalid';
+      }
+      if (probe !== 'invalid') {
+        painter.clearRect(0, 0, 1, 1);
+        painter.fillRect(0, 0, 1, 1);
+        const [r, g, b, a] = painter.getImageData(0, 0, 1, 1).data;
+        result = { r, g, b, a: a / 255 };
+      }
+    }
+    converted.set(value, result);
+    return result;
+  };
   const parse = (value) => {
-    const m = /rgba?\(([^)]+)\)/.exec(value);
-    if (!m) return null;
-    const parts = m[1].split(/[,\s/]+/).filter(Boolean).map(Number);
-    return { r: parts[0], g: parts[1], b: parts[2], a: parts.length > 3 ? parts[3] : 1 };
+    if (typeof value !== 'string' || value === '') return null;
+    const m = /^rgba?\(([^)]+)\)$/.exec(value.trim());
+    if (m) {
+      const parts = m[1].split(/[,\s/]+/).filter(Boolean).map(Number);
+      if (parts.length >= 3 && parts.every((n) => Number.isFinite(n))) return { r: parts[0], g: parts[1], b: parts[2], a: parts.length > 3 ? parts[3] : 1 };
+    }
+    return viaCanvas(value.trim());
   };
   const over = (top, bottom) => {
     const a = top.a + bottom.a * (1 - top.a);
@@ -145,6 +180,7 @@ function collectViolations() {
   const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
   const checked = new Set();
   let unverifiable = 0;
+  const unverifiableNodes = [];
   for (let node = walker.nextNode(); node; node = walker.nextNode()) {
     const el = node.parentElement;
     if (!el || checked.has(el) || !node.textContent.trim() || !visible(el) || hiddenFromAT(el)) continue;
@@ -155,6 +191,10 @@ function collectViolations() {
     const fg0 = parse(style.color);
     if (!bg || !fg0) {
       unverifiable += 1;
+      if (unverifiableNodes.length < 8) {
+        const style0 = getComputedStyle(el);
+        unverifiableNodes.push(`${el.tagName.toLowerCase()}${el.id ? `#${el.id}` : ''}${!fg0 ? ` color:${style0.color.slice(0, 48)}` : ''}${!bg ? ' background:image-or-unparseable' : ''}`);
+      }
       continue;
     }
     const fg = over({ ...fg0, a: fg0.a }, bg);
@@ -167,7 +207,7 @@ function collectViolations() {
     const rgb = (c) => `rgb(${Math.round(c.r)},${Math.round(c.g)},${Math.round(c.b)})`;
     if (ratio < need) add('color-contrast', 'serious', el, `contrast ${ratio.toFixed(2)}:1 < ${need}:1 (text ${rgb(fg)} on ${rgb(bg)}, class "${String(el.className).slice(0, 60)}", ${px}px)`);
   }
-  return { violations: out, unverifiableContrast: unverifiable, controls: controls.length };
+  return { violations: out, unverifiableContrast: unverifiable, unverifiableNodes, controls: controls.length };
 }
 
 /** Walks the page with the real keyboard: every enabled control gets a stop with a visible focus indicator. */
@@ -253,18 +293,21 @@ async function keyboardWalk(page) {
  * Audits one page state. Throws (naming the rule, impact and element, never page text) on any
  * violation. `label` is the step so a failure points at the state.
  */
-export async function auditAccessibility(page, label) {
+export async function auditAccessibility(page, label, { allowUnverifiableContrast = 0 } = {}) {
   // Audit a settled state: no request in flight (aria-busy) and two painted frames since the last change.
   await page.waitForFunction(() => !document.querySelector('[aria-busy="true"]'), undefined, { timeout: 10_000 });
   await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
   // Colours are audited at rest: let CSS transitions (the 150 ms colour fades) finish first, so a restored page
   // is not judged mid-fade. Only finite transitions are awaited; the spinner animation is never waited on.
   await page.evaluate(() => Promise.all(document.getAnimations().filter((animation) => animation.transitionProperty !== undefined).map((animation) => animation.finished.catch(() => undefined))));
-  const { violations, unverifiableContrast, controls } = await page.evaluate(collectViolations);
+  const { violations, unverifiableContrast, unverifiableNodes, controls } = await page.evaluate(collectViolations);
   const walk = await keyboardWalk(page);
   const all = [...violations, ...walk.problems];
   const blocking = all.filter((v) => v.impact === 'serious' || v.impact === 'critical' || v.impact === 'moderate');
   assert.deepEqual(blocking, [], `${label}: accessibility violations (${controls} controls, ${unverifiableContrast} contrast checks unverifiable)`);
+  // A contrast check that could not be performed is a failure, not a pass: the only way through is a named, bounded allowance
+  // (for example a deliberate background image) passed by the caller and recorded with the test (P1.18.4 P116-L4).
+  assert.ok(unverifiableContrast <= allowUnverifiableContrast, `${label}: ${unverifiableContrast} text contrast checks were unverifiable (allowed ${allowUnverifiableContrast}): ${unverifiableNodes.join('; ')}`);
   return { controls, tabStops: walk.reached, unverifiableContrast };
 }
 

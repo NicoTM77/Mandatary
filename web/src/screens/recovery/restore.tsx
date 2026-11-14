@@ -333,6 +333,13 @@ function Complete({ ended, runbookHref }: { ended: Extract<RestoreEnded, { kind:
   );
 }
 
+/**
+ * Where the operator runbook lives when no served page exists for it. It is a file on the host, in the Mandatary documentation, not a web route:
+ * this page never invents a /docs URL or an external address (P1.18.4 P118-note-runbook-pointer), and it never asks for the recovery token here.
+ */
+export const RUNBOOK_FILE = 'docs/backup-restore.md';
+export const RUNBOOK_SECTION = 'section 10, “Operator runbook”';
+
 /** The first step after any restore that reached quarantine. Shared so the two outcomes cannot drift apart. */
 function HostRecoveryStep({ runbookHref }: { runbookHref?: string }) {
   return (
@@ -346,7 +353,12 @@ function HostRecoveryStep({ runbookHref }: { runbookHref?: string }) {
           </a>
           .
         </>
-      ) : null}
+      ) : (
+        <>
+          {' '}
+          The steps are in the operator runbook: <code className="font-mono text-[0.8125rem]">{RUNBOOK_FILE}</code>, {RUNBOOK_SECTION}, a file in the Mandatary documentation on the server.
+        </>
+      )}
     </li>
   );
 }

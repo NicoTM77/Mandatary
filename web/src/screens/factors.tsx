@@ -3,16 +3,48 @@ import { Alert, Badge, Button, CodeField, Icon, Panel, PasswordField, SecretReve
 import type { RecoveryCodesProps, RestrictedRecoveryProps, SignInMethodsProps, WebAuthnRegisterProps } from './contract';
 import { Command, RejectionAlert, commonRejection, useRequiredForm, type Rejection } from './shared';
 import { TotpEnrollment } from './setup';
+import { removalConsequence, removalWarning } from './removal';
+
+/**
+ * Shown when a recovery session that existed has ended. Fixed and neutral: the ten minutes passed or the server discarded it, a saved code that
+ * was already accepted can't be used again, and the next step is another saved code or the host recovery. It never says whether any particular
+ * code was valid or spent (P1.18.4 P116-L2).
+ */
+const RECOVERY_SESSION_ENDED: Rejection = {
+  title: 'Your recovery session ended',
+  body: 'The ten-minute recovery session is over, so nothing was changed by it. A saved code that was already accepted can’t be used again. Start again with another saved code, or ask whoever runs this server to use the host recovery.',
+};
 
 // ───────────────────────── sign-in methods list ─────────────────────────
 
-function RemoveConfirm({ label, busy, onCancel, onConfirm }: { label: string; busy: boolean; onCancel: () => void; onConfirm: () => void }) {
+function RemoveConfirm({ label, busy, warning, check, onCancel, onConfirm }: { label: string; busy: boolean; warning: { title: string; body: string } | null; check: 'checking' | 'fresh' | 'failed'; onCancel: () => void; onConfirm: () => void }) {
   return (
-    <div role="group" aria-label={`Confirm removing ${label}`} className="mt-3 rounded-control border border-danger bg-danger-soft p-3.5">
+    <div role="group" aria-label={`Confirm removing ${label}`} aria-busy={check === 'checking'} className="mt-3 rounded-control border border-danger bg-danger-soft p-3.5">
       <p className="font-medium text-danger">Remove {label}?</p>
-      <p className="mt-1 text-sm">You won’t be able to use it to sign in. If it’s your last second factor you’ll need a saved recovery code to get back in. We’ll email your other notification addresses.</p>
+      {check === 'checking' ? (
+        <p role="status" className="mt-1 text-sm">
+          Checking which other sign-in methods you have…
+        </p>
+      ) : (
+        <>
+          <p className="mt-1 text-sm">You won’t be able to use it to sign in. We’ll email your other notification addresses.</p>
+          {check === 'failed' ? (
+            <p className="mt-2 text-sm font-medium text-danger">
+              Mandatary couldn’t re-check your other sign-in methods just now. Treat this as your last working second factor: without it you can get back in only with a saved recovery code, and everyone signed in as you is signed out.
+            </p>
+          ) : null}
+          {warning ? (
+            <div className="mt-2 flex items-start gap-2 text-sm text-danger">
+              <Icon name="alert" className="mt-0.5 size-4 shrink-0" />
+              <p>
+                <span className="font-semibold">{warning.title}.</span> {warning.body}
+              </p>
+            </div>
+          ) : null}
+        </>
+      )}
       <div className="mt-3 flex flex-wrap gap-2">
-        <Button variant="danger" busy={busy} busyLabel="Removing…" onClick={onConfirm}>
+        <Button variant="danger" busy={busy} busyLabel="Removing…" disabled={check === 'checking'} onClick={onConfirm}>
           Remove {label}
         </Button>
         <Button variant="secondary" onClick={onCancel} disabled={busy}>
@@ -23,10 +55,12 @@ function RemoveConfirm({ label, busy, onCancel, onConfirm }: { label: string; bu
   );
 }
 
-export function SignInMethods({ totp, keys, maxKeys, keysSupported = true, confirmingRemoval, removing = false, onAddTotp, onAddKey, onAskRemove, onCancelRemove, onConfirmRemove }: SignInMethodsProps) {
+export function SignInMethods({ totp, keys, maxKeys, keysSupported = true, confirmingRemoval, removing = false, recoveryRemaining = 0, removalCheck = 'fresh', onAddTotp, onAddKey, onAskRemove, onCancelRemove, onConfirmRemove }: SignInMethodsProps) {
   const prefix = useId();
   const totpHeading = `${prefix}-totp`;
   const keysHeading = `${prefix}-keys`;
+  // The consequence is computed from the inventory this page shows, which the container re-reads when a removal is asked for. Only this account's rows.
+  const warningFor = (kind: 'totp' | 'webauthn', id: string) => (removalCheck === 'fresh' ? removalWarning(removalConsequence(totp, keys, { kind, id }), recoveryRemaining) : null);
   return (
     <Panel title="Sign-in methods" description="Your password plus one of these proves it’s you. Adding or removing a method needs a recent verification.">
       <section aria-labelledby={totpHeading}>
@@ -56,7 +90,7 @@ export function SignInMethods({ totp, keys, maxKeys, keysSupported = true, confi
                     </Button>
                   </div>
                 </div>
-                {confirmingRemoval?.kind === 'totp' && confirmingRemoval.id === row.id ? <RemoveConfirm label={row.label} busy={removing} onCancel={onCancelRemove} onConfirm={onConfirmRemove} /> : null}
+                {confirmingRemoval?.kind === 'totp' && confirmingRemoval.id === row.id ? <RemoveConfirm label={row.label} busy={removing} warning={warningFor('totp', row.id)} check={removalCheck} onCancel={onCancelRemove} onConfirm={onConfirmRemove} /> : null}
               </li>
             ))}
           </ul>
@@ -88,7 +122,7 @@ export function SignInMethods({ totp, keys, maxKeys, keysSupported = true, confi
                     Remove
                   </Button>
                 </div>
-                {confirmingRemoval?.kind === 'webauthn' && confirmingRemoval.id === row.id ? <RemoveConfirm label={row.name} busy={removing} onCancel={onCancelRemove} onConfirm={onConfirmRemove} /> : null}
+                {confirmingRemoval?.kind === 'webauthn' && confirmingRemoval.id === row.id ? <RemoveConfirm label={row.name} busy={removing} warning={warningFor('webauthn', row.id)} check={removalCheck} onCancel={onCancelRemove} onConfirm={onConfirmRemove} /> : null}
               </li>
             ))}
           </ul>
@@ -250,6 +284,7 @@ export function RestrictedRecovery({ state, onSubmit, onBeginTotp, onConfirmTotp
     <Panel title="Recover with a saved code" description="For when you can’t use your authenticator app or security key. You need your password and one unused recovery code.">
       <form {...form.formProps} aria-label="Recover access" className="space-y-4">
         {state.kind === 'rejected' ? <RejectionAlert rejection={state.reason === 'denied' ? { title: 'Recovery failed', body: 'The username, password or code is incorrect, or the code was already used. Check them and try again.' } : commonRejection(state.reason)} active /> : null}
+        {state.kind === 'expired' ? <RejectionAlert rejection={RECOVERY_SESSION_ENDED} active /> : null}
         <TextField name="username" label="Username" autoComplete="username" autoCapitalize="none" autoCorrect="off" spellCheck={false} required error={form.errorFor('username')} readOnly={busy} />
         <PasswordField name="password" label="Password" autoComplete="current-password" required error={form.errorFor('password')} readOnly={busy} />
         <CodeField kind="saved-code" name="code" label="Recovery code" required error={form.errorFor('code')} readOnly={busy} />

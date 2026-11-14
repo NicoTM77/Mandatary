@@ -516,6 +516,9 @@ describe.each(themes)('login against the adapter contract (%s theme)', (theme) =
     mountLogin(world, theme);
     signIn();
     await screen.findByRole('form', { name: 'Enter authenticator code' });
+    // The display timer is armed by a passive effect that runs after the factor form is committed; the form can be found before that effect has
+    // run, so flush it first or the clock is advanced before the timer exists (a load- and order-dependent failure, deterministic when run alone).
+    await act(async () => {});
     act(() => {
       vi.advanceTimersByTime(5 * 60 * 1000 + 1000);
     });

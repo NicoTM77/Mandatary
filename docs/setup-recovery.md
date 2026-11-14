@@ -214,6 +214,17 @@ account recovery or identity proofing. Host/root/service-UID holders are trusted
   setup endpoint can keep the backoff engaged and delay the legitimate exchange
   (availability only; it cannot learn or consume the token). Block the endpoint
   at the proxy/network if that is a concern; host rotation resets the counters.
+* **Exclusive reveal across real processes (P1.18.4 AUTH-09-L3).** The one-time
+  reveal is claimed durably before any plaintext is read, so concurrent helpers
+  cannot both be shown a generation. This is proven with real OS processes
+  (`cmd/mandatary/cli_subprocess_test.go`: the test binary re-executed as helpers
+  against one synthetic temporary installation, released together by a stdin gate):
+  exactly one of several contenders is shown the token and the others refuse
+  cleanly; a claimant that exits right after the display leaves nothing to replay
+  and `mandatary setup rotate` recovers with a new generation that supersedes the
+  old token; racing rotate and reveal never displays a generation twice. The
+  fixture uses a throw-away key and token, no controlling terminal and no live
+  helper; the in-process tests remain.
 * The first automatic issuance happens at first empty-store start even when no
   mail relay is configured (the log warns; the address proof cannot then be sent).
   Configure the relay and run `mandatary setup rotate` to get a usable window.

@@ -206,12 +206,101 @@ describe.each(themes)('account security page (%s theme)', (theme) => {
     await screen.findByText('Authenticator app 1');
     click('Remove Authenticator app 1');
     const group = screen.getByRole('group', { name: 'Confirm removing Authenticator app 1' });
+    // The confirmation opens only after the inventory was re-read (AUTH-08-L4): this is the sole working factor, so it says so.
+    await waitFor(() => expect((within(group).getByRole('button', { name: 'Remove Authenticator app 1' }) as HTMLButtonElement).disabled).toBe(false));
+    expect(group.textContent).toContain('This is your last working second factor.');
     fireEvent.click(within(group).getByRole('button', { name: 'Remove Authenticator app 1' }));
     await screen.findByText('Sign-in method removed');
     expect(screen.queryByText('Authenticator app 1')).toBeNull();
     expect(w.server.calls('POST', '/api/v1/account/totp/remove')[0]?.body).toEqual({ authenticator_id: 'totp-1' });
     click('Sign in');
     expect(w.navigate).toHaveBeenCalledWith('/login');
+  });
+});
+
+describe('removing the last working second factor (AUTH-08-L4)', () => {
+  const twoApps = (second: 'active' | 'disabled') => inventoryJson({ totp: [{ id: 'totp-1', added_at: 1_700_000_000, status: 'active' }, { id: 'totp-2', added_at: 1_700_000_100, status: second }], recovery_codes: { remaining: 7 } });
+
+  test('the inventory is re-read when a removal is asked for, and a protectively disabled sibling is named as not counting', async () => {
+    const w = world((server) => server.route('GET', '/api/v1/account/security', () => json(200, twoApps('disabled'))));
+    mountSecurity(w);
+    await screen.findByText('Authenticator app 2');
+    const before = w.server.calls('GET', '/api/v1/account/security').length;
+    click('Remove Authenticator app 1');
+    const group = screen.getByRole('group', { name: 'Confirm removing Authenticator app 1' });
+    await waitFor(() => expect(w.server.calls('GET', '/api/v1/account/security').length).toBe(before + 1));
+    await waitFor(() => expect(group.getAttribute('aria-busy')).toBe('false'));
+    expect(group.textContent).toContain('This is your last working second factor.');
+    expect(group.textContent).toContain('Your other authenticator app is disabled after too many failed codes');
+    expect(group.textContent).toContain('You have 7 unused codes');
+    // The controls: nothing was sent by asking.
+    expect(w.server.calls('POST', '/api/v1/account/totp/remove')).toHaveLength(0);
+  });
+
+  test('with a second working factor there is no last-factor warning, and the page that was stale before the re-read is corrected', async () => {
+    let calls = 0;
+    const w = world((server) =>
+      server.route('GET', '/api/v1/account/security', () => {
+        calls += 1;
+        // The page first loaded with ONE factor; by the time a removal is asked for a second working one exists.
+        return json(200, calls === 1 ? inventoryJson() : twoApps('active'));
+      }),
+    );
+    mountSecurity(w);
+    await screen.findByText('Authenticator app 1');
+    click('Remove Authenticator app 1');
+    const group = screen.getByRole('group', { name: 'Confirm removing Authenticator app 1' });
+    await waitFor(() => expect(group.getAttribute('aria-busy')).toBe('false'));
+    expect(group.textContent).not.toContain('last working second factor');
+    expect(screen.getByText('Authenticator app 2')).toBeTruthy(); // the refreshed list replaced the stale one
+  });
+
+  test('a method that is already gone when the re-read happens is never removed: the person is told and nothing is sent', async () => {
+    let calls = 0;
+    const w = world((server) =>
+      server
+        .route('GET', '/api/v1/account/security', () => {
+          calls += 1;
+          return json(200, calls === 1 ? twoApps('active') : inventoryJson({ totp: [{ id: 'totp-2', added_at: 1_700_000_100, status: 'active' }] }));
+        })
+        .route('POST', '/api/v1/account/totp/remove', () => empty()),
+    );
+    mountSecurity(w);
+    await screen.findByText('Authenticator app 2');
+    click('Remove Authenticator app 1');
+    await screen.findByText('That sign-in method is already gone');
+    expect(screen.queryByRole('group', { name: /Confirm removing/ })).toBeNull();
+    expect(w.server.calls('POST', '/api/v1/account/totp/remove')).toHaveLength(0);
+  });
+
+  test('when the re-read fails the confirmation assumes the worst and the server still decides (a refusal changes nothing)', async () => {
+    let calls = 0;
+    const w = world((server) =>
+      server
+        .route('GET', '/api/v1/account/security', () => {
+          calls += 1;
+          return calls === 1 ? json(200, twoApps('active')) : json(503, { error: 'unavailable' });
+        })
+        .route('POST', '/api/v1/account/totp/remove', (request) => requireCsrf(request, SESSION_CSRF, () => json(403, { error: 'denied' }))),
+    );
+    mountSecurity(w);
+    await screen.findByText('Authenticator app 2');
+    click('Remove Authenticator app 1');
+    const group = screen.getByRole('group', { name: 'Confirm removing Authenticator app 1' });
+    await waitFor(() => expect(group.textContent).toContain('couldn’t re-check your other sign-in methods just now'));
+    fireEvent.click(within(group).getByRole('button', { name: 'Remove Authenticator app 1' }));
+    await screen.findByText('The sign-in method wasn’t removed');
+    expect(screen.queryByText('Sign-in method removed')).toBeNull();
+  });
+
+  test('cancelling while the re-read is in flight leaves no confirmation behind when it arrives', async () => {
+    const w = world((server) => server.route('GET', '/api/v1/account/security', () => json(200, twoApps('active'))));
+    mountSecurity(w);
+    await screen.findByText('Authenticator app 2');
+    click('Remove Authenticator app 1');
+    click('Keep it');
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(screen.queryByRole('group', { name: /Confirm removing/ })).toBeNull();
   });
 });
 
@@ -376,6 +465,31 @@ describe.each(themes)('restricted recovery (%s theme)', (theme) => {
     click('Create authenticator key');
     await screen.findByRole('form', { name: 'Recover access' });
     expect(screen.queryByText('Your authenticator key')).toBeNull();
+  });
+
+  test('an ended capability says the session ended, never that the code or password was wrong, and reveals nothing about any code', async () => {
+    const server = recoveryWorld((s) =>
+      s
+        .route('POST', '/api/v1/recovery', () => json(200, { step: 'capability', csrf_token: 'synthetic-capability-csrf', expires_at: Math.floor(Date.now() / 1000) + 600, methods: ['totp'], replacement_code: REPLACEMENT }))
+        .route('POST', '/api/v1/recovery/totp', () => json(401, { error: 'unauthenticated' })),
+    );
+    mountRecovery(server, theme);
+    await screen.findByRole('form', { name: 'Recover access' });
+    recover();
+    await screen.findByText(/Recovery code accepted/);
+    click('Create authenticator key');
+    await screen.findByRole('form', { name: 'Recover access' });
+    const alert = screen.getByRole('alert');
+    expect(alert.textContent).toContain('Your recovery session ended');
+    expect(alert.textContent).toContain('A saved code that was already accepted can’t be used again');
+    expect(alert.textContent).toContain('host recovery');
+    expect(alert.textContent).not.toMatch(/incorrect|wrong|Recovery failed|was already used\. Check/);
+    expect(document.body.textContent).not.toContain('Recovery failed');
+    expectNoLeak(REPLACEMENT, 'synthetic-capability-csrf');
+    // A genuine wrong guess keeps its own, different message.
+    server.route('POST', '/api/v1/recovery', () => json(403, { error: 'denied' }));
+    recover();
+    await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('Recovery failed'));
   });
 
   test('the ten-minute deadline ends the capability on this page as a display only', async () => {
