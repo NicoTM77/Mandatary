@@ -8,6 +8,7 @@ import (
 	"io"
 	"time"
 
+	"github.com/NicoTM77/Mandatary/internal/backup"
 	"github.com/NicoTM77/Mandatary/internal/domain"
 	"github.com/NicoTM77/Mandatary/internal/store"
 )
@@ -88,6 +89,9 @@ type Admin struct {
 	notify   func(context.Context) error
 	// targets is the optional read-only container source for the policy pages (policy_admin.go).
 	targets targetHolder
+	// backup is the optional logical backup service (backup_admin.go). Without it the backup and
+	// restore routes do not exist.
+	backup *backup.Service
 }
 
 // NewAdmin binds the service to the lifecycle's repository and clock. notify, when

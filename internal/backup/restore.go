@@ -113,7 +113,7 @@ func (s *Service) Restore(ctx context.Context, v *Verified, o RestoreOptions) (R
 		return Report{}, ErrUnavailable
 	}
 	if err := s.hook("restore:after-quarantine"); err != nil {
-		return Report{}, ErrUnavailable
+		return Report{}, afterTransition(ErrUnavailable)
 	}
 
 	var report Report
@@ -153,13 +153,13 @@ func (s *Service) Restore(ctx context.Context, v *Verified, o RestoreOptions) (R
 		return s.hook("restore:before-commit")
 	}, nil)
 	if superseded {
-		return Report{}, ErrSuperseded
+		return Report{}, afterTransition(ErrSuperseded)
 	}
 	if inconsistentImport {
-		return Report{}, ErrConsistency
+		return Report{}, afterTransition(ErrConsistency)
 	}
 	if err != nil {
-		return Report{}, ErrUnavailable
+		return Report{}, afterTransition(ErrUnavailable)
 	}
 	return report, nil
 }

@@ -4,10 +4,8 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"sort"
-	"testing"
 )
 
 var snapshotTables = []string{"users", "groups", "agents", "user_group_memberships", "agent_group_memberships", "administrative_roles", "endpoints", "container_selectors",
@@ -98,11 +96,4 @@ func (e *env) activeAuthority() int64 {
  +(SELECT count(*) FROM user_group_memberships WHERE state='active')+(SELECT count(*) FROM agent_group_memberships WHERE state='active')+(SELECT count(*) FROM administrative_roles WHERE state='active')
  +(SELECT count(*) FROM policies WHERE state='active')+(SELECT count(*) FROM endpoints WHERE state='active')+(SELECT count(*) FROM notification_addresses WHERE state='active')
  +(SELECT count(*) FROM authenticators WHERE state='active')+(SELECT count(*) FROM agent_credentials WHERE state='active')+(SELECT count(*) FROM sessions WHERE state='active')`)
-}
-
-func mustErrorIs(t *testing.T, err, want error) {
-	t.Helper()
-	if err == nil || !errors.Is(err, want) {
-		t.Fatalf("error %v, want %v", err, want)
-	}
 }

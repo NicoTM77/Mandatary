@@ -248,7 +248,7 @@ func TestAnUnauthorizedInitiatorChangesNothingAndCannotTriggerQuarantine(t *test
 	raw := e.export(ModeFull)
 	v := e.verify(raw)
 	before, beforeControl := e.snapshot(), e.controls()
-	if _, err := e.svc.Restore(t.Context(), v, RestoreOptions{Initiator: InitiatorAdmin, Authorize: refuse}); !errors.Is(err, ErrDenied) {
+	if _, err := e.svc.Restore(t.Context(), v, RestoreOptions{Initiator: InitiatorAdmin, Authorize: refuse}); !errors.Is(err, ErrDenied) || Quarantined(err) {
 		t.Fatalf("restore = %v", err)
 	}
 	e.sameExceptControl(before)
@@ -283,8 +283,8 @@ func TestAFailureAfterTheTransitionLeavesQuarantineAndNoPartialImport(t *testing
 				}
 				return nil
 			}
-			if _, err := dst.restore(raw, InitiatorHost, false); !errors.Is(err, ErrUnavailable) {
-				t.Fatalf("restore = %v", err)
+			if _, err := dst.restore(raw, InitiatorHost, false); !errors.Is(err, ErrUnavailable) || !Quarantined(err) {
+				t.Fatalf("restore = %v (quarantined %v)", err, Quarantined(err))
 			}
 			dst.sameExceptControl(before) // no archive record, report or manifest row
 			c := dst.controls()
@@ -315,7 +315,7 @@ func TestADatabaseFailureMidImportRollsEverythingBack(t *testing.T) {
 	dst := freshSameKey(t)
 	dst.exec(`CREATE TRIGGER fail_policy_insert BEFORE INSERT ON policies BEGIN SELECT RAISE(ABORT,'synthetic constraint failure'); END`)
 	before := dst.snapshot()
-	if _, err := dst.restore(raw, InitiatorHost, false); !errors.Is(err, ErrUnavailable) {
+	if _, err := dst.restore(raw, InitiatorHost, false); !errors.Is(err, ErrUnavailable) || !Quarantined(err) {
 		t.Fatalf("restore = %v", err)
 	}
 	dst.sameExceptControl(before)
@@ -336,8 +336,8 @@ func TestThePostRestoreIntegrityCheckRefusesToCommitAnEffectiveRecord(t *testing
 	dst := freshSameKey(t)
 	dst.exec(`CREATE TRIGGER sneaky AFTER INSERT ON groups BEGIN UPDATE groups SET state='active',authority_generation=1 WHERE id=NEW.id; END`)
 	before := dst.snapshot()
-	if _, err := dst.restore(raw, InitiatorHost, false); !errors.Is(err, ErrConsistency) {
-		t.Fatalf("restore = %v, want ErrConsistency", err)
+	if _, err := dst.restore(raw, InitiatorHost, false); !errors.Is(err, ErrConsistency) || !Quarantined(err) {
+		t.Fatalf("restore = %v, want ErrConsistency after quarantine", err)
 	}
 	dst.sameExceptControl(before)
 }
@@ -382,6 +382,38 @@ func TestParallelRestoresLeaveOneConsistentInactiveState(t *testing.T) {
 	// The newest report is the last generation, and the data is exactly one consistent import.
 	if dst.scalar(`SELECT max(restore_generation) FROM restore_reports`) != c.RestoreGeneration || dst.scalar(`SELECT count(*) FROM users`) != 2 || dst.scalar(`SELECT count(*) FROM policies`) != 2 {
 		t.Fatal("inconsistent final state")
+	}
+}
+
+// RESTORE-05: a restore whose transition was overtaken by a newer restore applies nothing. Deterministic
+// interleaving: restore A commits its transition, restore B runs to completion, then A reaches its import.
+func TestARestoreOvertakenByANewerOneAppliesNothing(t *testing.T) {
+	src := newEnv(t, keyHexA)
+	src.seed()
+	older := src.export(ModeFull)
+	src.exec(`INSERT INTO users(id,username,state,mfa_requirement,credential_generation,authority_generation) VALUES('carol','carol','active','required',1,1)`)
+	newer := src.export(ModeFull)
+	dst := freshSameKey(t)
+	done := false
+	dst.svc.step = func(name string) error {
+		if name == "restore:after-quarantine" && !done {
+			done = true
+			if _, err := dst.restore(newer, InitiatorHost, false); err != nil { // B: transition and import both commit
+				return err
+			}
+		}
+		return nil
+	}
+	_, err := dst.restore(older, InitiatorHost, false)
+	if !errors.Is(err, ErrSuperseded) || !Quarantined(err) {
+		t.Fatalf("overtaken restore = %v", err)
+	}
+	// Only B's import is present: three users (adm, alice, carol), B's generation and report.
+	if dst.scalar(`SELECT count(*) FROM users`) != 3 || dst.scalar(`SELECT count(*) FROM restore_reports`) != 1 || dst.scalar(`SELECT max(restore_generation) FROM restore_reports`) != 2 {
+		t.Fatal("the overtaken restore changed the data")
+	}
+	if c := dst.controls(); c.RestoreQuarantined != 1 || c.RestoreGeneration != 2 || dst.activeAuthority() != 0 {
+		t.Fatalf("controls %+v", c)
 	}
 }
 

@@ -78,3 +78,19 @@ func (e *ConflictError) Error() string {
 	return ErrConflict.Error() + ": " + strings.Join(parts, ",")
 }
 func (e *ConflictError) Is(target error) bool { return target == ErrConflict }
+
+// quarantinedError marks a failure that happened AFTER the availability-changing transition had
+// committed: the installation is in restore quarantine and no archive record was applied. Callers
+// (and the UI contract) use Quarantined to tell this apart from a refusal that changed nothing.
+type quarantinedError struct{ err error }
+
+func (e *quarantinedError) Error() string { return e.err.Error() }
+func (e *quarantinedError) Unwrap() error { return e.err }
+
+func afterTransition(err error) error { return &quarantinedError{err: err} }
+
+// Quarantined reports whether err left the installation in restore quarantine.
+func Quarantined(err error) bool {
+	var q *quarantinedError
+	return errors.As(err, &q)
+}

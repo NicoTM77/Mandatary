@@ -80,6 +80,11 @@ func (h *AdminHTTP) Register(b *Browser) error {
 			return err
 		}
 	}
+	for _, r := range h.backupRoutes(read) { // P1.18 export/restore routes: present only with a backup service
+		if err := b.Handle(r.pattern, r.policy, r.handler); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
