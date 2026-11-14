@@ -625,12 +625,20 @@ func inventoryItem(c docker.ContainerSummary) InventoryItem {
 
 // containers asks the source for the endpoint's visible containers, bounded in time. ok is false for any
 // reason the endpoint cannot be inspected.
+//
+// The read is DETACHED from the caller's cancellation (values are kept, cancellation is not) and bounded
+// only by targetTimeout. The production Docker adapter treats every error from this read, a cancellation
+// included, as loss of the endpoint-wide safety proof, so an administrator closing the tab or navigating
+// away mid-read would otherwise make every principal's operations fail with safety_unverified until
+// self-verification ran again (the same reason ops.Service.acquire detaches). Reaching the targetTimeout
+// deadline is a genuine backend fault and MAY still invalidate that proof; that is the intended fail-closed
+// behaviour, not something this bound hides.
 func (a *Admin) containers(ctx context.Context, endpoint domain.EndpointID) (list []docker.ContainerSummary, ok bool) {
 	src := a.targets.get()
 	if src == nil {
 		return nil, false
 	}
-	bounded, cancel := context.WithTimeout(ctx, targetTimeout)
+	bounded, cancel := context.WithTimeout(context.WithoutCancel(ctx), targetTimeout)
 	defer cancel()
 	list, err := src.Containers(bounded, endpoint)
 	if err != nil {

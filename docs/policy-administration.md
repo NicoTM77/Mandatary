@@ -57,6 +57,12 @@ or operation (`TestAdministrativeRouteInventoryIsExactAndExplicit`).
   In this build no Docker backend is composed in `cmd/mandatary`, so the page truthfully shows the endpoint
   as unverified with no inventory; the Docker-backed source is `auth.AuthorizerTargets`, wired by whoever
   composes the executor (the end-to-end test composes it).
+* **The endpoint read survives an aborted request.** The inventory read behind the Rules page and the
+  selector preview is detached from the HTTP request's cancellation and bounded only by an 8 s timeout
+  (`TestEndpointReadIsDetachedFromCallerCancellationButBounded`). The production Docker adapter treats any
+  error from that read as loss of the endpoint-wide safety proof, so an administrator closing the tab must
+  not be able to make every principal's operations fail with `safety_unverified`. Reaching the 8 s deadline
+  is a genuine backend fault and may still invalidate that proof; that is deliberate fail-closed behaviour.
 * **Removal state is data.** `removal.allowed` and `blockers` come from the same function that refuses the
   deletion, so the page and the refusal cannot disagree (`TestIdentityPagesReportOwnershipMembershipRulesAndRemovalFromServerState`).
 * **Empty lists are `[]`.** The web client decodes strictly and fails closed (`TestEmptyPagesUseEmptyArrays`).

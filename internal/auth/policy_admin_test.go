@@ -526,3 +526,60 @@ func TestSelectorPreviewMatchesTheEvaluatorAndRefusesBadSelectors(t *testing.T) 
 		t.Fatal("preview wrote or notified")
 	}
 }
+
+// abortingTargets simulates the HTTP client going away while the endpoint is being read: it cancels the
+// caller's context and then records what context the source itself was handed.
+type abortingTargets struct {
+	cancel   context.CancelFunc
+	mu       sync.Mutex
+	calls    int
+	errAtUse error
+	deadline bool
+}
+
+func (s *abortingTargets) Containers(ctx context.Context, _ domain.EndpointID) ([]docker.ContainerSummary, error) {
+	s.cancel()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.calls++
+	s.errAtUse = ctx.Err()
+	_, s.deadline = ctx.Deadline()
+	return nil, ctx.Err()
+}
+
+// A caller that goes away mid-read must not cancel the endpoint read: the production Docker adapter treats
+// ANY error from the read as loss of the endpoint-wide safety proof, which would refuse every principal's
+// operations until self-verification ran again (review F1). The read stays bounded by targetTimeout.
+func TestEndpointReadIsDetachedFromCallerCancellationButBounded(t *testing.T) {
+	t.Parallel()
+	for label, call := range map[string]func(e *ruleEnv, ctx context.Context) error{
+		"rules page": func(e *ruleEnv, ctx context.Context) error { _, err := e.a.RulesPage(ctx, e.secret); return err },
+		"preview": func(e *ruleEnv, ctx context.Context) error {
+			_, err := e.a.PreviewSelector(ctx, e.secret, name("web"))
+			return err
+		},
+	} {
+		t.Run(label, func(t *testing.T) {
+			t.Parallel()
+			e := newRuleEnv(t)
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			src := &abortingTargets{cancel: cancel}
+			e.a.WithTargetSource(src)
+			if err := call(e, ctx); err != nil {
+				t.Fatalf("an aborted caller must still get a well-formed answer, got %v", err)
+			}
+			src.mu.Lock()
+			defer src.mu.Unlock()
+			if src.calls != 1 {
+				t.Fatalf("source consulted %d times", src.calls)
+			}
+			if src.errAtUse != nil {
+				t.Fatalf("the endpoint read inherited the caller's cancellation: %v", src.errAtUse)
+			}
+			if !src.deadline {
+				t.Fatal("the endpoint read is unbounded")
+			}
+		})
+	}
+}
