@@ -229,7 +229,7 @@ func TestSessionCookieAttributes(t *testing.T) { // S05 / N63B4-SESSION-COOKIE-C
 		t.Fatal("cookie must use the __Host- prefix")
 	}
 	value := cookieValue(t, w)
-	if len(value) != 43 || strings.ContainsAny(value, "+/=") {
+	if len(value) != sessionCookieChars || strings.ContainsAny(value, "+/=") {
 		t.Fatalf("cookie value is not unpadded base64url of 32 bytes: %q", value)
 	}
 	// The cookie is the opaque encoding of exactly 32 secret bytes and nothing else. Guessing state-like substrings inside a uniformly random
@@ -999,12 +999,20 @@ func TestUnsafeRequestBodiesAreBounded(t *testing.T) { // bounded input before p
 // prefix, suffix, delimiter or structured claim), decode back to the same bytes, and be accepted by the parser only in that exact shape. A
 // cookie carrying structured claims ("aal2.<secret>", "<user>:<secret>") is refused whatever its content. No production token is logged,
 // no entropy is reduced and the cookie format is unchanged.
+const sessionCookieChars = 43 // unpadded base64url of 32 bytes
+
 func TestSessionCookieConstructorSerializesOnlyTheSecretBytes(t *testing.T) {
 	t.Parallel()
+	// A deterministic secret whose ENCODING contains "aal" (the substring the old assertion tripped over by chance) is an ordinary opaque cookie.
+	aal, err := base64.RawURLEncoding.Strict().DecodeString("aal" + strings.Repeat("A", sessionCookieChars-3))
+	if err != nil || len(aal) != sessionSecretBytes {
+		t.Fatalf("the synthetic sample does not decode to %d bytes: %v", sessionSecretBytes, err)
+	}
 	inputs := map[string][]byte{
-		"state words": []byte("aal2;admin;preauth;synthetic-user!"[:sessionSecretBytes]),
-		"all zero":    make([]byte, sessionSecretBytes),
-		"all ones":    bytes.Repeat([]byte{0xFF}, sessionSecretBytes),
+		"encoding contains aal": aal,
+		"state words":           []byte("aal2;admin;preauth;synthetic-user!"[:sessionSecretBytes]),
+		"all zero":              make([]byte, sessionSecretBytes),
+		"all ones":              bytes.Repeat([]byte{0xFF}, sessionSecretBytes),
 		"ascending": func() []byte {
 			b := make([]byte, sessionSecretBytes)
 			for i := range b {
@@ -1017,7 +1025,10 @@ func TestSessionCookieConstructorSerializesOnlyTheSecretBytes(t *testing.T) {
 	for name, secret := range inputs {
 		value := encodeSessionCookie(secret)
 		want := base64.RawURLEncoding.EncodeToString(secret)
-		if value != want || len(value) != 43 || strings.ContainsAny(value, "+/=.:;") {
+		if name == "encoding contains aal" && !strings.Contains(value, "aal") {
+			t.Fatal("the sample no longer contains the substring it exists to cover")
+		}
+		if value != want || len(value) != sessionCookieChars || strings.ContainsAny(value, "+/=.:;") {
 			t.Fatalf("%s: cookie %q is not exactly the unpadded base64url of the secret (%q)", name, value, want)
 		}
 		r := httptest.NewRequest(http.MethodGet, "https://example.invalid/", nil)
