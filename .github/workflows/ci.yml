@@ -93,7 +93,7 @@ jobs:
   storage-arm64:
     name: Storage (linux/arm64)
     runs-on: ubuntu-24.04-arm
-    timeout-minutes: 30
+    timeout-minutes: 45
     env:
       GOTOOLCHAIN: local
       GOMAXPROCS: '4'
@@ -118,7 +118,7 @@ jobs:
           test_root=$(mktemp -d "$HOME/mandatary-tests.XXXXXXXX")
           printf 'TMPDIR=%s\n' "$test_root" >> "$GITHUB_ENV"
           stat -c '%a %u:%g %n' / /home "$HOME" "$test_root"
-      - run: uname -m && make install build GOFLAGS="-mod=readonly -p=4" GOMAXPROCS=4 GOMEMLIMIT=12GiB GOGC=100 && go test -race -timeout=20m -count=1 -v ./...
+      - run: uname -m && make install build GOFLAGS="-mod=readonly -p=4" GOMAXPROCS=4 GOMEMLIMIT=12GiB GOGC=100 && go test -race -timeout=30m -count=1 -v ./...
   security:
     name: Security
     # Fail-closed aggregation: the Security check (already required) can only pass

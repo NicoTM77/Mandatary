@@ -62,7 +62,13 @@ type RoutePolicy struct {
 	// Background marks a poll/stream route: it is authenticated but does not count
 	// as user activity and so cannot keep an idle session alive (S06).
 	Background bool
+	// MaxBody raises the request-body bound of ONE unsafe route above the 64 KiB default. It exists only
+	// for the logical-backup restore upload; zero keeps the default and the value is capped at 32 MiB.
+	MaxBody int64
 }
+
+// maxRouteBodyBytes is the ceiling any route may raise its own body bound to.
+const maxRouteBodyBytes = 32 << 20
 
 // RouteInfo is the inventory entry used by route-coverage tests.
 type RouteInfo struct {
@@ -197,6 +203,9 @@ func (b *Browser) Handle(pattern string, p RoutePolicy, h http.Handler) (err err
 		}
 	}
 	if p.Background && (p.Require != RequireSession || method != http.MethodGet || p.Sensitive != "") {
+		return ErrDenied
+	}
+	if p.MaxBody != 0 && (p.MaxBody < maxRequestBodyBytes || p.MaxBody > maxRouteBodyBytes || !unsafeMethods[method] || p.Require != RequireSession) {
 		return ErrDenied
 	}
 	if b.seen[pattern] {
@@ -353,7 +362,11 @@ func (b *Browser) guard(method string, p RoutePolicy, next http.Handler) http.Ha
 			}
 			// Bounded input before any handler or proof work (WebAuthn responses
 			// are separately capped at 32 KiB by their service).
-			r.Body = http.MaxBytesReader(w, r.Body, maxRequestBodyBytes)
+			limit := int64(maxRequestBodyBytes)
+			if p.MaxBody > 0 {
+				limit = p.MaxBody
+			}
+			r.Body = http.MaxBytesReader(w, r.Body, limit)
 		}
 		var session Session
 		if p.Require != RequireNone {

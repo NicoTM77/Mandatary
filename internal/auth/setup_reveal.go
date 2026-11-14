@@ -45,7 +45,8 @@ func findLive(ctx context.Context, q *store.Queries, purpose SetupPurpose, targe
 
 // resolveTarget applies the purpose-specific authorization of an issuance/reveal
 // target. Initial setup needs an eligible empty store; an MFA reset needs an
-// existing active account and an unlocked installation (never an ordinary login).
+// existing active account and an unlocked installation (never an ordinary login);
+// a restore-administrator recovery needs a persisted RESTORE quarantine and no account.
 func resolveTarget(ctx context.Context, q *store.Queries, purpose SetupPurpose, username string) (sql.NullString, error) {
 	switch purpose {
 	case PurposeInitialSetup:
@@ -74,6 +75,12 @@ func resolveTarget(ctx context.Context, q *store.Queries, purpose SetupPurpose, 
 			return sql.NullString{}, errSetupLogical
 		}
 		return nullStr(u.ID), nil
+	case PurposeRestoreRecovery:
+		// A restore-administrator recovery names no account: the administrator is created inside the ceremony.
+		if username != "" {
+			return sql.NullString{}, errSetupLogical
+		}
+		return sql.NullString{}, restoreRecoveryEligible(ctx, q)
 	default:
 		return sql.NullString{}, errSetupLogical
 	}

@@ -85,7 +85,7 @@ UPDATE setup_sessions SET state = CAST(sqlc.arg(to_state) AS TEXT), ended_at = s
 
 -- name: StageSetupUser :execrows
 UPDATE setup_sessions SET staged_user_id = sqlc.arg(user_id), staged_verifier = sqlc.arg(verifier), staged_password_format = sqlc.arg(format), staged_password_codepoints = sqlc.arg(codepoints)
-WHERE id = sqlc.arg(id) AND state = 'active' AND purpose = 'initial_setup' AND staged_user_id IS NULL AND staged_verifier IS NULL;
+WHERE id = sqlc.arg(id) AND state = 'active' AND purpose IN ('initial_setup','restore_recovery') AND staged_user_id IS NULL AND staged_verifier IS NULL;
 
 -- name: StageSetupVerifier :execrows
 UPDATE setup_sessions SET staged_verifier = sqlc.arg(verifier), staged_password_format = sqlc.arg(format), staged_password_codepoints = sqlc.arg(codepoints)
@@ -149,6 +149,27 @@ UPDATE notification_addresses SET state = 'revoked', revoked_at = sqlc.arg(now) 
 -- the installation is still quarantined. It can never regress or re-run.
 UPDATE installation_control SET credential_generation = 1, session_generation = 1, authority_generation = 1, restore_generation = 1, restore_quarantined = 0
 WHERE singleton = 1 AND credential_generation = 0 AND session_generation = 0 AND authority_generation = 0 AND restore_generation = 0 AND restore_quarantined = 1;
+
+-- name: EndRestoreQuarantine :execrows
+-- The ONLY statement that ends a restore quarantine (S2.2.5): the completion of the host-authorized
+-- restore-administrator recovery. It leaves every generation exactly as the restore transition rotated it
+-- (nothing a backup carries can lower them), refuses a fresh installation (all generations zero) and an
+-- installation that is not in quarantine, and can only run once per quarantine.
+UPDATE installation_control SET restore_quarantined = 0
+WHERE singleton = 1 AND restore_quarantined = 1 AND restore_generation > 0 AND credential_generation > 0
+  AND session_generation > 0 AND authority_generation > 0;
+
+-- name: ActivateRecoveryAdmin :execrows
+-- The recovery administrator is a NEW account staged inside this ceremony; it takes the CURRENT generations.
+UPDATE users SET state = 'active', credential_generation = sqlc.arg(credential_generation), authority_generation = sqlc.arg(authority_generation)
+WHERE id = sqlc.arg(id) AND state = 'quarantined' AND mfa_requirement = 'required';
+
+-- name: CreateRecoveryAdminVerifier :exec
+INSERT INTO authenticators(id,user_id,kind,state,credential_generation,created_at,bound_at,changed_at,verifier_hash,password_codepoints,password_format,max_assurance)
+VALUES (?,?,'password','active',?,?,?,?,?,?,?,1);
+
+-- name: CreateRecoveryAdminRole :exec
+INSERT INTO administrative_roles(id,user_id,role,state,authority_generation) VALUES (?,?,'super_admin','active',?);
 
 -- name: ActivateStagedAdmin :execrows
 UPDATE users SET state = 'active', credential_generation = 1, authority_generation = 1 WHERE id = ? AND state = 'quarantined' AND mfa_requirement = 'required';

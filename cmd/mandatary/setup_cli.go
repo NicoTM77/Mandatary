@@ -25,7 +25,8 @@ const cliUsage = `usage:
   mandatary setup status|rotate|reveal [flags]
   mandatary recovery reset-mfa --user NAME --acknowledge-all-factors-lost-risk [--replace-password] [flags]
   mandatary recovery reveal --user NAME [flags]
-  mandatary recovery restore-admin            (unavailable until the restore service exists)
+  mandatary recovery restore-admin --acknowledge-restore-recovery [flags]
+  mandatary recovery reveal --restore-admin [flags]
 flags:
   --data-dir PATH         existing data directory (default $MANDATARY_DATA_DIR, then /data)
   --uid N --gid N         numeric service identity; REQUIRED when launched as root
@@ -88,6 +89,10 @@ type cliFlags struct {
 	user             string
 	replacePassword  bool
 	acknowledge      bool
+	// restoreAdmin selects the restore-administrator recovery on `recovery reveal`; acknowledgeRestore is the
+	// recorded host acknowledgement of `recovery restore-admin`.
+	restoreAdmin       bool
+	acknowledgeRestore bool
 }
 
 type optionalInt struct {
@@ -119,10 +124,31 @@ func parseCLIFlags(e cliEnv, args []string) (cliFlags, bool) {
 	fs.StringVar(&f.user, "user", "", "")
 	fs.BoolVar(&f.replacePassword, "replace-password", false, "")
 	fs.BoolVar(&f.acknowledge, "acknowledge-all-factors-lost-risk", false, "")
+	fs.BoolVar(&f.restoreAdmin, "restore-admin", false, "")
+	fs.BoolVar(&f.acknowledgeRestore, "acknowledge-restore-recovery", false, "")
 	if err := fs.Parse(args); err != nil || fs.NArg() != 0 {
 		return cliFlags{}, false
 	}
 	return f, true
+}
+
+// validFor rejects flag combinations that do not belong to the command, so a restore-administrator recovery can never
+// be steered at a named account and an MFA reset can never be issued without one. It runs before anything is opened.
+func (f cliFlags) validFor(group, command string) bool {
+	mfaFlags := f.user != "" || f.replacePassword || f.acknowledge
+	switch group + " " + command {
+	case "recovery reset-mfa":
+		return f.user != "" && !f.restoreAdmin && !f.acknowledgeRestore
+	case "recovery reveal":
+		if f.restoreAdmin {
+			return !mfaFlags && !f.acknowledgeRestore
+		}
+		return f.user != "" && !f.replacePassword && !f.acknowledge && !f.acknowledgeRestore
+	case "recovery restore-admin":
+		return !mfaFlags && !f.restoreAdmin
+	default: // setup status|rotate|reveal take no recovery flag at all
+		return !mfaFlags && !f.restoreAdmin && !f.acknowledgeRestore
+	}
 }
 
 // resolveIdentity applies S3.1b step 2: a root launch must name the numeric
@@ -154,19 +180,13 @@ func runCLI(e cliEnv) int {
 	}
 	command, rest := rest[0], rest[1:]
 	switch group + " " + command {
-	case "setup status", "setup rotate", "setup reveal", "recovery reset-mfa", "recovery reveal":
-	case "recovery restore-admin":
-		return e.fail("restore-administrator recovery is not available until the restore service is delivered")
+	case "setup status", "setup rotate", "setup reveal", "recovery reset-mfa", "recovery reveal", "recovery restore-admin":
 	default:
 		_, _ = fmt.Fprint(e.stderr, cliUsage)
 		return 2
 	}
 	flags, ok := parseCLIFlags(e, rest)
-	if !ok {
-		_, _ = fmt.Fprint(e.stderr, cliUsage)
-		return 2
-	}
-	if group == "recovery" && flags.user == "" {
+	if !ok || !flags.validFor(group, command) {
 		_, _ = fmt.Fprint(e.stderr, cliUsage)
 		return 2
 	}
@@ -210,7 +230,15 @@ func runCLI(e cliEnv) int {
 			return e.fail("--acknowledge-all-factors-lost-risk is required: this trusted-host ceremony is not NIST AAL2 account recovery")
 		}
 		return e.issue(ctx, setup, auth.IssueRequest{Purpose: auth.PurposeMFAReset, Username: flags.user, ReplacePassword: flags.replacePassword, RiskAcknowledged: true}, "MFA-reset", flags.user)
+	case "recovery restore-admin":
+		if !flags.acknowledgeRestore {
+			return e.fail("--acknowledge-restore-recovery is required: this establishes a NEW administrator for a restored installation, approves nothing the backup carried and is not NIST AAL2 account recovery")
+		}
+		return e.issue(ctx, setup, auth.IssueRequest{Purpose: auth.PurposeRestoreRecovery, RiskAcknowledged: true}, "restore-administrator recovery", "")
 	default: // recovery reveal
+		if flags.restoreAdmin {
+			return e.reveal(ctx, setup, auth.PurposeRestoreRecovery, "")
+		}
 		return e.reveal(ctx, setup, auth.PurposeMFAReset, flags.user)
 	}
 }
@@ -223,7 +251,7 @@ func (e cliEnv) status(ctx context.Context, s *auth.Setup) int {
 	if err != nil {
 		return e.fail("status unavailable")
 	}
-	_, _ = fmt.Fprintf(e.stdout, "setup eligible: %t\nsetup completed: %t\n", status.Eligible, status.Completed)
+	_, _ = fmt.Fprintf(e.stdout, "setup eligible: %t\nrestore recovery eligible: %t\nsetup completed: %t\n", status.Eligible, status.RestoreRecoveryEligible, status.Completed)
 	for _, t := range status.Tokens {
 		_, _ = fmt.Fprintf(e.stdout, "generation %d purpose %s state %s expires %s expired %t\n", t.Generation, t.Purpose, t.State, t.ExpiresAt.Format(time.RFC3339), t.Expired)
 	}

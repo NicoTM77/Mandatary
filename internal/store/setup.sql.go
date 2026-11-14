@@ -54,6 +54,26 @@ func (q *Queries) ActivateProvenTOTP(ctx context.Context, arg ActivateProvenTOTP
 	return result.RowsAffected()
 }
 
+const activateRecoveryAdmin = `-- name: ActivateRecoveryAdmin :execrows
+UPDATE users SET state = 'active', credential_generation = ?1, authority_generation = ?2
+WHERE id = ?3 AND state = 'quarantined' AND mfa_requirement = 'required'
+`
+
+type ActivateRecoveryAdminParams struct {
+	CredentialGeneration int64
+	AuthorityGeneration  int64
+	ID                   string
+}
+
+// The recovery administrator is a NEW account staged inside this ceremony; it takes the CURRENT generations.
+func (q *Queries) ActivateRecoveryAdmin(ctx context.Context, arg ActivateRecoveryAdminParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, activateRecoveryAdmin, arg.CredentialGeneration, arg.AuthorityGeneration, arg.ID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
 const activateStagedAdmin = `-- name: ActivateStagedAdmin :execrows
 UPDATE users SET state = 'active', credential_generation = 1, authority_generation = 1 WHERE id = ? AND state = 'quarantined' AND mfa_requirement = 'required'
 `
@@ -251,6 +271,53 @@ func (q *Queries) CreateInitialAdminRole(ctx context.Context, arg CreateInitialA
 	return err
 }
 
+const createRecoveryAdminRole = `-- name: CreateRecoveryAdminRole :exec
+INSERT INTO administrative_roles(id,user_id,role,state,authority_generation) VALUES (?,?,'super_admin','active',?)
+`
+
+type CreateRecoveryAdminRoleParams struct {
+	ID                  string
+	UserID              string
+	AuthorityGeneration int64
+}
+
+func (q *Queries) CreateRecoveryAdminRole(ctx context.Context, arg CreateRecoveryAdminRoleParams) error {
+	_, err := q.db.ExecContext(ctx, createRecoveryAdminRole, arg.ID, arg.UserID, arg.AuthorityGeneration)
+	return err
+}
+
+const createRecoveryAdminVerifier = `-- name: CreateRecoveryAdminVerifier :exec
+INSERT INTO authenticators(id,user_id,kind,state,credential_generation,created_at,bound_at,changed_at,verifier_hash,password_codepoints,password_format,max_assurance)
+VALUES (?,?,'password','active',?,?,?,?,?,?,?,1)
+`
+
+type CreateRecoveryAdminVerifierParams struct {
+	ID                   string
+	UserID               string
+	CredentialGeneration int64
+	CreatedAt            int64
+	BoundAt              sql.NullInt64
+	ChangedAt            sql.NullInt64
+	VerifierHash         []byte
+	PasswordCodepoints   sql.NullInt64
+	PasswordFormat       sql.NullString
+}
+
+func (q *Queries) CreateRecoveryAdminVerifier(ctx context.Context, arg CreateRecoveryAdminVerifierParams) error {
+	_, err := q.db.ExecContext(ctx, createRecoveryAdminVerifier,
+		arg.ID,
+		arg.UserID,
+		arg.CredentialGeneration,
+		arg.CreatedAt,
+		arg.BoundAt,
+		arg.ChangedAt,
+		arg.VerifierHash,
+		arg.PasswordCodepoints,
+		arg.PasswordFormat,
+	)
+	return err
+}
+
 const createSetupGeneration = `-- name: CreateSetupGeneration :one
 INSERT INTO setup_tokens(purpose,target_user_id,installation_id,build_identity,digest,state,issued_at,expires_at,replace_password,risk_acknowledged)
 VALUES (?,?,?,?,?,'pending',?,?,?,?) RETURNING id
@@ -345,6 +412,24 @@ type CreateStagedUserParams struct {
 func (q *Queries) CreateStagedUser(ctx context.Context, arg CreateStagedUserParams) error {
 	_, err := q.db.ExecContext(ctx, createStagedUser, arg.ID, arg.Username)
 	return err
+}
+
+const endRestoreQuarantine = `-- name: EndRestoreQuarantine :execrows
+UPDATE installation_control SET restore_quarantined = 0
+WHERE singleton = 1 AND restore_quarantined = 1 AND restore_generation > 0 AND credential_generation > 0
+  AND session_generation > 0 AND authority_generation > 0
+`
+
+// The ONLY statement that ends a restore quarantine (S2.2.5): the completion of the host-authorized
+// restore-administrator recovery. It leaves every generation exactly as the restore transition rotated it
+// (nothing a backup carries can lower them), refuses a fresh installation (all generations zero) and an
+// installation that is not in quarantine, and can only run once per quarantine.
+func (q *Queries) EndRestoreQuarantine(ctx context.Context) (int64, error) {
+	result, err := q.db.ExecContext(ctx, endRestoreQuarantine)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 const endSetupSession = `-- name: EndSetupSession :execrows
@@ -1084,7 +1169,7 @@ func (q *Queries) SetSetupTOTP(ctx context.Context, arg SetSetupTOTPParams) (int
 
 const stageSetupUser = `-- name: StageSetupUser :execrows
 UPDATE setup_sessions SET staged_user_id = ?1, staged_verifier = ?2, staged_password_format = ?3, staged_password_codepoints = ?4
-WHERE id = ?5 AND state = 'active' AND purpose = 'initial_setup' AND staged_user_id IS NULL AND staged_verifier IS NULL
+WHERE id = ?5 AND state = 'active' AND purpose IN ('initial_setup','restore_recovery') AND staged_user_id IS NULL AND staged_verifier IS NULL
 `
 
 type StageSetupUserParams struct {

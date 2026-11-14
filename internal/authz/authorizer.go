@@ -907,6 +907,25 @@ func (a *Authorizer) InvalidateAll() {
 	}
 }
 
+// InvalidateSelfProtection drops the self/peer safety proof of EVERY registered backend and cancels every active
+// Lease. From this moment no operation reaches a backend (safety_unverified) until that backend's own VerifySelf
+// succeeds again. It is the hook a restore uses (security-contracts.md S2.2.1/S2.2.6, RESTORE-06): an authenticated
+// archive proves nothing about the Docker daemon, the peers around Mandatary or Mandatary's own identity, so after
+// a restore and when its endpoint becomes effective again the proof has to be rebuilt independently, never inherited.
+// The composition root passes it to auth.Admin.WithSafetyReset.
+func (a *Authorizer) InvalidateSelfProtection() {
+	a.mu.RLock()
+	backends := make([]docker.DockerBackend, 0, len(a.backends))
+	for _, b := range a.backends {
+		backends = append(backends, b)
+	}
+	a.mu.RUnlock()
+	for _, b := range backends {
+		b.InvalidateSafety()
+	}
+	a.InvalidateAll()
+}
+
 // ActiveLeaseCount returns the number of currently active Leases.
 func (a *Authorizer) ActiveLeaseCount() int {
 	a.mu.RLock()

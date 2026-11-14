@@ -111,8 +111,28 @@ func TestCLIUsageAndRefusals(t *testing.T) {
 			t.Fatalf("%s: exit %d", name, code)
 		}
 	}
-	if code := f.run("recovery", "restore-admin", "--user", "x"); code != 1 || !strings.Contains(f.stderr.String(), "not available") {
-		t.Fatalf("restore-admin: %d %q", code, f.stderr.String())
+	// restore-admin names no account, is never combined with the MFA-reset flags, and its reveal names no user.
+	for name, args := range map[string][]string{
+		"restore-admin with a user":         {"recovery", "restore-admin", "--user", "x", "--acknowledge-restore-recovery"},
+		"restore-admin with replace":        {"recovery", "restore-admin", "--replace-password", "--acknowledge-restore-recovery"},
+		"restore-admin with the MFA flag":   {"recovery", "restore-admin", "--acknowledge-all-factors-lost-risk"},
+		"reveal of both purposes":           {"recovery", "reveal", "--user", "x", "--restore-admin"},
+		"reveal restore-admin with replace": {"recovery", "reveal", "--restore-admin", "--replace-password"},
+		"reset-mfa as restore-admin":        {"recovery", "reset-mfa", "--restore-admin", "--user", "x", "--acknowledge-all-factors-lost-risk"},
+	} {
+		if code := f.run(args...); code != 2 {
+			t.Fatalf("%s: exit %d", name, code)
+		}
+	}
+	if code := f.run("recovery", "restore-admin"); code != 1 || !strings.Contains(f.stderr.String(), "acknowledge-restore-recovery") {
+		t.Fatalf("restore-admin without the acknowledgement: %d %q", code, f.stderr.String())
+	}
+	// A fresh installation was never restored: there is nothing to recover and nothing is issued.
+	if code := f.run("recovery", "restore-admin", "--acknowledge-restore-recovery"); code != 1 || !strings.Contains(f.stderr.String(), "refused") {
+		t.Fatalf("restore-admin on an installation that was never restored: %d %q", code, f.stderr.String())
+	}
+	if code := f.run("recovery", "reveal", "--restore-admin"); code != 1 || f.term.writes != 0 {
+		t.Fatalf("reveal with no generation: %d", code)
 	}
 	if code := f.run("recovery", "reset-mfa", "--user", "someone"); code != 1 || !strings.Contains(f.stderr.String(), "acknowledge-all-factors-lost-risk") {
 		t.Fatalf("reset-mfa without acknowledgement: %d %q", code, f.stderr.String())

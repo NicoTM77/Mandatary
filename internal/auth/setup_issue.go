@@ -25,11 +25,14 @@ type TokenStatus struct {
 
 // SetupStatus is what operators and startup logging may learn. Redacted by design.
 type SetupStatus struct {
-	Eligible       bool
-	Completed      bool
-	MailConfigured bool
-	Tokens         []TokenStatus
-	LiveSessions   int
+	Eligible bool
+	// RestoreRecoveryEligible: the installation is in restore quarantine produced by a restore, so the host
+	// restore-administrator recovery (S2.2.5) may be issued. Never true on a fresh or an unquarantined installation.
+	RestoreRecoveryEligible bool
+	Completed               bool
+	MailConfigured          bool
+	Tokens                  []TokenStatus
+	LiveSessions            int
 }
 
 // IssueRequest asks for a new generation. Issuing always revokes the previous live
@@ -245,9 +248,17 @@ func (s *Setup) issue(ctx context.Context, req IssueRequest, automatic bool) (To
 			if e = retireUserCredentials(bounded, q, user.ID, "", retireProtective, now); e != nil {
 				return e
 			}
+		case PurposeRestoreRecovery:
+			// The host-authorized restore-administrator recovery (S2.2.5, RESTORE-08). It is deliberately
+			// explicit and disruptive, so it needs the recorded acknowledgement, names no account and
+			// is never issued automatically. It only exists inside a quarantine that a restore produced.
+			if !req.RiskAcknowledged || req.Username != "" || req.ReplacePassword || automatic {
+				return fail(errSetupLogical)
+			}
+			if e = restoreRecoveryEligible(bounded, q); e != nil {
+				return fail(e)
+			}
 		default:
-			// Restore-quarantine administrator recovery is delivered with the restore
-			// service (P1.18). Until then no token of that purpose can be issued.
 			return fail(errSetupLogical)
 		}
 		removals, e = revokeLive(bounded, q, req.Purpose, target, now, "rotated")
@@ -502,6 +513,9 @@ func (s *Setup) Status(ctx context.Context) (SetupStatus, error) {
 		now := s.now().Unix()
 		if clockReadable(ctx, q, now) == nil && setupEligible(ctx, q) == nil {
 			out.Eligible = true
+		}
+		if clockReadable(ctx, q, now) == nil && restoreRecoveryEligible(ctx, q) == nil {
+			out.RestoreRecoveryEligible = true
 		}
 		st, e := q.GetSetupState(ctx)
 		if e != nil {

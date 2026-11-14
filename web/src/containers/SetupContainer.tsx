@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { commonReason } from '../api/http';
 import { SetupApi, type SetupView } from '../api/setup';
-import type { AccountFormState, AccountFormValues, AddressRow, ProofState, SetupClock, SetupCompleteProps, SetupExchangeState, TotpEnrollState } from '../screens/contract';
+import type { AccountFormState, AccountFormValues, AddressRow, ProofState, SetupClock, SetupCompleteProps, SetupPurpose, SetupExchangeState, TotpEnrollState } from '../screens/contract';
 import { deriveSetupClock } from '../screens/clock';
 import { SETUP_STEPS, SetupAccount, SetupAddresses, SetupClockNotice, SetupComplete, SetupExchange, TotpEnrollment } from '../screens/setup';
 import { Alert, Button, CenteredFrame, Skeleton, Steps } from '../ui';
@@ -28,7 +28,7 @@ function stepFor(view: SetupView): Step {
     if (view.replacePassword && !view.accountStaged) return 'account';
     return view.totpProven ? 'complete' : 'totp';
   }
-  if (!view.accountStaged) return 'account';
+  if (!view.accountStaged) return 'account'; // initial_setup and restore_recovery both enrol a NEW account, address and authenticator
   if (!view.addresses.some((row) => row.confirmed)) return 'addresses';
   return view.totpProven ? 'complete' : 'totp';
 }
@@ -51,6 +51,8 @@ export function SetupContainer({ api: injected }: { api?: SetupApi }) {
   const [now, setNow] = useState(() => Date.now());
   const mounted = useRef(true);
   const deadline = useRef(Infinity); // ms; written by handlers, read by the timer
+  // The purpose of the last accepted window: the closing screens outlive the view and must still speak for the right ceremony.
+  const purposeRef = useRef<SetupPurpose>('initial_setup');
 
   useEffect(() => {
     mounted.current = true;
@@ -90,12 +92,12 @@ export function SetupContainer({ api: injected }: { api?: SetupApi }) {
 
   /** Enters the wizard for a session view (first load, resume after reload, or after the exchange). */
   function enter(next: SetupView) {
-    if (next.purpose !== 'initial_setup' && next.purpose !== 'mfa_reset') {
-      // restore_recovery belongs to the restore card; nothing here may drive it.
+    if (next.purpose !== 'initial_setup' && next.purpose !== 'mfa_reset' && next.purpose !== 'restore_recovery') {
       api.forget();
       setStage({ kind: 'unsupported' });
       return;
     }
+    purposeRef.current = next.purpose;
     setView(next);
     deadline.current = next.expiresAt * 1000;
     setStep(stepFor(next));
@@ -139,7 +141,7 @@ export function SetupContainer({ api: injected }: { api?: SetupApi }) {
   function onAccount(values: AccountFormValues) {
     if (!view) return;
     setAccount({ kind: 'submitting' });
-    const initial = view.purpose === 'initial_setup';
+    const initial = view.purpose !== 'mfa_reset'; // a new account: first setup or the recovery administrator
     const request = initial ? api.account({ username: values.username, password: values.password, addresses: values.addresses }) : api.account({ password: values.password });
     void request.then(async (result) => {
       if (!mounted.current) return;
@@ -235,13 +237,13 @@ export function SetupContainer({ api: injected }: { api?: SetupApi }) {
 
   const frame = (children: React.ReactNode) => (
     <CenteredFrame width="max-w-xl">
-      <h1 className="sr-only">First-time setup</h1>
+      <h1 className="sr-only">{purposeRef.current === 'restore_recovery' ? 'Restore recovery' : 'First-time setup'}</h1>
       <div className="space-y-5">{children}</div>
     </CenteredFrame>
   );
 
   if (complete.kind === 'done') {
-    return frame(<SetupComplete accountStaged confirmedAddressCount={0} totpProven state={complete} onComplete={() => undefined} signInHref="/login" />);
+    return frame(<SetupComplete accountStaged confirmedAddressCount={0} totpProven state={complete} onComplete={() => undefined} signInHref="/login" purpose={purposeRef.current} />);
   }
   if (stage.kind === 'loading') return frame(<Skeleton label="setup" lines={3} />);
   if (stage.kind === 'exchange') return frame(<SetupExchange state={stage.state} onSubmit={onExchange} />);
@@ -255,7 +257,7 @@ export function SetupContainer({ api: injected }: { api?: SetupApi }) {
   if (stage.kind === 'ended' || !view || !clock) {
     return frame(
       <>
-        <SetupClockNotice clock={{ kind: 'expired' }} />
+        <SetupClockNotice clock={{ kind: 'expired' }} purpose={purposeRef.current} />
         <Button onClick={() => globalThis.location.reload()}>Enter a new token</Button>
       </>,
     );
@@ -263,13 +265,13 @@ export function SetupContainer({ api: injected }: { api?: SetupApi }) {
   if (expired) {
     return frame(
       <>
-        <SetupClockNotice clock={clock} />
+        <SetupClockNotice clock={clock} purpose={purposeRef.current} />
         <Button onClick={() => globalThis.location.reload()}>Enter a new token</Button>
       </>,
     );
   }
 
-  const initial = view.purpose === 'initial_setup';
+  const initial = view.purpose !== 'mfa_reset';
   const steps = initial ? SETUP_STEPS : SETUP_STEPS.filter((item) => item.id !== 'addresses' && (item.id !== 'account' || view.replacePassword));
   const rows: AddressRow[] = view.addresses.map((row) => ({ id: row.id, address: row.address, confirmed: row.confirmed, proof: proofs.get(row.id) ?? { kind: 'idle' } }));
   const confirmed = rows.filter((row) => row.confirmed).length;
@@ -278,9 +280,9 @@ export function SetupContainer({ api: injected }: { api?: SetupApi }) {
   return frame(
     <>
       <Steps steps={steps} currentId={current} />
-      <SetupClockNotice clock={clock} />
+      <SetupClockNotice clock={clock} purpose={purposeRef.current} />
       {step === 'account' ? (
-        <SetupAccount purpose={view.purpose === 'mfa_reset' ? 'mfa_reset' : 'initial_setup'} targetUser={view.targetUser} replacePassword={view.replacePassword} mailConfigured={view.mailConfigured} maxAddresses={MAX_ADDRESSES} state={account} onSubmit={onAccount} />
+        <SetupAccount purpose={view.purpose === 'mfa_reset' ? 'mfa_reset' : view.purpose === 'restore_recovery' ? 'restore_recovery' : 'initial_setup'} targetUser={view.targetUser} replacePassword={view.replacePassword} mailConfigured={view.mailConfigured} maxAddresses={MAX_ADDRESSES} state={account} onSubmit={onAccount} />
       ) : null}
       {step === 'addresses' ? (
         <>
@@ -300,7 +302,7 @@ export function SetupContainer({ api: injected }: { api?: SetupApi }) {
           ) : null}
         </>
       ) : null}
-      {step === 'complete' ? <SetupComplete accountStaged={view.accountStaged || view.purpose === 'mfa_reset'} confirmedAddressCount={confirmed} totpProven={totp.kind === 'proven' || view.totpProven} state={complete} onComplete={onComplete} signInHref="/login" /> : null}
+      {step === 'complete' ? <SetupComplete accountStaged={view.accountStaged || view.purpose === 'mfa_reset'} confirmedAddressCount={confirmed} totpProven={totp.kind === 'proven' || view.totpProven} state={complete} onComplete={onComplete} signInHref="/login" purpose={purposeRef.current} /> : null}
     </>,
   );
 }

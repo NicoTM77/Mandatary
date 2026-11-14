@@ -7,6 +7,7 @@ import { SETUP_STEPS, SetupAccount, SetupAddresses, SetupClockNotice, SetupCompl
 import { AdminShell, Alert, AutoFocusContext, Panel, Steps, SyntheticBadge, ThemeToggle, type NavItem } from '../ui';
 import { NAV, SYNTHETIC } from './fixtures';
 import PolicyGallery from './PolicyGallery';
+import RecoveryGallery from './RecoveryGallery';
 
 const noop = () => undefined;
 
@@ -62,6 +63,7 @@ const INDEX: ReadonlyArray<readonly [string, string]> = [
 /** Entry used by App when Vite DEV is on and the URL has ?synthetic (states) or ?synthetic=shell. */
 export default function GalleryRoot({ view }: { view: string }) {
   if (view.startsWith('policy')) return <PolicyGallery view={view} />;
+  if (view.startsWith('recovery')) return <RecoveryGallery view={view} />;
   return view === 'shell' ? <ShellView /> : <StateGallery />;
 }
 

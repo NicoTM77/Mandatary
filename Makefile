@@ -81,7 +81,7 @@ browser-install: versions
 	web/node_modules/.bin/playwright install chromium
 
 browser-test: versions
-	go test -tags=webauthnbrowser -count=1 -v ./internal/auth -run '^(TestWebAuthnBrowserVirtualAuthenticator|TestAdminUIBrowser|TestSecurityUIBrowser)$$'
+	go test -tags=webauthnbrowser -count=1 -v ./internal/auth -run '^(TestWebAuthnBrowserVirtualAuthenticator|TestAdminUIBrowser|TestSecurityUIBrowser|TestRecoveryUIBrowser)$$'
 
 negative-control:
 	bash scripts/negative-control.sh

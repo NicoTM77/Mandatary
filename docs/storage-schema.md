@@ -11,8 +11,9 @@ Use `make generate` to update it and `make generate-check` to compare without
 rewriting. Both approved Go baselines run the generator and model tests.
 
 P1.03 adds [runtime pool/WAL/FULL and encryption](storage-repository.md).
-Archive import, authenticators, authorization and delivery remain their owning
-later P1 rows. A valid row is
+Archive import is P1.18 ([logical backup and restore](backup-restore.md); migration
+`00014` adds the local, non-importable `restore_reports`/`restore_manifest` tables).
+Authenticators, authorization and delivery remain their owning later P1 rows. A valid row is
 not proof of authenticated factors, a current generation, trusted UTC, an
 approved manifest, successful SMTP delivery or runtime self-verification.
 

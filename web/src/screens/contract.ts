@@ -22,7 +22,7 @@ export type CommonReason = 'rate_limited' | 'unavailable' | 'invalid_request';
 
 // ───────────────────────── Slice 1 · setup ─────────────────────────
 
-export type SetupPurpose = 'initial_setup' | 'mfa_reset';
+export type SetupPurpose = 'initial_setup' | 'mfa_reset' | 'restore_recovery';
 
 export type SetupExchangeState = Phase | { kind: 'rejected'; reason: 'invalid_token' | CommonReason } | { kind: 'closed' };
 
@@ -106,6 +106,8 @@ export interface SetupCompleteProps {
   onComplete: () => void;
   /** Where "Go to sign in" points once setup is complete. NO session is issued by setup. */
   signInHref: string;
+  /** Default `initial_setup`. `restore_recovery` words the screen for the recovery administrator of a restored installation. */
+  purpose?: SetupPurpose;
 }
 
 // ───────────────────────── Slice 1 · login ─────────────────────────

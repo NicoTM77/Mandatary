@@ -88,7 +88,7 @@ function setupWorld(overrides: { purpose?: string; replacePassword?: boolean; se
       account_staged: state.staged,
       totp_begun: state.begun,
       totp_proven: state.proven,
-      addresses: state.staged && purpose === 'initial_setup' ? [{ id: 'addr-1', address: 'admin@example.invalid', confirmed: state.confirmed }] : null,
+      addresses: state.staged && purpose !== 'mfa_reset' ? [{ id: 'addr-1', address: 'admin@example.invalid', confirmed: state.confirmed }] : null,
     });
   let live = overrides.session === 'live';
   const server = new FakeServer()
@@ -314,10 +314,78 @@ describe.each(themes)('setup against the adapter contract (%s theme)', (theme) =
     expectNoLeak(PASSWORD);
   });
 
-  test('a restore-recovery window is not driven by this screen', async () => {
-    mountSetup(setupWorld({ session: 'live', purpose: 'restore_recovery' }), theme);
+  test('a window of an unknown purpose is not driven by this screen', async () => {
+    mountSetup(setupWorld({ session: 'live', purpose: 'something_else' }), theme);
     expect(await screen.findByText('This setup window can’t be used here')).toBeTruthy();
     expect(screen.queryByRole('form')).toBeNull();
+  });
+
+  // RESTORE-08: the host-authorized recovery of a RESTORED installation enrolls a NEW administrator (fresh password, a
+  // confirmed address and a fresh authenticator). It is presented as that, never as "first setup", and it never offers a way to
+  // reuse an account, factor or session that the backup carried.
+  test('a restore-recovery window enrolls a new recovery administrator and says what it does not do', async () => {
+    const world = setupWorld({ purpose: 'restore_recovery' });
+    mountSetup(world, theme);
+    fireEvent.change(await screen.findByLabelText('Setup token'), { target: { value: TOKEN } });
+    submit('Enter setup token');
+    await screen.findByRole('form', { name: 'Create recovery administrator' });
+    expect(screen.getByText(/restored from a backup/i)).toBeTruthy();
+    expect(screen.getByText(/stay switched off/i)).toBeTruthy();
+    expect(screen.queryByRole('form', { name: 'Create administrator' })).toBeNull();
+    expectNoLeak(TOKEN);
+
+    type('Username', 'recovery-admin');
+    type('Password', PASSWORD);
+    type('Email address 1', 'admin@example.invalid');
+    submit('Create recovery administrator');
+    await screen.findByText('Confirm a notification address');
+    expect(world.server.calls('POST', '/api/v1/setup/account')[0]?.body).toEqual({ username: 'recovery-admin', password: PASSWORD, addresses: ['admin@example.invalid'] });
+    click('Send confirmation code');
+    await screen.findByRole('form', { name: 'Confirm admin@example.invalid' });
+    type('Code from the email', '123456');
+    submit('Confirm admin@example.invalid');
+    await screen.findByText('1 of 1 addresses confirmed. You can continue.');
+    click('Continue');
+    click('Create authenticator key');
+    await screen.findByText('Your authenticator key');
+    type('6-digit code', '654321');
+    submit('Confirm authenticator code');
+    await screen.findByText('Authenticator confirmed');
+    expectNoLeak(SEED);
+    click('Continue');
+
+    expect(screen.getByText('Recovery administrator account saved')).toBeTruthy();
+    click('Finish recovery');
+    await screen.findByText('first-admin is ready');
+    expect(screen.getByText(/nothing from the backup was switched on/i)).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Go to sign in' }).getAttribute('href')).toBe('/login');
+    const unsafe = world.server.requests.filter((request) => request.method === 'POST' && request.path !== '/api/v1/setup/exchange');
+    for (const request of unsafe) expect(request.headers['x-csrf-token']).toBe(SETUP_CSRF);
+    expectNoLeak(SETUP_CSRF, TOKEN, PASSWORD, SEED);
+    expect(consoleCalls).toEqual([]);
+  });
+
+  test('an expired restore-recovery window names the restore commands, not the first-setup ones', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const world = setupWorld({ session: 'live', purpose: 'restore_recovery' });
+    mountSetup(world, theme);
+    await screen.findByRole('form', { name: 'Create recovery administrator' });
+    act(() => {
+      vi.setSystemTime(Date.now() + 31 * 60 * 1000);
+      vi.advanceTimersByTime(16_000);
+    });
+    await screen.findByText('This setup session has expired');
+    expect(screen.getByText(/mandatary recovery restore-admin/)).toBeTruthy();
+    expect(screen.queryByText(/mandatary setup rotate/)).toBeNull();
+  });
+
+  test('without a configured mail relay a restore recovery explains the restore command', async () => {
+    const world = setupWorld({ session: 'live', purpose: 'restore_recovery' });
+    world.server.route('GET', '/api/v1/setup/session', () => json(200, setupView({ purpose: 'restore_recovery', mail_configured: false })));
+    mountSetup(world, theme);
+    expect(await screen.findByText('Setup can’t be completed yet')).toBeTruthy();
+    expect(screen.getByText(/mandatary recovery restore-admin/)).toBeTruthy();
+    expect(screen.queryByLabelText('Password')).toBeNull();
   });
 
   test('without a configured mail relay the account form is replaced by an operator explanation', async () => {

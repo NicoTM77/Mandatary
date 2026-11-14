@@ -115,7 +115,7 @@ func (s *Setup) StageAccount(ctx context.Context, secret []byte, req AccountRequ
 	var values []string
 	var addresses []string
 	switch purpose {
-	case PurposeInitialSetup:
+	case PurposeInitialSetup, PurposeRestoreRecovery:
 		if !validSetupUsername(req.Username) || len(req.Addresses) < 1 || len(req.Addresses) > setupMaxAddresses {
 			return nil, ErrSetupDenied
 		}
@@ -281,7 +281,7 @@ func (s *Setup) SendAddressProof(ctx context.Context, secret []byte, addressID s
 		if e != nil {
 			return e
 		}
-		if sess.Purpose != string(PurposeInitialSetup) || !sess.StagedUserID.Valid || now-sess.LastProofSentAt < int64(setupProofResend/time.Second) {
+		if !SetupPurpose(sess.Purpose).createsAccount() || !sess.StagedUserID.Valid || now-sess.LastProofSentAt < int64(setupProofResend/time.Second) {
 			return errSetupLogical
 		}
 		count, e := q.CountAddressProofs(ctx, sess.StagedUserID.String)
@@ -345,7 +345,7 @@ func (s *Setup) ConfirmAddress(ctx context.Context, secret []byte, addressID, pr
 		if e != nil {
 			return e
 		}
-		if sess.Purpose != string(PurposeInitialSetup) || !sess.StagedUserID.Valid {
+		if !SetupPurpose(sess.Purpose).createsAccount() || !sess.StagedUserID.Valid {
 			return errSetupLogical
 		}
 		if now < sess.ProofNextAttemptAt {
@@ -423,7 +423,7 @@ func (s *Setup) BeginTOTP(ctx context.Context, secret []byte, algorithm string) 
 		}
 		userID := ""
 		switch SetupPurpose(sess.Purpose) {
-		case PurposeInitialSetup:
+		case PurposeInitialSetup, PurposeRestoreRecovery:
 			if !sess.StagedUserID.Valid || sess.StagedVerifier == nil {
 				return errSetupLogical // the account is staged first
 			}
@@ -585,6 +585,8 @@ func (s *Setup) Complete(ctx context.Context, secret []byte) (CompleteResult, er
 			result, removals, e = s.completeInitial(ctx, q, sess, totp, now)
 		case PurposeMFAReset:
 			result, removals, e = s.completeReset(ctx, q, sess, tok, totp, now)
+		case PurposeRestoreRecovery:
+			result, removals, e = s.completeRestoreRecovery(ctx, q, sess, totp, now)
 		default:
 			e = errSetupLogical
 		}

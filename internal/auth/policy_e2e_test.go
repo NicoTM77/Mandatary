@@ -92,7 +92,13 @@ type world struct {
 
 func newWorld(t *testing.T) *world {
 	t.Helper()
-	p := auth.NewPolicyE2E(t)
+	return newWorldFrom(t, auth.NewPolicyE2E(t))
+}
+
+// newWorldFrom composes the machine surfaces over an already built installation (P1.18 uses one that has the
+// backup service attached).
+func newWorldFrom(t *testing.T, p *auth.PolicyE2E) *world {
+	t.Helper()
 	idCfg, containers := docker.DefaultMockFixtures(p.EndpointID)
 	containers = append(containers, docker.MockContainerFixture{ // an innocuously named labelled peer (SELF-08)
 		ID: docker.ContainerID(strings.Repeat("9", 64)), Name: "reverse-proxy", Image: "nginx:1.27-alpine", State: "running", Status: "Up",
