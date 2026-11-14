@@ -210,6 +210,29 @@ type RepositoryMetadatum struct {
 	KeyCheck       []byte
 }
 
+type RestoreManifest struct {
+	RestoreGeneration int64
+	Kind              string
+	ItemID            string
+	Label             string
+	Origin            string
+	SourceState       sql.NullString
+	Imported          string
+	Effective         string
+	Decision          string
+	DecidedAt         sql.NullInt64
+}
+
+type RestoreReport struct {
+	RestoreGeneration int64
+	BackupID          string
+	Mode              string
+	Provenance        string
+	Initiator         string
+	RestoredAt        int64
+	Summary           string
+}
+
 type SecurityEvent struct {
 	ID               string
 	UserID           string
