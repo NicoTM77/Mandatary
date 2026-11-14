@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 	"testing"
@@ -274,5 +275,126 @@ func TestAddressHTTPNeedsFreshAssuranceAndReportsRelayFailure(t *testing.T) {
 	// Reads stay possible: the page can still show the account and ask for step-up.
 	if inv := h.inventory(s); len(inv.Addresses) != 3 {
 		t.Fatalf("addresses after expiry: %+v", inv.Addresses)
+	}
+}
+
+// P1.18.4 P116-L5: a storage/infrastructure fault of an address mutation is the fixed 503
+// "unavailable", never the opaque 403 "denied" that is reserved for LOGICAL refusals; it
+// leaks no SQL or driver text, never claims success and leaves no uncommitted state, notice
+// or proof. The logical controls (unknown/foreign address, wrong proof, last confirmed
+// address) stay 403 denied.
+func TestAddressHTTPStorageFaultsAreUnavailableNeverDeniedAndChangeNothing(t *testing.T) {
+	type op struct {
+		name string
+		// prepare returns the request path and body after any setup (before the fault is armed).
+		prepare func(h *addressHarness, s cookieSession) (path string, body map[string]string)
+	}
+	ops := []op{
+		{"propose", func(h *addressHarness, s cookieSession) (string, map[string]string) {
+			return AccountAddressPath, map[string]string{"address": "fault-new@example.invalid"}
+		}},
+		{"resend-proof", func(h *addressHarness, s cookieSession) (string, map[string]string) {
+			id, _ := h.propose(s, "fault-pending@example.invalid")
+			return AccountAddressProofPath, map[string]string{"id": id}
+		}},
+		{"confirm", func(h *addressHarness, s cookieSession) (string, map[string]string) {
+			id, _ := h.propose(s, "fault-confirm@example.invalid")
+			if h.send(s, id) != http.StatusNoContent {
+				h.t.Fatal("setup send")
+			}
+			return AccountAddressConfirmPath, map[string]string{"id": id, "code": h.lastProof("fault-confirm@example.invalid")}
+		}},
+		{"remove", func(h *addressHarness, s cookieSession) (string, map[string]string) {
+			return AccountAddressRemovePath, map[string]string{"id": "addr1"} // one of two confirmed addresses
+		}},
+	}
+	faults := []struct {
+		name string
+		arm  func(h *addressHarness)
+	}{
+		{"transaction-begin", func(h *addressHarness) { h.e.l.repo.FailClosed() }},
+		{"read", func(h *addressHarness) {
+			h.e.exec(`ALTER TABLE notification_addresses RENAME TO notification_addresses_x`)
+		}},
+		{"write-address-row", func(h *addressHarness) {
+			h.e.exec(`CREATE TRIGGER p1184_fail_addr_ins BEFORE INSERT ON notification_addresses BEGIN SELECT RAISE(ABORT,'synthetic write fault'); END`)
+			h.e.exec(`CREATE TRIGGER p1184_fail_addr_upd BEFORE UPDATE ON notification_addresses BEGIN SELECT RAISE(ABORT,'synthetic write fault'); END`)
+		}},
+		{"write-proof-row", func(h *addressHarness) {
+			h.e.exec(`CREATE TRIGGER p1184_fail_proof_ins BEFORE INSERT ON notification_address_proofs BEGIN SELECT RAISE(ABORT,'synthetic write fault'); END`)
+			h.e.exec(`CREATE TRIGGER p1184_fail_proof_upd BEFORE UPDATE ON notification_address_proofs BEGIN SELECT RAISE(ABORT,'synthetic write fault'); END`)
+		}},
+		{"write-notice-event", func(h *addressHarness) {
+			h.e.exec(`CREATE TRIGGER p1184_fail_event BEFORE INSERT ON security_events BEGIN SELECT RAISE(ABORT,'synthetic write fault'); END`)
+		}},
+	}
+	// A fault that cannot reach a given operation's path is skipped, but every operation must be
+	// hit by at least the begin and one other fault, and every combination that DOES fail must be 503.
+	for _, o := range ops {
+		hit := 0
+		for _, f := range faults {
+			t.Run(o.name+"/"+f.name, func(t *testing.T) {
+				h := newAddressHarness(t)
+				s := h.signIn()
+				path, body := o.prepare(h, s)
+				// Only tables the fault leaves readable are snapshotted (a renamed table cannot be).
+				snapshot := func() string {
+					var b strings.Builder
+					for _, q := range []string{
+						`SELECT count(*) FROM security_events`, `SELECT count(*) FROM security_notice_outbox`,
+						`SELECT count(*) FROM notification_address_proofs`, `SELECT count(*) FROM notification_address_proofs WHERE consumed_at IS NOT NULL`,
+					} {
+						b.WriteString(fmt.Sprint(h.e.scalar(q)) + "|")
+					}
+					return b.String()
+				}
+				before := snapshot()
+				f.arm(h)
+				w := h.post(s, path, body)
+				if w.Code == http.StatusNoContent || w.Code == http.StatusCreated {
+					return // this fault does not touch that operation's path: nothing to assert
+				}
+				hit++
+				if w.Code != http.StatusServiceUnavailable || errorCode(w) != "unavailable" {
+					t.Fatalf("%s under %s fault: %d %s, want 503 unavailable (never 403 denied)", o.name, f.name, w.Code, w.Body.String())
+				}
+				for _, leak := range []string{"synthetic", "no such table", "SQL", "notification_addresses", "constraint"} {
+					if strings.Contains(w.Body.String(), leak) {
+						t.Fatalf("response leaks %q: %s", leak, w.Body.String())
+					}
+				}
+				if f.name != "read" && f.name != "write-address-row" || o.name == "confirm" {
+					if got := snapshot(); got != before {
+						t.Fatalf("uncommitted state/notice/proof after a failed %s: before %s after %s", o.name, before, got)
+					}
+				}
+			})
+		}
+		if hit < 3 {
+			t.Fatalf("%s: only %d of %d injected faults reached the operation; the fault matrix is not exercising it", o.name, hit, len(faults))
+		}
+	}
+
+	// Logical controls are still the opaque 403 denied, with no fault involved.
+	h := newAddressHarness(t)
+	s := h.signIn()
+	for name, c := range map[string]struct {
+		path string
+		body map[string]string
+	}{
+		"remove-unknown-address":  {AccountAddressRemovePath, map[string]string{"id": "no-such-address"}},
+		"send-for-unknown":        {AccountAddressProofPath, map[string]string{"id": "no-such-address"}},
+		"confirm-wrong-proof":     {AccountAddressConfirmPath, map[string]string{"id": "addr1", "code": "AAAAAAAAAAAAAAAAAAAAAAAAAA"}},
+		"propose-duplicate-email": {AccountAddressPath, map[string]string{"address": "first@example.invalid"}},
+	} {
+		if w := h.post(s, c.path, c.body); w.Code != http.StatusForbidden || errorCode(w) != "denied" {
+			t.Errorf("%s: %d %s, want 403 denied", name, w.Code, w.Body.String())
+		}
+	}
+	if got := h.remove(s, "addr1"); got != http.StatusNoContent {
+		t.Fatalf("control removal of one of two: %d", got)
+	}
+	if w := h.post(s, AccountAddressRemovePath, map[string]string{"id": "addr2"}); w.Code != http.StatusForbidden || errorCode(w) != "denied" {
+		t.Errorf("last confirmed address removal: %d %s, want 403 denied", w.Code, w.Body.String())
 	}
 }

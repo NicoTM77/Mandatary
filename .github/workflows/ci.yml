@@ -13,7 +13,10 @@ jobs:
   baseline:
     name: Baseline (Go ${{ matrix.go }})
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    # 45, not 30: this one job runs the complete race suite AND the browser suites. Observed hosted durations at the P1.18.4 head: Go 1.27.4 about
+    # 19 minutes, Go 1.26.11 about 26 minutes (the older toolchain is slower), with the suite still growing; 30 left too little headroom
+    # (P1.18.4 AUTH-CI-BUDGET; scripts/ci-budget.test.mjs pins this and the other budgets).
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       max-parallel: 2

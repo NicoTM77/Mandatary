@@ -101,11 +101,16 @@ scans report zero affected symbols. Our configuration invokes only local SQLite
 generation/diff with remote execution disabled, not CEL vet/native struct input.
 This is a documented not-reachable tool-package finding, **not** an application
 exposure, suppression or claim that the whole dependency graph has no advisories.
-cel-go remains pinned: a non-compatibility security upgrade of this separate
-module is outside the approved exception. Independent review must verify this
-disposition; a reachable finding or use of those functions requires renewed
-owner disposition, not continued reliance on this assessment. Go/GitHub differ
-on patched release metadata (0.30.0 vs0.29.0); no upgrade is inferred from either.
+**Superseded by P1.18.4 (AUTH-dependency residuals).** The advisory is no longer
+carried as an exception: this separate module now resolves cel-go **0.30.0**, the
+release the Go vulnerability record lists as fixed (GitHub's metadata names 0.29.0;
+0.30.0 satisfies both). The change is the one `cel-go` line plus the
+`go.yaml.in/yaml/v3` indirect line that `go mod tidy` then requires; sqlc stays
+v1.31.1, the Go family is unchanged, `sqlc diff --no-remote` shows no generated
+output change, `make sqlc` builds, and both `make tool-security` scans report no
+vulnerabilities. `scripts/dependency-residuals.test.mjs` refuses a fall back below
+0.30.0. A reachable finding in this tool module still requires renewed owner
+disposition rather than continued reliance on an old assessment.
 Make runs heavy jobs serially with process-local GOMAXPROCS2/-p1 and
 GOMEMLIMIT768MiB/GOGC25; restricted worker additionally uses approved affinity2–5
 and nice+10. No system/runtime limit or security configuration changes.

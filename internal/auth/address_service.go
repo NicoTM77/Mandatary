@@ -91,10 +91,10 @@ func (l *Lifecycle) ProposeAddress(ctx context.Context, session []byte, address 
 	}
 	id, err := randomID()
 	if err != nil {
-		return AddressView{}, ErrDenied
+		return AddressView{}, store.ErrStorage // no randomness: unavailable, not a refusal
 	}
 	var view AddressView
-	err = l.repo.Control(ctx, func(q *store.Queries) error {
+	err = l.addressControl(ctx, func(q *store.Queries) error {
 		now := l.now().Unix()
 		c, u, _, e := freshSession(ctx, q, session, now)
 		if e != nil {
@@ -119,7 +119,10 @@ func (l *Lifecycle) ProposeAddress(ctx context.Context, session []byte, address 
 			}
 		}
 		active, e := activeAddresses(ctx, q, u.ID, c.AuthorityGeneration)
-		if e != nil || len(active) == 0 || live >= maxManagedAddresses {
+		if e != nil {
+			return e // a read fault is not "no confirmed address"
+		}
+		if len(active) == 0 || live >= maxManagedAddresses {
 			return ErrDenied
 		}
 		if e = q.CreateManagedAddress(ctx, store.CreateManagedAddressParams{ID: id, UserID: u.ID, Address: address, Version: version, CreatedAt: now}); e != nil {
@@ -127,9 +130,9 @@ func (l *Lifecycle) ProposeAddress(ctx context.Context, session []byte, address 
 		}
 		view = AddressView{ID: id, Address: address}
 		return l.enqueue(ctx, q, c, u.ID, "address_change_proposed", now)
-	}, nil)
+	})
 	if err != nil {
-		return AddressView{}, ErrDenied
+		return AddressView{}, err
 	}
 	return view, nil
 }
@@ -143,7 +146,7 @@ func (l *Lifecycle) SendAddressConfirmation(ctx context.Context, session []byte,
 	}
 	raw := make([]byte, 16)
 	if _, err := io.ReadFull(rand.Reader, raw); err != nil {
-		return ErrDenied
+		return store.ErrStorage
 	}
 	defer clear(raw)
 	proof := make([]byte, proofEncoding.EncodedLen(len(raw)))
@@ -151,10 +154,10 @@ func (l *Lifecycle) SendAddressConfirmation(ctx context.Context, session []byte,
 	defer clear(proof)
 	proofID, err := randomID()
 	if err != nil {
-		return ErrDenied
+		return store.ErrStorage
 	}
 	var recipient string
-	err = l.repo.Control(ctx, func(q *store.Queries) error {
+	err = l.addressControl(ctx, func(q *store.Queries) error {
 		now := l.now().Unix()
 		_, u, _, e := freshSession(ctx, q, session, now)
 		if e != nil {
@@ -191,9 +194,9 @@ func (l *Lifecycle) SendAddressConfirmation(ctx context.Context, session []byte,
 		}
 		recipient = target.Address
 		return q.CreateManagedAddressProof(ctx, store.CreateManagedAddressProofParams{ID: proofID, UserID: u.ID, AddressID: target.ID, AddressVersion: target.Version, ProofHash: proofDigest(target.ID, proof), IssuedAt: now, ExpiresAt: now + int64(addressProofLifetime/time.Second)})
-	}, nil)
+	})
 	if err != nil {
-		return ErrDenied
+		return err
 	}
 	if failure := l.sendAddressProof(ctx, recipient, string(proof)); failure != "" {
 		return ErrAddressMail
@@ -212,7 +215,7 @@ func (l *Lifecycle) ConfirmAddressProof(ctx context.Context, session []byte, add
 	}
 	defer clear(proof)
 	digest := proofDigest(addressID, proof)
-	return deny(l.repo.Control(ctx, func(q *store.Queries) error {
+	return l.addressControl(ctx, func(q *store.Queries) error {
 		now := l.now().Unix()
 		c, u, _, e := freshSession(ctx, q, session, now)
 		if e != nil {
@@ -220,7 +223,7 @@ func (l *Lifecycle) ConfirmAddressProof(ctx context.Context, session []byte, add
 		}
 		row, e := q.GetAddressProofByHash(ctx, digest)
 		if e != nil {
-			return ErrDenied
+			return authorityReadError(e) // no such proof is a refusal; any other error is a fault
 		}
 		all, e := q.ListNotificationAddresses(ctx, u.ID)
 		if e != nil {
@@ -235,14 +238,18 @@ func (l *Lifecycle) ConfirmAddressProof(ctx context.Context, session []byte, add
 		if !current || row.UserID != u.ID || row.AddressID != addressID || row.ConsumedAt.Valid || now < row.IssuedAt || now >= row.ExpiresAt {
 			return ErrDenied
 		}
-		if n, e := q.ConsumeAddressProof(ctx, store.ConsumeAddressProofParams{Now: nullable(now), ID: row.ID}); e != nil || n != 1 {
+		if n, e := q.ConsumeAddressProof(ctx, store.ConsumeAddressProofParams{Now: nullable(now), ID: row.ID}); e != nil {
+			return e
+		} else if n != 1 {
 			return ErrDenied
 		}
-		if n, e := q.ActivateConfirmedAddress(ctx, store.ActivateConfirmedAddressParams{Now: nullable(now), Generation: c.AuthorityGeneration, ID: addressID, UserID: u.ID}); e != nil || n != 1 {
+		if n, e := q.ActivateConfirmedAddress(ctx, store.ActivateConfirmedAddressParams{Now: nullable(now), Generation: c.AuthorityGeneration, ID: addressID, UserID: u.ID}); e != nil {
+			return e
+		} else if n != 1 {
 			return ErrDenied
 		}
 		return l.enqueue(ctx, q, c, u.ID, "address_changed", now)
-	}, nil))
+	})
 }
 
 // RemoveAddress withdraws a proposal or retires a confirmed address. The last
@@ -252,7 +259,7 @@ func (l *Lifecycle) RemoveAddress(ctx context.Context, session []byte, addressID
 	if addressID == "" || len(addressID) > 64 {
 		return ErrDenied
 	}
-	return deny(l.repo.Control(ctx, func(q *store.Queries) error {
+	return l.addressControl(ctx, func(q *store.Queries) error {
 		now := l.now().Unix()
 		c, u, _, e := freshSession(ctx, q, session, now)
 		if e != nil {
@@ -273,24 +280,48 @@ func (l *Lifecycle) RemoveAddress(ctx context.Context, session []byte, addressID
 		}
 		if target.State == "active" {
 			active, e := activeAddresses(ctx, q, u.ID, c.AuthorityGeneration)
-			if e != nil || len(active) < 2 {
+			if e != nil {
+				return e
+			}
+			if len(active) < 2 {
 				return ErrDenied // the last confirmed destination stays
 			}
 			if e = l.enqueue(ctx, q, c, u.ID, "address_changed", now); e != nil {
 				return e
 			}
 		}
-		if n, e := q.RevokeManagedAddress(ctx, store.RevokeManagedAddressParams{Now: nullable(now), ID: addressID, UserID: u.ID}); e != nil || n != 1 {
+		if n, e := q.RevokeManagedAddress(ctx, store.RevokeManagedAddressParams{Now: nullable(now), ID: addressID, UserID: u.ID}); e != nil {
+			return e
+		} else if n != 1 {
 			return ErrDenied
 		}
 		return nil
-	}, nil))
+	})
 }
 
-// deny reduces every failure of an address mutation to the one public outcome.
-func deny(err error) error {
-	if err != nil {
+// addressControl runs fn in one durable control transaction and reduces its outcome to exactly
+// two public results (P1.18.4 P116-L5). Repository.Control collapses every callback error to
+// store.ErrStorage, so a LOGICAL refusal (wrong owner, stale authentication, unknown or foreign
+// address or proof, last confirmed address, limits: the callback returned ErrDenied) is captured
+// out of band and returned as the one opaque ErrDenied. Anything else (transaction begin, read,
+// write, commit, randomness) is an infrastructure fault and is the fixed store.ErrStorage,
+// which the HTTP layer answers as 503 unavailable. Neither carries SQL or driver text, a fault
+// never claims success (the transaction is rolled back) and is never reported as a denial.
+func (l *Lifecycle) addressControl(ctx context.Context, fn func(*store.Queries) error) error {
+	refused := false
+	err := l.repo.Control(ctx, func(q *store.Queries) error {
+		e := fn(q)
+		if errors.Is(e, ErrDenied) {
+			refused = true
+		}
+		return e
+	}, nil)
+	switch {
+	case err == nil:
+		return nil
+	case refused:
 		return ErrDenied
+	default:
+		return store.ErrStorage
 	}
-	return nil
 }

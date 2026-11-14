@@ -312,6 +312,19 @@ test('complete: an authorizer that was not told is explained calmly; one that wa
   expect(screen.queryByText('Access decisions may take a moment to catch up')).toBeNull();
 });
 
+test('without a served runbook the page names the local file and section, never a link or a token field', () => {
+  mount(<RestoreEndedView ended={complete()} />);
+  expect(screen.queryByRole('link', { name: /runbook/i })).toBeNull();
+  const steps = screen.getByText(/Run the host recovery on the server/).closest('li') as HTMLElement;
+  expect(steps.textContent).toContain('docs/backup-restore.md');
+  expect(steps.textContent).toContain('section 10');
+  expect(steps.textContent).not.toMatch(/https?:\/\//);
+  expect(screen.queryByRole('textbox')).toBeNull();
+  cleanup();
+  mount(<RestoreEndedView ended={{ kind: 'incomplete', cause: 'failed' }} />);
+  expect(screen.getByText(/Run the host recovery on the server/).closest('li')?.textContent).toContain('docs/backup-restore.md');
+});
+
 test('the runbook link appears only when the container supplies one; nothing is invented', () => {
   const { unmount } = mount(<RestoreEndedView ended={complete()} />);
   expect(screen.queryByRole('link', { name: 'Open the operator runbook' })).toBeNull();

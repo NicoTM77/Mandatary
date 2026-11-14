@@ -9,13 +9,27 @@ recorded on the original Kanban card / draft PR, not here.
 
 **What P1.08 itself delivers.** `Browser` is middleware plus a policy registry.
 The P1.08 tests register their own routes; the product mounted none at that point.
-**Update (P1.16.3, local contribution to P1.16, not independently reviewed):**
-`internal/auth/login_http.go` now registers the slice-1 account routes on this
-boundary with explicit policies when the server has a trusted origin and a notice
-relay: `POST /api/v1/login` (`RequireNone`), `POST /api/v1/login/totp` and
-`POST /api/v1/login/no-mfa` (`RequirePreauth`), `GET /api/v1/session` and
-`POST /api/v1/logout` (`RequireSession`). Step-up, security-key login and the
-factor/recovery routes remain slice 2 (P1.16.4) and are not mounted. See
+**Update (P1.16, independently reviewed in run 472 and merged; corrected by P1.18.4):**
+the product now mounts this boundary in `cmd/mandatary/main.go`. `AccountPaths()`
+(`internal/auth/login_http.go`) registers `POST /api/v1/login` (`RequireNone`),
+`POST /api/v1/login/totp` and `POST /api/v1/login/no-mfa` (`RequirePreauth`),
+`GET /api/v1/session` and `POST /api/v1/logout` (`RequireSession`).
+`SecurityPaths()` (`internal/auth/security_http.go`) adds step-up (knowledge, TOTP and
+security key), security-key login, the account factor, recovery-code and
+notification-address routes and the recovery-state routes, and the admin API prefix
+(`auth.AdminPathPrefix`) carries the agent-credential reveal-once routes. All of them
+sit behind this boundary's explicit per-route policies (`Browser.Handle` refuses a
+registration without a valid policy). **Condition:** these routes are mounted only when the server has a trusted
+origin **and** a notice relay is configured, because `auth.Lifecycle` (and with it
+`Sessions`) is built only from the notice settings. An installation that has finished
+setup but has no relay configuration cannot sign in: the paths fall through to the
+static 404/405 and nothing is half-mounted. To recover, restore the verified-TLS relay
+settings (`MANDATARY_SMTP_RELAY`, `MANDATARY_SMTP_TLS`, `MANDATARY_SMTP_SENDER`,
+`MANDATARY_NOTICE_CONTACT`, with `MANDATARY_PUBLIC_ORIGIN`; see
+[setup and recovery](setup-recovery.md)) and restart; no authentication weaker than
+the approved flow is offered instead. This follows the
+approved design, in which the verified-TLS notice relay is mandatory
+(`docs/findings-ledger.md`, `P116-R462-sign-in-needs-notice-relay`). See
 [the P1.16.3 integration record](ui/p1.16.3-setup-login-integration.md). Setup/recovery
 sessions are P1.09, agent bearer adapters are P1.14, own-session visibility UI is
 Phase 3, backup/agent-credential/policy mutations are P1.10/P1.18/P1.17, and
@@ -250,7 +264,7 @@ browser-engine or provider evidence.
 | E03, E08, E12, TD §4.3 every sensitive mutation | `TestSessionGatedLifecycleMutationsNegativeAndStepUpPositive`, `TestSessionGatedMutationBoundaryExactlyFifteenMinutes`, `TestSensitiveRoutesStepUpOverHTTP` |
 | S07 / `REAUTH-IDLE-EXCEPTION` | No reduced-factor idle reauthentication exists: `StepUp*` always verify full password+TOTP, UV WebAuthn or (AAL1-only account) password; covered by `TestStepUpCannotDowngradeOrCrossAccounts` and `TestStepUpPasswordForAAL1OnlyAccount`. |
 | S03 / `SESSION-LOGOUT`, E13 / `AUTHENTICATOR-INVALIDATION`, E12 / `COMPROMISE-REPORT`, RESTORE generation substrate | `TestSessionLogoutAndInvalidation`, `TestLogoutOverHTTPInvalidatesCopiedCookie`, `TestProtectiveReportInvalidatesCopiedSessions` |
-| S05 / `SESSION-COOKIE-CSRF` | `TestSessionCookieAttributes`, `TestNegativeOriginsAreRejectedOnEveryUnsafeRoute`, `TestCSRFTokenIsServerBoundPerSession`, `TestMethodConfusionNeverReachesHandlers`, `TestUnsafeRequestsRequireJSONContentType`, `TestCookieAmbiguityAndTossingAreRejected` |
+| S05 / `SESSION-COOKIE-CSRF` | `TestSessionCookieAttributes`, `TestSessionCookieConstructorSerializesOnlyTheSecretBytes` (P1.18.4: the cookie is the canonical opaque encoding of exactly 32 secret bytes; no structured claim is serialized), `TestNegativeOriginsAreRejectedOnEveryUnsafeRoute`, `TestCSRFTokenIsServerBoundPerSession`, `TestMethodConfusionNeverReachesHandlers`, `TestUnsafeRequestsRequireJSONContentType`, `TestCookieAmbiguityAndTossingAreRejected` |
 | Weaker-route bypass, default deny / `DOC-SESSION-COVERAGE` | `TestRouteRegistrationRequiresExplicitPolicy`, `TestWeakerRouteBypassMatrix`, `TestPathVariantsCannotBypassPolicy` |
 | S04, W02 / `TLS-BOUNDARY` (application part only) | `TestHostAndForwardedHeadersAreNotTrusted`, `TestSessionOriginMustMatchWebAuthnOrigin` |
 | S08 / `TOKEN-NOT-PRESENCE`, `SCOPE-MACHINE` | `TestAgentTokensAreNeverHumanSessions` |

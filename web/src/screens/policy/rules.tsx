@@ -254,7 +254,16 @@ function RulesList({ data, props }: { data: RulesData; props: RulesScreenProps }
   const [filters, setFilters] = useState<Filter>(NO_FILTER);
   const attention = data.rules.filter(needsAttention);
   const missing = data.rules.filter((rule) => rule.target.kind === 'missing');
-  const shown = data.rules.filter((rule) => (filters.effect === 'all' || rule.effect === filters.effect) && (filters.subject === 'all' || rule.subject.kind === filters.subject) && (!filters.attention || needsAttention(rule)));
+  // The subject link filters by kind and IMMUTABLE id, never by display name; the name shown is whatever a rule that matches by id carries.
+  const only = props.subjectFilter ?? null;
+  const named = only ? data.rules.find((rule) => rule.subject.kind === only.kind && rule.subject.id === only.id)?.subject.name : undefined;
+  const shown = data.rules.filter(
+    (rule) =>
+      (only === null || (rule.subject.kind === only.kind && rule.subject.id === only.id)) &&
+      (filters.effect === 'all' || rule.effect === filters.effect) &&
+      (filters.subject === 'all' || rule.subject.kind === filters.subject) &&
+      (!filters.attention || needsAttention(rule)),
+  );
   const allow = data.rules.filter((rule) => rule.effect === 'allow').length;
   return (
     <>
@@ -272,6 +281,22 @@ function RulesList({ data, props }: { data: RulesData; props: RulesScreenProps }
           }
         >
           They stay here, marked Inactive · target missing, instead of vanishing: they allow nothing now and apply again if a matching container is created. Delete any you no longer need.
+        </Alert>
+      ) : null}
+      {only ? (
+        <Alert
+          tone="info"
+          role="none"
+          title={`Showing only the rules that name ${only.kind} ${named ?? 'with this ID'}`}
+          actions={
+            props.onClearSubjectFilter ? (
+              <Button variant="secondary" onClick={props.onClearSubjectFilter}>
+                Show all rules
+              </Button>
+            ) : null
+          }
+        >
+          Matched by the account’s ID, not its name{named ? ` (${named})` : ''}. Rules that reach it through a group are listed under that group.
         </Alert>
       ) : null}
       <Panel title="All rules" description={`${plural(data.rules.length, 'rule')} · ${allow} Allow · ${data.rules.length - allow} Deny${attention.length > 0 ? ` · ${attention.length} need attention` : ''}`}>

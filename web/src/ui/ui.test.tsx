@@ -201,6 +201,20 @@ test('several secrets (recovery codes) render as one ordered list and copy toget
   await waitFor(() => expect(writeText).toHaveBeenCalledWith('AAA-1\nBBB-2'));
 });
 
+test('one recovery code says Copy code and several say Copy all codes; both copy exactly the shown text on an explicit press only', async () => {
+  const writeText = vi.fn().mockResolvedValue(undefined);
+  installClipboard(writeText);
+  render(<SecretReveal heading="Your replacement recovery code" items={['SOLO-1']} />);
+  expect(screen.queryByRole('button', { name: 'Copy all codes' })).toBeNull();
+  expect(writeText).not.toHaveBeenCalled(); // no automatic copy
+  fireEvent.click(screen.getByRole('button', { name: 'Copy code' }));
+  await waitFor(() => expect(writeText).toHaveBeenCalledWith('SOLO-1'));
+  cleanup();
+  render(<SecretReveal heading="Codes" items={['AAA-1', 'BBB-2']} />);
+  expect(screen.queryByRole('button', { name: 'Copy code' })).toBeNull();
+  expect(screen.getByRole('button', { name: 'Copy all codes' })).toBeTruthy();
+});
+
 test('a single value can be shown in groups while copying the raw value', async () => {
   const writeText = vi.fn().mockResolvedValue(undefined);
   installClipboard(writeText);

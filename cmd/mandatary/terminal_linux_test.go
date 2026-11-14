@@ -23,6 +23,9 @@ const helperSecret = "SYNTHETIC-TERMINAL-SECRET-0001"
 // started with a pseudo-terminal as its CONTROLLING terminal (or deliberately not),
 // and runs the production hostTerminal against its real fds 0/1/2.
 func TestMain(m *testing.M) {
+	if os.Getenv(cliChildEnv) != "" {
+		os.Exit(cliChildMain()) // P1.18.4 AUTH-09-L3: one real helper process of cli_subprocess_test.go
+	}
 	if mode := os.Getenv(helperEnv); mode != "" {
 		term := newHostTerminal()
 		if err := term.Verify(); err != nil {

@@ -224,10 +224,17 @@ func TestFollowRequestsAreAuthorizedAndBoundedLikeEveryOtherRequest(t *testing.T
 		e.spy.reset()
 		f := openFollow(t, e, token, path)
 		defer f.close()
-		body, _ := io.ReadAll(f.resp.Body)
+		// Check the status BEFORE reading: an unexpected 200 is a live follow stream
+		// that never ends, so reading its body would turn a cap regression into a
+		// package-timeout hang instead of a prompt, readable failure (P1.14 run452 I4).
 		if f.resp.StatusCode != status {
+			if f.resp.StatusCode == http.StatusOK {
+				t.Fatalf("%s: %d (an open follow stream was granted), want %d %s/%s", path, f.resp.StatusCode, status, code, reason)
+			}
+			body, _ := io.ReadAll(io.LimitReader(f.resp.Body, 4096))
 			t.Fatalf("%s: %d %s, want %d", path, f.resp.StatusCode, body, status)
 		}
+		body, _ := io.ReadAll(f.resp.Body)
 		var eb api.ErrorBody
 		if json.Unmarshal(body, &eb) != nil || eb.Error.Code != code || eb.Error.Reason != reason {
 			t.Fatalf("%s: %s, want %s/%s", path, body, code, reason)

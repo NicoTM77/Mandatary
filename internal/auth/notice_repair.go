@@ -30,6 +30,30 @@ func (l *Lifecycle) NoticeHealth(ctx context.Context) (NoticeStatus, error) {
 	return result, nil
 }
 
+// AccountNoticeHealth is the delivery health of ONE account's own security notices: the same
+// aggregate counts as NoticeHealth over that user's records only, with no recipient, event
+// content or other account's count (P1.18.4 P116-L3, least privilege). An unreadable status is
+// reported as degraded with ErrDenied, never as healthy.
+func (l *Lifecycle) AccountNoticeHealth(ctx context.Context, userID string) (NoticeStatus, error) {
+	result := NoticeStatus{Degraded: true}
+	if userID == "" {
+		return result, ErrDenied
+	}
+	e := l.repo.Read(ctx, func(q *store.Queries) error {
+		n, e := q.GetAccountNoticeHealth(ctx, userID)
+		if e != nil {
+			return e
+		}
+		result = NoticeStatus{Pending: n.Pending, Failed: n.Failed, Bounced: n.Bounced, Quarantined: n.Quarantined, Protective: n.Protective}
+		result.Degraded = n.Pending != 0 || n.Failed != 0 || n.Bounced != 0 || n.Quarantined != 0 || n.Protective != 0
+		return nil
+	})
+	if e != nil {
+		return NoticeStatus{Degraded: true}, ErrDenied
+	}
+	return result, nil
+}
+
 // RetryNotice is an explicit, fresh-maximum-assurance repair of this account's
 // failed recipient record, not an address rewrite. Preserve lifetime attempts,
 // snapshot, Message-ID and incident; allow at most three further eight-attempt

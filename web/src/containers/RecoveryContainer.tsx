@@ -75,7 +75,7 @@ export function RecoveryContainer({ api: injected }: { api?: RecoveryApi }) {
     setTotp({ kind: 'not_started' });
     setKey({ kind: 'idle' });
     setReplacement(undefined);
-    setStage({ kind: 'form', state: { kind: 'rejected', reason: 'denied' } });
+    setStage({ kind: 'form', state: { kind: 'expired' } });
   }
 
   function beginTotp() {
@@ -136,7 +136,7 @@ export function RecoveryContainer({ api: injected }: { api?: RecoveryApi }) {
 
   // The capability's deadline is the server's; reaching it only changes what is shown (the secrets with it:
   // an expired capability renders the form, so neither the replacement code nor a seed stays on screen).
-  const shown: Stage = stage.kind === 'capability' && now >= stage.start.expiresAt * 1000 ? { kind: 'form', state: { kind: 'rejected', reason: 'denied' } } : stage;
+  const shown: Stage = stage.kind === 'capability' && now >= stage.start.expiresAt * 1000 ? { kind: 'form', state: { kind: 'expired' } } : stage;
 
   let state: RestrictedRecoveryState;
   switch (shown.kind) {

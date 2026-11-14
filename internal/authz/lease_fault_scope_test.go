@@ -3,6 +3,7 @@ package authz_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -46,6 +47,10 @@ func (b *faultBackend) ResolveTarget(ctx context.Context, ref string) (docker.Co
 	}
 	return b.DockerBackend.ResolveTarget(ctx, ref)
 }
+
+// errGenericResolveFault stands for an arbitrary non-context metadata failure
+// (never matched by error text anywhere in the production classifier).
+var errGenericResolveFault = errors.New("synthetic backend metadata fault")
 
 // sharedGroupLeases gives Alice and Bob live leases on one shared group ALLOW.
 func sharedGroupLeases(t *testing.T, bobSecret []byte, req authz.AuthorizeRequest, a *authz.Authorizer) (alice, bob *authz.Lease, bobReq authz.AuthorizeRequest) {
@@ -93,6 +98,14 @@ func TestLeaseSharedFaultNotMaskedByCallerCancellation(t *testing.T) {
 		{"unverified/caller-canceled", docker.ErrUnverified, true, true, true},
 		{"unverified/not-canceled", docker.ErrUnverified, true, false, true},
 		{"pure-cancel-control", nil, false, true, false},
+		// P1.18.4 P111-L2: a joined/wrapped generic (non-context) metadata fault
+		// co-observed with the caller's cancellation is an independent fault and
+		// must cancel the affected peer; a joined pure cancellation + deadline stays local.
+		{"generic-fault/caller-canceled", errGenericResolveFault, false, true, true},
+		{"generic-fault/not-canceled", errGenericResolveFault, false, false, true},
+		{"multi-wrap-generic-fault/caller-canceled", fmt.Errorf("resolve: %w: %w", context.Canceled, errGenericResolveFault), false, true, true},
+		{"pure-cancel-and-deadline-control", context.DeadlineExceeded, false, true, false},
+		{"missing-target/caller-canceled", docker.ErrTargetNotFound, false, true, true},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -226,6 +239,62 @@ func TestLeaseSurvivesOverlappingNoopNotification(t *testing.T) {
 			}
 			if _, err := a.Authorize(ctx, req); err != nil {
 				t.Errorf("fresh control: %v", err)
+			}
+		})
+	}
+}
+
+// P1.18.4 P111-L1: the no-op-notification guarantee holds only with a LIVE
+// bounded notification context. A direct caller that hands the Authorizer an
+// already ended context (an un-detached request context, or an expired bound)
+// fails closed: the epoch still advances and the lease is canceled instead of
+// being silently skipped. The supported service path detaches cancellation and
+// keeps a finite bound (internal/ops TestNotifyAuthorityChangeIsNotKilledByRequestContext).
+func TestDirectNotifyWithEndedContextFailsClosedWhileLiveContextKeepsLease(t *testing.T) {
+	expired := func() (context.Context, context.CancelFunc) {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Nanosecond)
+		<-ctx.Done()
+		return ctx, cancel
+	}
+	canceled := func() (context.Context, context.CancelFunc) {
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		return ctx, func() {}
+	}
+	live := func() (context.Context, context.CancelFunc) {
+		return context.WithTimeout(context.Background(), 20*time.Second)
+	}
+	cases := []struct {
+		name     string
+		mkCtx    func() (context.Context, context.CancelFunc)
+		wantLive bool
+	}{
+		{"live-bounded-context-keeps-healthy-lease", live, true},
+		{"expired-bound-fails-closed", expired, false},
+		{"canceled-request-context-fails-closed", canceled, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			e, req := publicationSetup(t)
+			lease, err := e.authorizer.AcquireLease(context.Background(), req)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer lease.Release()
+			ctx, cancel := tc.mkCtx()
+			defer cancel()
+			if err := e.authorizer.NotifyPolicyChange(ctx); err != nil {
+				t.Fatalf("notification itself must not error: %v", err)
+			}
+			if got := lease.Context().Err() == nil; got != tc.wantLive {
+				t.Errorf("lease live=%v want %v", got, tc.wantLive)
+			}
+			if tc.wantLive != (e.authorizer.ActiveLeaseCount() == 1) {
+				t.Errorf("active leases=%d wantLive=%v", e.authorizer.ActiveLeaseCount(), tc.wantLive)
+			}
+			// The authority itself is untouched: a fresh decision still succeeds.
+			if _, err := e.authorizer.Authorize(context.Background(), req); err != nil {
+				t.Errorf("fresh authorization after notification: %v", err)
 			}
 		})
 	}

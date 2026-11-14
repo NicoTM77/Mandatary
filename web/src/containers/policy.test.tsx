@@ -463,3 +463,66 @@ describe('Agent tokens page preselection from Policy > Agents', () => {
     await screen.findByText('Credentials for first-agent');
   });
 });
+
+// ───────────────────────── P1.18.4 P117-note-rule-link: the "View rules" link and the Rules filter ─────────────────────────
+
+describe('View rules links and the Rules page subject filter', () => {
+  const link = (name: RegExp) => screen.getAllByRole('link', { name }).map((a) => a.getAttribute('href'));
+
+  test('the user, group and agent pages link to the Rules page by kind and immutable id, and invent no other link', async () => {
+    const w = world((s) =>
+      s
+        .route('GET', `${POLICY}/users`, () => json(200, usersPage()))
+        .route('GET', `${POLICY}/groups`, () => json(200, { ...groupsPage(), groups: [{ ...groupsPage().groups[0], rule_count: 2 }] }))
+        .route('GET', `${POLICY}/agents`, () => json(200, agentsPage())),
+    );
+    mount(<UsersContainer api={w.api} navigate={w.navigate} />);
+    await screen.findByText('sample-robin');
+    expect(link(/View rules/)).toEqual(['/policy#subject=user:u', '/policy#subject=user:u-robin']);
+    cleanup();
+    mount(<GroupsContainer api={w.api} navigate={w.navigate} />);
+    await screen.findAllByText('sample-ops');
+    expect(link(/View rules/)).toEqual(['/policy#subject=group:g-ops']);
+    cleanup();
+    mount(<PolicyAgentsContainer api={w.api} navigate={w.navigate} />);
+    await screen.findByText('sample-runner');
+    expect(link(/View rules/)).toEqual(['/policy#subject=agent:a-runner']);
+  });
+
+  test('the Rules page filters by the fragment, matches by id, ignores a malformed fragment and clears the filter and the fragment on request', async () => {
+    const twins = rulesPage({
+      rules: [
+        { id: 'r-1', subject: agentSubject, effect: 'ALLOW', operation: 'container:logs', selector: selectorJson(), log_tail_max: null, stop_timeout_max: null, state: 'active', target: { status: 'present', matches: 1 } },
+        { id: 'r-2', subject: { ...agentSubject, id: 'a-other' }, effect: 'ALLOW', operation: 'container:start', selector: selectorJson({ container_name: 'sample-other' }), log_tail_max: null, stop_timeout_max: null, state: 'active', target: { status: 'present', matches: 1 } },
+      ],
+    });
+    const w = world((s) => s.route('GET', `${POLICY}/rules`, () => json(200, twins)));
+    window.location.hash = '#subject=agent:a-runner';
+    mount(<RulesContainer api={w.api} navigate={w.navigate} />);
+    await screen.findByText('Showing only the rules that name agent sample-runner');
+    expect(screen.getByRole('status', { name: '' }).textContent).toBe('Showing 1 of 2');
+    expect(w.server.calls('GET', `${POLICY}/rules`)[0]?.path).toBe(`${POLICY}/rules`); // the fragment never reaches the server
+    click('Show all rules');
+    await waitFor(() => expect(screen.getByRole('status', { name: '' }).textContent).toBe('Showing 2 of 2'));
+    expect(window.location.hash).toBe('');
+    cleanup();
+
+    window.location.hash = '#subject=agent:../../etc';
+    mount(<RulesContainer api={w.api} navigate={w.navigate} />);
+    await waitFor(() => expect(screen.getByRole('status', { name: '' }).textContent).toBe('Showing 2 of 2'));
+    expect(screen.queryByText(/Showing only the rules/)).toBeNull();
+    window.location.hash = '';
+  });
+
+  test('a hash change on the open page updates the filter, so a stale filter never outlives its link', async () => {
+    const w = world((s) => s.route('GET', `${POLICY}/rules`, () => json(200, rulesPage())));
+    window.location.hash = '';
+    mount(<RulesContainer api={w.api} navigate={w.navigate} />);
+    await waitFor(() => expect(screen.getByRole('status', { name: '' }).textContent).toBe('Showing 2 of 2'));
+    window.location.hash = '#subject=agent:nobody';
+    await waitFor(() => expect(screen.getByRole('status', { name: '' }).textContent).toBe('Showing 0 of 2'));
+    window.location.hash = '#unrelated';
+    await waitFor(() => expect(screen.getByRole('status', { name: '' }).textContent).toBe('Showing 2 of 2'));
+    window.location.hash = '';
+  });
+});

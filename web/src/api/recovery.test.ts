@@ -146,7 +146,8 @@ test('a post-transition failure keeps installation_state so the screen cannot sa
 
 // ───────────────────────── manifest ─────────────────────────
 
-const item = (over: Record<string, unknown>) => ({ kind: 'group', id: 'g-1', label: 'sample-ops', origin: 'imported', source_state: 'active', imported: {}, effective: {}, decision: 'pending', approvable: true, needs: 'approval', ...over });
+const DIGEST = 'a1'.repeat(32);
+const item = (over: Record<string, unknown>) => ({ kind: 'group', id: 'g-1', label: 'sample-ops', origin: 'imported', source_state: 'active', imported: {}, effective: {}, decision: 'pending', approvable: true, needs: 'approval', digest: DIGEST, ...over });
 const manifest = (items: unknown[], over: Record<string, unknown> = {}) => ({
   backup_id: 'bk-0001',
   mode: 'full',
@@ -254,4 +255,217 @@ test('an approval conflict keeps the refused records; an unreadable success is n
   expect(await (await signedIn(conflict)).approve([{ kind: 'role', id: 'adm' }])).toEqual({ ok: false, status: 409, code: 'conflict', items });
   const odd = new FakeServer().route('POST', APPROVALS, () => json(200, { approved: 'all' }));
   expect(await (await signedIn(odd)).approve([{ kind: 'user', id: 'u-1' }])).toEqual({ ok: false, status: 200, code: 'invalid_response' });
+});
+
+// ───────────────────────── P1.18.4 FC4-1: identifying detail and digest ─────────────────────────
+
+const named = (
+  kind: string,
+  id: string,
+  name: string,
+  extra: Record<string, unknown> = {},
+) => ({ kind, id, name, ...extra });
+const ruleDetail = (over: Record<string, unknown> = {}) => ({
+  effect: "ALLOW",
+  operation: "container:logs",
+  subject: named("agent", "a-1", "sample-bot"),
+  endpoint: named("endpoint", "ep-1", "local"),
+  selector: {
+    id: "sel-1",
+    name_type: "glob",
+    container_name: "web-*",
+    compose_project: "sample-platform",
+    image_pattern: "registry.invalid/web:*",
+  },
+  log_tail_max: 500,
+  ...over,
+});
+
+async function decoded(items: unknown[]) {
+  return await (
+    await signedIn(
+      new FakeServer().route("GET", MANIFEST, () => json(200, manifest(items))),
+    )
+  ).manifest();
+}
+
+test("a rule and a membership carry their exact detail and digest, decoded by id and never guessed", async () => {
+  const result = await decoded([
+    item({
+      kind: "policy",
+      id: "p-1",
+      label: "ALLOW container:logs",
+      imported: { effect: "ALLOW" },
+      effective: { effect: "ALLOW" },
+      detail: ruleDetail(),
+    }),
+    item({
+      kind: "agent_membership",
+      id: "a-1:g-1",
+      label: "x in y",
+      detail: {
+        member: named("agent", "a-1", "sample-bot"),
+        group: named("group", "g-1", "sample-ops", { missing: true }),
+      },
+    }),
+    item({
+      kind: "user",
+      id: "u-1",
+      label: "sample-robin",
+      imported: { mfa_requirement: "optional", compromised: true },
+      effective: { mfa_requirement: "required" },
+      approvable: false,
+      blocked_reason: "compromised",
+      needs: "credential_enrollment",
+      detail: { compromised: true },
+    }),
+    item({ kind: "group", id: "g-2" }),
+  ]);
+  expect(result.ok).toBe(true);
+  if (!result.ok) return;
+  const rows = Object.fromEntries(
+    result.data.items.map((row) => [row.id, row]),
+  );
+  expect(rows["p-1"]?.detail).toEqual({
+    kind: "rule",
+    effect: "allow",
+    operation: "container:logs",
+    subject: { kind: "agent", id: "a-1", name: "sample-bot", missing: false },
+    endpoint: { kind: "endpoint", id: "ep-1", name: "local", missing: false },
+    selector: {
+      id: "sel-1",
+      nameType: "glob",
+      containerName: "web-*",
+      composeProject: "sample-platform",
+      composeService: "",
+      imagePattern: "registry.invalid/web:*",
+      pinnedContainerId: "",
+      pinnedImageDigest: "",
+    },
+    logTailMax: 500,
+    stopTimeoutMax: null,
+  });
+  expect(rows["a-1:g-1"]?.detail).toEqual({
+    kind: "membership",
+    member: { kind: "agent", id: "a-1", name: "sample-bot", missing: false },
+    group: { kind: "group", id: "g-1", name: "sample-ops", missing: true },
+  });
+  expect(rows["u-1"]).toMatchObject({
+    approvable: false,
+    blockedReason: "compromised",
+    detail: null,
+  });
+  expect(rows["g-2"]?.detail).toBeNull();
+  expect(rows["p-1"]?.digest).toBe(DIGEST);
+});
+
+test("a rule or membership the service sent no detail for has a null detail: the screen then offers no checkbox", async () => {
+  const result = await decoded([
+    item({
+      kind: "policy",
+      id: "p-1",
+      imported: { effect: "ALLOW" },
+      effective: { effect: "ALLOW" },
+    }),
+    item({ kind: "user_membership", id: "u-1:g-1" }),
+  ]);
+  expect(result.ok && result.data.items.map((row) => row.detail)).toEqual([
+    null,
+    null,
+  ]);
+});
+
+test("a half-understood detail or a digest that is not a digest fails the whole manifest closed", async () => {
+  const policy = (detail: unknown) =>
+    item({
+      kind: "policy",
+      id: "p-1",
+      imported: { effect: "ALLOW" },
+      effective: { effect: "ALLOW" },
+      detail,
+    });
+  const bad: Record<string, unknown[]> = {
+    "detail not an object": [policy("ALLOW everything")],
+    "unknown effect": [policy(ruleDetail({ effect: "MAYBE" }))],
+    "unknown operation": [policy(ruleDetail({ operation: "container:exec" }))],
+    "subject of an unknown kind": [
+      policy(ruleDetail({ subject: named("credential", "c-1", "x") })),
+    ],
+    "subject without an id": [
+      policy(ruleDetail({ subject: named("agent", "", "x") })),
+    ],
+    "endpoint of the wrong kind": [
+      policy(ruleDetail({ endpoint: named("group", "g-1", "x") })),
+    ],
+    "selector without a name type": [
+      policy(ruleDetail({ selector: { id: "s", container_name: "web" } })),
+    ],
+    "selector constraint of the wrong type": [
+      policy(
+        ruleDetail({
+          selector: {
+            id: "s",
+            name_type: "exact",
+            container_name: "web",
+            compose_project: 7,
+          },
+        }),
+      ),
+    ],
+    "limit that is not a positive integer": [
+      policy(ruleDetail({ log_tail_max: -1 })),
+    ],
+    "membership with a group of the wrong kind": [
+      item({
+        kind: "agent_membership",
+        id: "a:g",
+        detail: {
+          member: named("agent", "a", "x"),
+          group: named("user", "g", "x"),
+        },
+      }),
+    ],
+    "membership whose user member is an agent": [
+      item({
+        kind: "user_membership",
+        id: "u:g",
+        detail: {
+          member: named("agent", "u", "x"),
+          group: named("group", "g", "x"),
+        },
+      }),
+    ],
+    "missing digest": [{ ...item({}), digest: undefined }],
+    "short digest": [item({ digest: "abc" })],
+    "upper-case digest": [item({ digest: "A1".repeat(32) })],
+    "name too long": [
+      policy(ruleDetail({ subject: named("agent", "a", "x".repeat(301)) })),
+    ],
+  };
+  for (const [name, items] of Object.entries(bad))
+    expect(await decoded(items), name).toMatchObject({ ok: false });
+});
+
+test("an approval sends each record's kind, id and the digest the person reviewed, and nothing else", async () => {
+  const server = new FakeServer().route("POST", APPROVALS, () =>
+    json(200, {
+      approved: [
+        { kind: "policy", id: "p-1", result: "approved" },
+        { kind: "user", id: "u-1", result: "approved" },
+      ],
+    }),
+  );
+  const api = await signedIn(server);
+  expect(
+    await api.approve([
+      { kind: "policy", id: "p-1", digest: DIGEST },
+      { kind: "user", id: "u-1" },
+    ]),
+  ).toMatchObject({ ok: true, data: 2 });
+  expect(server.calls("POST", APPROVALS)[0]?.body).toEqual({
+    items: [
+      { kind: "policy", id: "p-1", digest: DIGEST },
+      { kind: "user", id: "u-1" },
+    ],
+  });
 });

@@ -129,7 +129,7 @@ export function SecretReveal({ heading, intro, value, items, groupEvery, copyLab
 
       <div className="mt-3 flex flex-wrap items-center gap-3">
         <Button variant="secondary" icon="copy" onClick={copyToClipboard} aria-describedby={statusId}>
-          {items ? 'Copy all codes' : copyLabel}
+          {items ? (items.length === 1 ? 'Copy code' : 'Copy all codes') : copyLabel}
         </Button>
         {/* The status text never contains the secret. */}
         <p id={statusId} role="status" className={`text-sm ${copy === 'failed' ? 'font-medium text-danger' : 'text-success'}`}>

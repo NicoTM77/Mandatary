@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Alert, Badge, Button, CodeField, Icon, Panel, PasswordField, SecretReveal, TextField, type StepItem } from '../ui';
+import { formatMinutes } from '../ui/format';
 import type { AccountFormValues, AddressRow, ProofState, SetupAccountProps, SetupAddressesProps, SetupClock, SetupCompleteProps, SetupExchangeProps, SetupPurpose, TotpEnrollmentProps } from './contract';
 import { Command, RejectionAlert, commonRejection, useRequiredForm, type Rejection } from './shared';
 
@@ -25,7 +26,7 @@ export function SetupClockNotice({ clock, purpose }: { clock: SetupClock; purpos
       </Alert>
     );
   }
-  const minutes = `${clock.minutesLeft} ${clock.minutesLeft === 1 ? 'minute' : 'minutes'}`;
+  const minutes = formatMinutes(clock.minutesLeft);
   return clock.kind === 'expiring' ? (
     <Alert tone="warning" title={`Setup session ends in ${minutes}`}>
       Finish soon. The deadline is fixed; it does not extend when you are active.

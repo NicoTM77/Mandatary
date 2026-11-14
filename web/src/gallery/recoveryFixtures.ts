@@ -1,4 +1,4 @@
-import type { ManifestData, ManifestRow, RestoreReportView } from '../screens/recovery/contract';
+import type { ManifestData, ManifestRow, NamedRef, RestoreReportView, SelectorDetail } from '../screens/recovery/contract';
 
 /**
  * Synthetic data for the P1.18 gallery and presentational tests ONLY. Every name starts with "sample-", every id is a short label (never a real
@@ -13,6 +13,25 @@ export function sampleFile(name = 'sample-backup-0001-clean.json', size = 48 * 1
   return new File(['x'.repeat(size)], name, { type: 'application/json' });
 }
 
+/** A deterministic 64-hex stand-in for the service's detail digest (never a real hash of anything). */
+export const sampleDigest = (kind: string, id: string): string => {
+  let hex = '';
+  for (const ch of `${kind}:${id}`) hex += ch.charCodeAt(0).toString(16).padStart(2, '0');
+  return hex.slice(0, 64).padEnd(64, '0');
+};
+
+export const ref = (kind: NamedRef['kind'], id: string, name: string, missing = false): NamedRef => ({ kind, id, name: missing ? id : name, missing });
+export const selector = (over: Partial<SelectorDetail> & Pick<SelectorDetail, 'id' | 'containerName'>): SelectorDetail => ({
+  nameType: 'exact',
+  composeProject: '',
+  composeService: '',
+  imagePattern: '',
+  pinnedContainerId: '',
+  pinnedImageDigest: '',
+  ...over,
+});
+export const localEndpoint = ref('endpoint', 'ep-local', 'sample-local');
+
 const row = (r: Partial<ManifestRow> & Pick<ManifestRow, 'kind' | 'id' | 'label'>): ManifestRow => ({
   origin: 'imported',
   sourceState: 'active',
@@ -21,22 +40,45 @@ const row = (r: Partial<ManifestRow> & Pick<ManifestRow, 'kind' | 'id' | 'label'
   blockedReason: null,
   needs: 'approval',
   comparison: { kind: 'none' },
+  detail: null,
+  digest: sampleDigest(r.kind, r.id),
   ...r,
 });
 
 export const manifestItems: readonly ManifestRow[] = [
   row({ kind: 'endpoint', id: 'ep-local', label: 'sample-local-endpoint' }),
   row({ kind: 'user', id: 'u-restored', label: 'sample-restored', needs: 'credential_enrollment', comparison: { kind: 'mfa', imported: 'optional', effective: 'required', compromised: false } }),
-  row({ kind: 'user', id: 'u-risky', label: 'sample-risky', needs: 'credential_enrollment', sourceState: 'disabled', comparison: { kind: 'mfa', imported: 'required', effective: 'required', compromised: true } }),
+  row({ kind: 'user', id: 'u-risky', label: 'sample-risky', needs: 'credential_enrollment', sourceState: 'disabled', approvable: false, blockedReason: 'compromised', comparison: { kind: 'mfa', imported: 'required', effective: 'required', compromised: true } }),
   row({ kind: 'user', id: 'u-local-only', label: 'sample-local-only', origin: 'local_retained', sourceState: null, needs: 'credential_enrollment' }),
   row({ kind: 'user', id: 'u-sam', label: 'sample-sam', decision: 'approved', needs: 'credential_enrollment' }),
   row({ kind: 'group', id: 'g-ops', label: 'sample-ops' }),
   row({ kind: 'agent', id: 'a-ci', label: 'sample-ci-runner', needs: 'token_reissue' }),
   row({ kind: 'agent', id: 'a-billing', label: 'sample-billing-bot', decision: 'approved', needs: 'token_reissue' }),
-  row({ kind: 'user_membership', id: 'u-restored:g-ops', label: 'sample-restored in sample-ops' }),
-  row({ kind: 'agent_membership', id: 'a-ci:g-ops', label: 'sample-ci-runner in sample-ops' }),
-  row({ kind: 'policy', id: 'p-logs', label: 'ALLOW container:logs', comparison: { kind: 'rule', imported: 'allow', effective: 'allow', localDenyKept: false } }),
-  row({ kind: 'policy', id: 'p-stop', label: 'ALLOW container:stop', comparison: { kind: 'rule', imported: 'allow', effective: 'deny', localDenyKept: true } }),
+  row({ kind: 'user_membership', id: 'u-restored:g-ops', label: 'sample-restored in sample-ops', detail: { kind: 'membership', member: ref('user', 'u-restored', 'sample-restored'), group: ref('group', 'g-ops', 'sample-ops') } }),
+  row({ kind: 'agent_membership', id: 'a-ci:g-ops', label: 'sample-ci-runner in sample-ops', detail: { kind: 'membership', member: ref('agent', 'a-ci', 'sample-ci-runner'), group: ref('group', 'g-ops', 'sample-ops') } }),
+  row({
+    kind: 'policy',
+    id: 'p-logs',
+    label: 'ALLOW container:logs',
+    comparison: { kind: 'rule', imported: 'allow', effective: 'allow', localDenyKept: false },
+    detail: { kind: 'rule', effect: 'allow', operation: 'container:logs', subject: ref('group', 'g-ops', 'sample-ops'), endpoint: localEndpoint, selector: selector({ id: 'sel-web', containerName: 'sample-web' }), logTailMax: 500, stopTimeoutMax: null },
+  }),
+  row({
+    kind: 'policy',
+    id: 'p-stop',
+    label: 'ALLOW container:stop',
+    comparison: { kind: 'rule', imported: 'allow', effective: 'deny', localDenyKept: true },
+    detail: {
+      kind: 'rule',
+      effect: 'deny',
+      operation: 'container:stop',
+      subject: ref('agent', 'a-ci', 'sample-ci-runner'),
+      endpoint: localEndpoint,
+      selector: selector({ id: 'sel-batch', containerName: 'sample-batch-*', nameType: 'glob', composeProject: 'sample-platform', composeService: 'batch' }),
+      logTailMax: null,
+      stopTimeoutMax: 30,
+    },
+  }),
   row({ kind: 'role', id: 'r-admin', label: 'administrator role of sample-admin', approvable: false, blockedReason: 'single_administrator', needs: 'none_in_phase_1' }),
   row({ kind: 'address', id: 'addr-1', label: 'notification address of user sample-restored', sourceState: null, approvable: false, blockedReason: 'needs_reverification', needs: 'reverification' }),
 ];

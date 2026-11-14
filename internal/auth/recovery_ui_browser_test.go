@@ -285,3 +285,33 @@ func TestRecoveryUIBrowser(t *testing.T) {
 		}
 	}
 }
+
+// TestRecoveryUIBrowserPhone runs the restore-and-reapproval scenario at a 390x844 phone viewport in both colour schemes (P1.18.4 round-1 review, FC4-1).
+// The scenario itself measures that the exact-authority sentence of a rule row and of the confirmation keeps most of the row width instead of a
+// squeezed column, that the page does not scroll sideways, and that the checkbox name is the exact sentence; the test requires that those phone-only
+// assertions actually ran, so a script that silently skipped them (a wrong viewport) fails here.
+func TestRecoveryUIBrowserPhone(t *testing.T) {
+	for _, engine := range browserEngines(t) {
+		for _, scheme := range []string{"light", "dark"} {
+			t.Run(engine+"/restore-flows-phone/"+scheme, func(t *testing.T) {
+				fixture := startRecoveryUIFixture(t)
+				ctx, cancel := context.WithTimeout(t.Context(), 8*time.Minute)
+				defer cancel()
+				script := filepath.Join("..", "..", "web", "tests", "recovery-ui-browser.mjs")
+				cmd := exec.CommandContext(ctx, "node", script, "restore-flows", scheme, fixture.origin, fixture.control)
+				cmd.Env = append(browserEnv(engine, fixture), "MANDATARY_VIEWPORT=390x844")
+				output, err := cmd.CombinedOutput()
+				if err != nil {
+					if secretLookingOutput.Match(output) {
+						t.Fatalf("browser scenario failed and its output looked secret-bearing, so it is not shown: %v", err)
+					}
+					t.Fatalf("browser scenario failed: %v\n%s", err, output)
+				}
+				if !strings.Contains(string(output), `"phoneChecks":true`) {
+					t.Fatalf("the phone-only layout assertions did not run:\n%s", output)
+				}
+				t.Logf("%s", output)
+			})
+		}
+	}
+}

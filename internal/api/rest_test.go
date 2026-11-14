@@ -630,3 +630,46 @@ func TestOperationCatalogIsExactlyTheSixApprovedKeysAndUnsupportedOnesAreAbsent(
 		}
 	}
 }
+
+// P1.18.4 P113-L2: the exact Classify contract for context errors. context.Canceled is
+// canceled/499 and context.DeadlineExceeded is timeout/504 with their fixed messages,
+// whatever wraps them, and neither can ever be classified as a 403 denial. On an
+// UNSANITIZED joined cancellation+deadline the deadline is checked first (504); the
+// shared service sanitizes before the adapters see an error, so the observable service
+// precedence is documented in docs/operations.md and tested in internal/ops.
+func TestClassifyContextErrorContractIsCanceled499AndTimeout504NeverForbidden(t *testing.T) {
+	const canary = "CANARY_CAUSE_P1184_0123456789"
+	cases := []struct {
+		name   string
+		err    error
+		status int
+		code   string
+	}{
+		{"canceled", context.Canceled, 499, api.CodeCanceled},
+		{"wrapped canceled", fmt.Errorf("%s: %w", canary, context.Canceled), 499, api.CodeCanceled},
+		{"deadline", context.DeadlineExceeded, 504, api.CodeTimeout},
+		{"wrapped deadline", fmt.Errorf("%s: %w", canary, context.DeadlineExceeded), 504, api.CodeTimeout},
+		{"joined cancel+deadline", errors.Join(context.Canceled, context.DeadlineExceeded), 504, api.CodeTimeout},
+		{"joined deadline+cancel", errors.Join(context.DeadlineExceeded, context.Canceled), 504, api.CodeTimeout},
+		{"joined cause+cancel", errors.Join(errors.New(canary), context.Canceled), 499, api.CodeCanceled},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			p := api.Classify(c.err)
+			if p.Status != c.status || p.Code != c.code {
+				t.Fatalf("Classify = %d %s, want %d %s", p.Status, p.Code, c.status, c.code)
+			}
+			if p.Code == api.CodeForbidden || p.Status == http.StatusForbidden || p.Reason != "" {
+				t.Fatalf("a context error classified as a denial: %+v", p)
+			}
+			if strings.Contains(p.Message, canary) {
+				t.Fatalf("cause text leaked into the fixed message: %q", p.Message)
+			}
+			// The same table backs the structured MCP tool error.
+			q := api.ProblemOf(c.code, "")
+			if q.Status != c.status || q.Message != p.Message {
+				t.Fatalf("ProblemOf(%s) = %d %q, want %d %q", c.code, q.Status, q.Message, c.status, p.Message)
+			}
+		})
+	}
+}

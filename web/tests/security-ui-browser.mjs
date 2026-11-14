@@ -6,7 +6,7 @@ import { engineName, launchEngine, viewport } from './engine.mjs';
 import { _collectViolationsForTest, auditAccessibility } from './a11y-audit.mjs';
 import { allowsAppRequest, appOrigin, control, controlBase, rawRequest, scanSurfaces, totpCode } from './admin-ui-lib.mjs';
 
-/* global console, document */
+/* global console, document, window, getComputedStyle, requestAnimationFrame */
 
 // Account-security browser tests (P1.16.4) against the REAL services (internal/auth/security_ui_browser_test.go
 // starts them behind synthetic loopback TLS and a loopback SMTP receiver). One scenario per invocation, in one
@@ -35,8 +35,8 @@ const observed = { blocked: [], console: [], errors: [], requests: [], responses
 const pending = [];
 const canaries = new Set();
 
-async function newContext() {
-  const context = await browser.newContext({ ignoreHTTPSErrors: true, serviceWorkers: 'block', colorScheme: scheme, viewport: viewport() });
+async function newContext(size = viewport()) {
+  const context = await browser.newContext({ ignoreHTTPSErrors: true, serviceWorkers: 'block', colorScheme: scheme, viewport: size });
   await context.route('**/*', (route) => {
     const request = route.request();
     if (allowsAppRequest(origin, request.url(), request.method())) return route.continue();
@@ -350,6 +350,148 @@ async function securityFlows() {
 }
 
 // ───────────────────────── scenario: restricted recovery with a saved code ─────────────────────────
+
+/**
+ * Round-1 review (P116-L1): before the harness focuses anything itself, the PRODUCT must have moved focus to the reveal region (the documented
+ * target: a tabindex=-1 section labelled by its heading, so a screen-reader user lands on the warning first), and the heading and the first
+ * warning ("This is the only time it will be shown") must be fully visible below the sticky header and inside the viewport, with no sideways scroll.
+ */
+async function assertProductFocusAndFirstWarning(page, label, headingName, { stickyHeader }) {
+  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  const measured = await page.evaluate(() => {
+    const active = document.activeElement;
+    const region = active && active.tagName === 'SECTION' && active.getAttribute('tabindex') === '-1' ? active : null;
+    const heading = region ? document.getElementById(region.getAttribute('aria-labelledby') ?? '') : null;
+    const warning = region ? Array.from(region.querySelectorAll('p')).find((p) => /only time it will be shown/.test(p.textContent ?? '')) : null;
+    const stuck = Array.from(document.querySelectorAll('header')).filter((h) => ['sticky', 'fixed'].includes(getComputedStyle(h).position));
+    const headerBottom = stuck.length ? Math.max(...stuck.map((h) => h.getBoundingClientRect().bottom)) : 0;
+    const box = (el) => (el ? { top: el.getBoundingClientRect().top, bottom: el.getBoundingClientRect().bottom, left: el.getBoundingClientRect().left, right: el.getBoundingClientRect().right } : null);
+    return {
+      focusedRegion: region !== null,
+      headingText: heading ? (heading.textContent ?? '').trim() : null,
+      heading: box(heading),
+      warning: box(warning),
+      headerBottom,
+      innerWidth: window.innerWidth,
+      innerHeight: window.innerHeight,
+      overflowX: document.documentElement.scrollWidth > window.innerWidth,
+    };
+  });
+  assert.equal(measured.focusedRegion, true, `${label}: the product did not move focus to the reveal region`);
+  assert.equal(measured.headingText, headingName, `${label}: the focused region is not the ${headingName} reveal`);
+  assert.equal(measured.headerBottom > 0, stickyHeader, `${label}: a sticky header is ${stickyHeader ? 'expected here (the signed-in shell)' : 'not expected on the public recovery page'}`);
+  for (const [name, rect] of [['heading', measured.heading], ['first warning', measured.warning]]) {
+    assert.ok(rect, `${label}: the ${name} was not found in the focused region`);
+    assert.ok(rect.top >= measured.headerBottom - 1, `${label}: the ${name} starts at ${Math.round(rect.top)}px, under the ${Math.round(measured.headerBottom)}px sticky header`);
+    assert.ok(rect.bottom <= measured.innerHeight + 1, `${label}: the ${name} ends at ${Math.round(rect.bottom)}px, below the ${measured.innerHeight}px fold`);
+    assert.ok(rect.left >= 0 && rect.right <= measured.innerWidth + 1, `${label}: the ${name} runs outside the ${measured.innerWidth}px screen`);
+  }
+  assert.equal(measured.overflowX, false, `${label}: the page scrolls sideways on a phone`);
+}
+
+/**
+ * P1.18.4 P116-L1: the recovery-code reveals on a PHONE-sized screen, permanently. The shared `html { scroll-padding-top: 6.5rem }` keeps a
+ * focused control below the sticky two-row admin header; this scenario proves it for BOTH reveals: the ten saved codes on Account security
+ * (inside the signed-in shell, whose header is sticky) and the one replacement code of restricted recovery. For each reveal the heading, the copy
+ * button, the acknowledgement checkbox and the hide button can be reached with the keyboard focus and are then NOT covered by the header (the
+ * topmost element at the centre of each is the control itself or its label), sit inside the viewport and cause no sideways scrolling. The run is
+ * always 390x844 whatever the default viewport, light and dark.
+ */
+async function assertRevealReachable(page, label, targets) {
+  const report = [];
+  for (const [name, locator] of targets) {
+    // The same scroll a keyboard user gets: focus() scrolls the element into view honouring scroll-padding.
+    await locator.evaluate((el) => {
+      if (!el.matches('button,input,a[href],select,textarea,[tabindex]')) el.setAttribute('tabindex', '-1');
+      el.focus();
+    });
+    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    const measured = await locator.evaluate((el) => {
+      const rect = el.getBoundingClientRect();
+      const stuck = Array.from(document.querySelectorAll('header')).filter((h) => getComputedStyle(h).position === 'sticky' || getComputedStyle(h).position === 'fixed');
+      const headerBottom = stuck.length ? Math.max(...stuck.map((h) => h.getBoundingClientRect().bottom)) : 0;
+      const x = Math.min(Math.max(rect.left + rect.width / 2, 1), window.innerWidth - 1);
+      const y = Math.min(Math.max(rect.top + Math.min(rect.height / 2, 12), 1), window.innerHeight - 1);
+      const hit = document.elementFromPoint(x, y);
+      const label = el.id ? document.querySelector(`label[for="${el.id}"]`) : null;
+      const owner = el.closest('label');
+      return {
+        top: rect.top,
+        bottom: rect.bottom,
+        headerBottom,
+        stickyHeaders: stuck.length,
+        covered: !(hit && (el.contains(hit) || hit.contains(el) || (label && label.contains(hit)) || (owner && owner.contains(hit)))),
+        overflowX: document.documentElement.scrollWidth > window.innerWidth,
+      };
+    });
+    report.push(`${name}: top ${Math.round(measured.top)} header ${Math.round(measured.headerBottom)}`);
+    assert.equal(measured.covered, false, `${label}: ${name} is covered by something else after focus (${report.join('; ')})`);
+    assert.ok(measured.top >= measured.headerBottom - 1, `${label}: ${name} sits under the sticky header after focus (${report.join('; ')})`);
+    assert.ok(measured.bottom <= 844 + 1, `${label}: ${name} is below the fold after focus (${report.join('; ')})`);
+    assert.equal(measured.overflowX, false, `${label}: ${name}: the page scrolls sideways on a phone`);
+  }
+  return report;
+}
+
+async function recoveryRevealPhone() {
+  const seed = await host.seed();
+  canaries.add(seed);
+  const context = await newContext({ width: 390, height: 844 });
+  const page = await context.newPage();
+  lastPage = page;
+  assert.equal(await page.evaluate(() => window.innerWidth), 390, 'a phone-sized viewport');
+  await signIn(page, seed);
+  await openSecurity(page);
+
+  // 1. The ten saved codes, inside the signed-in shell (sticky header).
+  await button(page, 'Create recovery codes').click();
+  const codes = await revealed(page, 'Your recovery codes');
+  for (const code of codes) canaries.add(code);
+  await assertProductFocusAndFirstWarning(page, 'saved codes', 'Your recovery codes', { stickyHeader: true });
+  const stuck = await page.evaluate(() => Array.from(document.querySelectorAll('header')).filter((h) => ['sticky', 'fixed'].includes(getComputedStyle(h).position)).length);
+  assert.ok(stuck >= 1, 'the signed-in shell has a sticky header: the scenario is only meaningful with one');
+  const tenReport = await assertRevealReachable(page, 'saved codes', [
+    ['reveal heading', page.getByRole('heading', { name: 'Your recovery codes' })],
+    ['Copy all codes button', page.getByRole('button', { name: 'Copy all codes' })],
+    ['acknowledgement checkbox', page.getByLabel('I have stored these codes somewhere safe.')],
+    ['Hide the codes button', page.getByRole('button', { name: 'Hide the codes' })],
+  ]);
+  await shot(page, 'recovery-codes-phone');
+  await auditAccessibility(page, 'saved codes on a phone');
+  await acknowledgeAndHide(page, 'I have stored these codes somewhere safe.', 'Hide the codes');
+  await button(page, 'Sign out').click();
+  await page.waitForURL(new URL('/login', origin).href);
+
+  // 2. The one replacement code of restricted recovery.
+  await page.goto(new URL('/recovery', origin).href);
+  await page.getByRole('form', { name: 'Recover access' }).waitFor();
+  await theme(page);
+  await field(page, 'Username').fill(USER);
+  await field(page, 'Password').fill(PASSWORD);
+  await field(page, 'Recovery code').fill(codes[0]);
+  await button(page, 'Continue').click();
+  await page.getByText(/Recovery code accepted/).waitFor();
+  const [replacement] = await revealed(page, 'Your replacement recovery code');
+  canaries.add(replacement);
+  await assertProductFocusAndFirstWarning(page, 'replacement code', 'Your replacement recovery code', { stickyHeader: false });
+  assert.equal(await page.getByRole('button', { name: 'Copy all codes' }).count(), 0, 'one code is not "all codes"');
+  const copy = page.getByRole('button', { name: 'Copy code', exact: true });
+  await copy.waitFor();
+  const oneReport = await assertRevealReachable(page, 'replacement code', [
+    ['reveal heading', page.getByRole('heading', { name: 'Your replacement recovery code' })],
+    ['Copy code button', copy],
+    ['acknowledgement checkbox', page.getByLabel('I have stored this code somewhere safe.')],
+    ['Hide the code button', page.getByRole('button', { name: 'Hide the code' })],
+  ]);
+  await shot(page, 'recovery-reveal-phone');
+  await auditAccessibility(page, 'recovery reveal on a phone');
+  await acknowledgeAndHide(page, 'I have stored this code somewhere safe.', 'Hide the code');
+  await step('phone reveal hidden').scan(page, [replacement, PASSWORD, ...codes]);
+  void tenReport;
+  void oneReport;
+  await finish([PASSWORD, seed]);
+  await context.close();
+}
 
 async function recoveryFlow() {
   const seed = await host.seed();
@@ -851,6 +993,28 @@ async function auditSelfCheck() {
     document.getElementById('d').open = true;
   });
   assert.equal((await auditAccessibility(page, 'open disclosure')).tabStops, 4, 'an open disclosure’s controls are expected and reached');
+  // P1.18.4 P116-L4: colours the engine reports in other colour spaces are converted, not skipped, and an unverifiable
+  // text colour or background fails the audit unless a bounded allowance is named.
+  await page.setContent(
+    '<!doctype html><html lang="en"><head><title>mix</title></head><body><main><h1>Mixed</h1>' +
+      '<p id="low" style="color:color-mix(in oklab, #808080 100%, #777777 0%);background:oklch(0.62 0 0)">Low contrast text that is not rgb</p>' +
+      '<p id="mixed-low" style="color:color-mix(in oklab, #cccccc 50%, #ffffff);background:#ffffff">Pale mixed text on white</p>' +
+      '<p id="fine" style="color:color-mix(in oklab, #000000 90%, #000000);background:#ffffff">Dark mixed text on white</p></main></body></html>',
+  );
+  const mixed = await page.evaluate(_collectViolationsForTest);
+  const lows = mixed.violations.filter((v) => v.rule === 'color-contrast').map((v) => v.node);
+  assert.ok(lows.some((node) => node.includes('p#low')), `an oklch background with colour-mix text must be judged, not skipped; got ${lows}`);
+  assert.ok(lows.some((node) => node.includes('p#mixed-low')), 'a pale colour-mix text must be flagged');
+  assert.ok(!lows.some((node) => node.includes('p#fine')), 'dark colour-mix text on white passes');
+  assert.equal(mixed.unverifiableContrast, 0, 'engine-parsable colours are verifiable');
+  await page.setContent(
+    '<!doctype html><html lang="en"><head><title>img</title></head><body><main><h1>Image</h1>' +
+      '<p id="img" style="color:#000;background-image:linear-gradient(#fff,#eee)">Text over a gradient</p></main></body></html>',
+  );
+  const gradient = await page.evaluate(_collectViolationsForTest);
+  assert.equal(gradient.unverifiableContrast, 1, 'a background image is counted as unverifiable');
+  await assert.rejects(auditAccessibility(page, 'gradient'), /1 text contrast checks were unverifiable \(allowed 0\)/);
+  assert.equal((await auditAccessibility(page, 'gradient allowance', { allowUnverifiableContrast: 1 })).unverifiableContrast, 1, 'a named, bounded allowance is the only way through');
   await context.close();
 }
 
@@ -858,6 +1022,7 @@ try {
   if (scenario === 'a11y-selfcheck') await auditSelfCheck();
   else if (scenario === 'security-flows') await securityFlows();
   else if (scenario === 'recovery-flow') await recoveryFlow();
+  else if (scenario === 'recovery-reveal-phone') await recoveryRevealPhone();
   else if (scenario === 'key-flows') await keyFlows();
   else if (scenario === 'denial-matrix') await denialMatrix();
   else if (scenario === 'policy-flows') await policyFlows();

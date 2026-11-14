@@ -111,6 +111,7 @@ MANDATARY_GO_VERSION=1.26.11 make install check negative-control
 | `make tool-security` | Require existing pinned govulncheck; build/verify sqlc, then scan BOTH binary and isolated tool source. Automatically required by `make security`. |
 | `make tools` | Build pinned govulncheck/gosec/golangci-lint from separate `tools/go.mod` + `tools/go.sum` into ignored `bin/tools`. Requires primary Go. |
 | `make security` | Run all three Go scanners and `npm audit --audit-level=high`; tool/advisory errors fail the command. Requires install/build/tools. |
+| `make test` (findings ledger) | `scripts/findings-ledger.test.mjs` checks `docs/findings-ledger.json` and `docs/findings-ledger.md` (P1.18.4): every row has a valid status, every fixed row names an existing regression test, every gate names an existing owner card and its missing evidence, and the two files agree. `scripts/ci-budget.test.mjs` pins the CI job budgets and `scripts/dependency-residuals.test.mjs` pins the remediated advisory versions. |
 | `make negative-control` | Inject an intentionally invalid route-denial expectation into the ordinary race suite; require exit 1 and exact assertion signature. Build/setup/race-detector failures do not qualify. |
 | `make dev` | Build and serve the embedded SPA at `http://127.0.0.1:8080`; Ctrl-C to stop. |
 | `make frontend-dev` | Vite loopback-only frontend iteration; no API proxy or Docker access. |

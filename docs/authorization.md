@@ -148,7 +148,15 @@ operational requests against the missing target deny with `ReasonTargetMissing`.
   policy-epoch move (binding intact, context live, backend unchanged and safe)
   re-evaluates on a fresh snapshot with the epoch re-captured (bounded to 16
   attempts, then fails closed); concurrent `NotifyPolicyChange` calls are
-  serialized so no-op notifications cannot cancel healthy leases.
+  serialized so no-op notifications cannot cancel healthy leases. That guarantee
+  holds **only with a live, bounded notification context**: a direct caller that
+  passes an already canceled or expired context (for example an un-detached HTTP
+  request context) still advances the epoch, but every revalidation then fails
+  closed and cancels the lease (`TestDirectNotifyWithEndedContextFailsClosedWhileLiveContextKeepsLease`).
+  Direct callers must detach request cancellation (`context.WithoutCancel`) and
+  retain a finite bound (`context.WithTimeout`); the supported bridge is
+  `ops.Service.NotifyAuthorityChange` (`TestNotifyAuthorityChangeIsNotKilledByRequestContext`).
+  Epoch/revocation work is never skipped and the bound is never removed.
 - Decisions are private issuance-bound handles: validation requires the issuing
   authorizer, endpoint backend revision, and explicit invalidation revision.
   Rebinding even the same backend, remove/re-register, and `InvalidateAll` cannot
@@ -159,6 +167,13 @@ operational requests against the missing target deny with `ReasonTargetMissing`.
   Shared backend/target failures (protected or missing target, unverified or
   unsafe backend) cancel affected peers even when co-observed with the caller's
   own cancellation; only a pure cancellation with no shared fault stays local.
+  "Pure" is decided structurally, never by error text: every leaf of the whole
+  error tree (`Unwrap() error` and `Unwrap() []error`, bounded to 64 nodes) must be
+  `context.Canceled` or `context.DeadlineExceeded` and the backend must still be
+  verified. A joined or wrapped generic metadata fault co-observed with the
+  cancellation (`errors.Join(context.Canceled, fault)`) is an independent fault
+  and cancels the affected peers (`TestOnlyContextCausesWalksWholeErrorTree`,
+  generic/multi-wrap rows of `TestLeaseSharedFaultNotMaskedByCallerCancellation`).
   Policy notification
   revalidates every active lease.
 - Future session creation/authentication/activity or token issuance, negative
@@ -168,6 +183,13 @@ operational requests against the missing target deny with `ReasonTargetMissing`.
 - Successful `Decision` and `*Lease` handles redact all `fmt` verbs and implement
   `slog.LogValuer`; private verification credentials are never log projections.
   Handles are trusted in-process values, not serialized capability tokens.
+  The guarantee is exactly: direct formatting of these handles and of a
+  `PrincipalCredentials` value, plus logging through `internal/logging.New`,
+  which drops every unknown `slog.Any` value (nested holders, nested groups,
+  `WithAttrs`/`WithGroup` values and dynamic preformatted messages) before
+  `Resolve`/`String`/JSON/reflection can run. Arbitrary direct `fmt` of a
+  container holding credentials in unexported fields is prohibited and outside
+  the guarantee; no second sanitizer exists or is needed.
 - `RegisterBackend`, `RemoveBackend`, `InvalidateAll`, and `Close` immediately
   cancel affected active leases.
 
@@ -177,7 +199,7 @@ operational requests against the missing target deny with `ReasonTargetMissing`.
 | --- | --- | --- |
 | Precedence order (`Self -> 401 -> DENY -> ALLOW -> Default 403`) | `TestAuthorizerPrecedenceOrder` (`authorizer_test.go`) | P1.13 (service), P1.14 (REST/MCP status codes) |
 | Storage fail-closed & canary/error/log redaction | `TestStorageFailClosedAndDenialRedaction` (`authorizer_test.go`) | P1.13, P1.14 |
-| Cross-product of direct/group `DENY`-overrides-`ALLOW`, 20 principal/credential states, endpoint selector (`ep_local` vs `ep_foreign`), and all 6 operations (1,560 subtests) | `TestAuthorizationCrossProductMatrix` (`matrix_test.go`) | C2 (live P1.08–P1.10 credential issuers; P1.10 issuer/administration delivered, see [agent-credentials.md](agent-credentials.md)) |
+| Cross-product of direct/group `DENY`-overrides-`ALLOW`, 20 principal/credential states, endpoint selector (`ep_local` vs `ep_foreign`), and all 6 operations (3,360 subtests: 14 policy rows x 6 operations x 2 endpoints x 20 principal states; direct and group DENY rows are separate, the fixture asserts the DENY subject kind and every row makes zero operational backend attempts) | `TestAuthorizationCrossProductMatrix`, `TestMissingAgentCredentialRefusedAcrossAllOperations` (`matrix_test.go`) | C2 (live P1.08–P1.10 credential issuers; P1.10 issuer/administration delivered, see [agent-credentials.md](agent-credentials.md)) |
 | Agent owner non-inheritance (`owner_user_id`, `owner_group_id`) & `super_admin` zero implicit container grants | `TestAgentOwnerNonInheritanceAndAdminZeroGrant` (`matrix_test.go`) | P1.13, P1.14 |
 | Assurance & session purpose boundaries (`preauth`, `setup`, `recovery`, AAL1 vs AAL2, `webauthn`, admin MFA, untrusted caller fields) | `TestAssuranceAndPurposeBoundaries` (`matrix_test.go`) | C2, P1.08, P1.09 |
 | Selector evaluation matrix (exact, glob, compose guardrails, image pattern, container ID pin, image digest pin, cross-endpoint, protected labels) | `TestSelectorEvaluationMatrix` (`selector_test.go`) | P1.16 (UI policy editor) |
@@ -190,9 +212,9 @@ operational requests against the missing target deny with `ReasonTargetMissing`.
 | Revocation publication fence with held real SQLite snapshots and zero post-revocation dispatch | `TestPolicyRevocationPublicationFence` (`publication_test.go`) | P1.13 dispatch integration |
 | Permanent issuer/backend/invalidation bindings; sequential and concurrent rebind/invalidation | `TestDecisionIssuingBindings`, `TestConcurrentDecisionBindingPublication` (`binding_test.go`) | SELF-13, P1.13 |
 | Principal-local failure isolation and shared-failure cancellation | `TestSharedPolicyLeaseFailureIsolation` (`lease_isolation_test.go`) | C2, P1.13 |
-| Joined shared-fault vs caller cancellation, no-op notification survival, concurrent notifications, bounded epoch-churn retry | `TestLeaseSharedFaultNotMaskedByCallerCancellation`, `TestLeaseBackendUnsafeAtPublicationNotMaskedByCancellation`, `TestLeaseSurvivesOverlappingNoopNotification`, `TestConcurrentNoopNotificationsKeepHealthyLeases`, `TestConcurrentRevocationAmongNoopNotificationsStillCancels`, `TestEpochChurnExhaustsBoundedRetryFailClosed` (`lease_fault_scope_test.go`) | C2, P1.13 |
+| Joined shared-fault vs caller cancellation, no-op notification survival, concurrent notifications, bounded epoch-churn retry | `TestLeaseSharedFaultNotMaskedByCallerCancellation`, `TestLeaseBackendUnsafeAtPublicationNotMaskedByCancellation`, `TestLeaseSurvivesOverlappingNoopNotification`, `TestConcurrentNoopNotificationsKeepHealthyLeases`, `TestConcurrentRevocationAmongNoopNotificationsStillCancels`, `TestEpochChurnExhaustsBoundedRetryFailClosed`, `TestDirectNotifyWithEndedContextFailsClosedWhileLiveContextKeepsLease` (`lease_fault_scope_test.go`), `TestOnlyContextCausesWalksWholeErrorTree` (`error_tree_internal_test.go`) | C2, P1.13 |
 | Observable clock rollback and future evidence denial with healthy boundary controls | `TestObservableClockRollbackDenies` (`clock_rollback_test.go`), existing expiry/overlap suite | RESTORE-04 bounded domain enforcement; P1.18 owns actual restore |
-| Human/agent success-path decision/lease `fmt`, JSON and text/JSON structured-log canaries | `TestSuccessfulAuthorizationSecretRedaction` (`redaction_test.go`) | TD §9.3; P1.13/P1.14 adapters |
+| Human/agent success-path decision/lease `fmt`, JSON and text/JSON structured-log canaries | `TestSuccessfulAuthorizationSecretRedaction` (`redaction_test.go`); supported logger boundary (`logging.New`): `TestSafeLoggerDropsCredentialHoldersBeforeAnyFormattingHook` (`redaction_test.go`) | TD §9.3; P1.13/P1.14 adapters |
 | **C1** integrated substrate gate (fresh/reopened SQLite + `MasterKey` secret store + tamper checks + `Authorizer` + `MockBackend` + log redaction + 0 operational calls on rejected fixtures) | `TestC1IntegratedSubstrateCheckpoint` (`c1_substrate_test.go`) | Independent reviewer gate check; P1.13/P1.14 |
 
 ## `SELF-01`–`SELF-13` service-level coverage and remaining boundaries

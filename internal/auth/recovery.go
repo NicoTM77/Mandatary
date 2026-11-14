@@ -24,10 +24,29 @@ func (RecoveryCodes) String() string          { return "[REDACTED]" }
 func (RecoveryCodes) GoString() string        { return "[REDACTED]" }
 func (r *RecoveryCodes) ExportOnce() []string { out := r.codes; r.codes = nil; return out }
 
+// RecoveryResult is the export-once outcome of Recover. The raw capability and the replacement
+// code are secrets; the capability's identifier, expiry and whether the TOTP method is permitted
+// are NON-secret metadata captured in the SAME successful transaction that consumed the saved
+// code, so the caller never needs a second storage read before it reveals the replacement code
+// (P1.18.4 P116-L6: that second read was the one avoidable window in which a consumed code and
+// a replacement could be lost together).
 type RecoveryResult struct {
 	capability  []byte
 	replacement RecoveryCodes
+	meta        RecoveryCapabilityMeta
 }
+
+// RecoveryCapabilityMeta is the non-secret description of a freshly issued recovery capability.
+type RecoveryCapabilityMeta struct {
+	ID        string
+	ExpiresAt int64
+	// TOTP reports whether TOTP re-enrolment is permitted (false for a WebAuthn-only account).
+	// WebAuthn availability is deployment configuration and is applied by the HTTP layer.
+	TOTP bool
+}
+
+// Meta returns the non-secret capability metadata. It stays valid after ExportOnce.
+func (r *RecoveryResult) Meta() RecoveryCapabilityMeta { return r.meta }
 
 func (RecoveryResult) String() string   { return "[REDACTED]" }
 func (RecoveryResult) GoString() string { return "[REDACTED]" }
@@ -36,6 +55,9 @@ func (r *RecoveryResult) ExportOnce() ([]byte, []string) {
 	r.capability = nil
 	return cap, r.replacement.ExportOnce()
 }
+
+// recoveryCapabilitySeconds is the lifetime of a recovery capability (ten minutes).
+const recoveryCapabilitySeconds = 600
 
 func newRecoveryCode() (string, string, error) {
 	id, e := randomID()
@@ -220,13 +242,13 @@ func (l *Lifecycle) Recover(ctx context.Context, name string, password []byte, c
 			return ErrDenied
 		}
 		digest := sha256.Sum256(cap)
-		if e = q.CreateRecoveryCapability(ctx, store.CreateRecoveryCapabilityParams{ID: id, UserID: u.ID, SecretHash: digest[:], CredentialGeneration: c.CredentialGeneration, SessionGeneration: c.SessionGeneration, PasswordRevision: u.PasswordRevision, CreatedAt: now, ExpiresAt: now + 600}); e != nil {
+		if e = q.CreateRecoveryCapability(ctx, store.CreateRecoveryCapabilityParams{ID: id, UserID: u.ID, SecretHash: digest[:], CredentialGeneration: c.CredentialGeneration, SessionGeneration: c.SessionGeneration, PasswordRevision: u.PasswordRevision, CreatedAt: now, ExpiresAt: now + recoveryCapabilitySeconds}); e != nil {
 			return e
 		}
 		if e = l.enqueue(ctx, q, c, u.ID, "recovery_codes_replaced", now); e != nil {
 			return e
 		}
-		result = RecoveryResult{capability: cap, replacement: RecoveryCodes{codes: []string{replacement}}}
+		result = RecoveryResult{capability: cap, replacement: RecoveryCodes{codes: []string{replacement}}, meta: RecoveryCapabilityMeta{ID: id, ExpiresAt: now + recoveryCapabilitySeconds, TOTP: u.MfaRequirement != "webauthn"}}
 		return nil
 	}, nil)
 	if e != nil || len(result.capability) == 0 {

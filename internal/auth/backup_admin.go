@@ -141,6 +141,9 @@ func (a *Admin) RestoreBackup(ctx context.Context, secret, archive []byte, ackno
 		return RestoreResult{}, err
 	}
 	defer verified.Wipe() // the opened credential material lives no longer than this call
+	if a.afterVerify != nil {
+		a.afterVerify(verified)
+	}
 	report, err := a.backup.Restore(ctx, verified, backup.RestoreOptions{Initiator: backup.InitiatorAdmin, Authorize: a.backupAuthorizer(secret), AcknowledgeUnauthenticated: acknowledgeUnauthenticated})
 	if err != nil && !backup.Quarantined(err) {
 		return RestoreResult{}, err

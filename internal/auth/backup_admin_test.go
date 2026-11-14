@@ -2,13 +2,16 @@ package auth
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/NicoTM77/Mandatary/internal/backup"
+	"github.com/NicoTM77/Mandatary/internal/store"
 )
 
 // P1.18 administrative export/restore over the real Browser boundary and the real fresh-administrator
@@ -408,5 +411,70 @@ func TestRestoredRecordsStayInactiveUntilNamedAndApprovedAfterTheRecoveryCeremon
 	// Approval is not credential reissuance: no token or factor became usable.
 	if h.scalar(`SELECT count(*) FROM agent_credentials WHERE state='active'`) != 0 {
 		t.Fatal("an approval revived a credential")
+	}
+}
+
+// P1.18.4 P118-L3: Admin.RestoreBackup owns the opened archive and wipes it on EVERY exit path
+// after Verify (success, authorization lost before the transition, failed import after the
+// transition). A wiped archive refuses any further restore, which is how the test observes the
+// wipe without reading secret bytes: the archive the Admin used is captured through a test-only
+// seam and an independent host-initiated restore of it must be refused as invalid on every
+// path. A missing deferred wipe makes that second restore succeed (it would import the
+// archive), so the check kills the mutant. No seed or token bytes are exported or scanned.
+func TestAdminRestoreWipesTheOpenedArchiveOnEveryExitPathAfterVerify(t *testing.T) {
+	t.Parallel()
+	allowAll := func(context.Context, *store.Queries, store.InstallationControl, int64) error { return nil }
+	type scenario struct {
+		name string
+		// prepare returns the archive and an action run between verification and the restore.
+		prepare func(h *adminHTTP) (archive []byte, between func())
+		wantErr func(error) bool
+	}
+	scenarios := []scenario{
+		{"committed restore", func(h *adminHTTP) ([]byte, func()) { return h.exportArchive("full"), nil },
+			func(err error) bool { return err == nil }},
+		{"authorization lost between verification and the transition", func(h *adminHTTP) ([]byte, func()) {
+			return h.exportArchive("full"), func() { h.exec(`UPDATE administrative_roles SET state='disabled' WHERE id='adm'`) }
+		}, func(err error) bool { return errors.Is(err, backup.ErrDenied) && !backup.Quarantined(err) }},
+		{"step-up evidence ended between verification and the transition", func(h *adminHTTP) ([]byte, func()) {
+			return h.exportArchive("full"), func() { h.clock.Advance(DefaultStepUpWindow + time.Second) }
+		}, func(err error) bool { return err != nil && !backup.Quarantined(err) }},
+		{"failed import after the quarantine transition", func(h *adminHTTP) ([]byte, func()) {
+			h.group("ops")
+			archive := h.exportArchive("full")
+			for _, ev := range []string{"INSERT", "UPDATE"} {
+				h.exec(`CREATE TRIGGER p1184_wipe_group_` + strings.ToLower(ev) + ` BEFORE ` + ev + ` ON groups BEGIN SELECT RAISE(ABORT,'synthetic import failure'); END`)
+			}
+			return archive, nil
+		}, func(err error) bool { return backup.Quarantined(err) }},
+	}
+	for _, sc := range scenarios {
+		t.Run(sc.name, func(t *testing.T) {
+			t.Parallel()
+			h := newBackupHTTP(t)
+			archive, between := sc.prepare(h)
+			var captured *backup.Verified
+			h.a.afterVerify = func(v *backup.Verified) {
+				captured = v
+				if between != nil {
+					between()
+				}
+			}
+			_, err := h.a.RestoreBackup(t.Context(), h.secret, archive, false)
+			if !sc.wantErr(err) {
+				t.Fatalf("unexpected restore outcome: %v", err)
+			}
+			if captured == nil {
+				t.Fatal("the archive was never verified: the scenario proves nothing")
+			}
+			before := h.scalar(`SELECT restore_generation FROM installation_control`)
+			_, second := h.a.backup.Restore(t.Context(), captured, backup.RestoreOptions{Initiator: backup.InitiatorHost, Authorize: allowAll})
+			if !errors.Is(second, backup.ErrInvalid) {
+				t.Fatalf("the archive was not wiped on this path: a second restore returned %v", second)
+			}
+			if h.scalar(`SELECT restore_generation FROM installation_control`) != before {
+				t.Fatal("a refused second restore advanced the generation")
+			}
+		})
 	}
 }

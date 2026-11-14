@@ -59,6 +59,9 @@ function SecurityPage({ api, view, navigate, refresh }: SignedInContext) {
   const [totpMeta, setTotpMeta] = useState({ id: '', algorithmLabel: 'SHA-256', digits: 6, period: 30 });
   const [removal, setRemoval] = useState<{ kind: 'totp' | 'webauthn'; id: string } | undefined>(undefined);
   const [removing, setRemoving] = useState(false);
+  // AUTH-08-L4: the inventory is re-read when a removal is asked for, so the warning reflects the account's current methods and not a stale page.
+  const [removalCheck, setRemovalCheck] = useState<'checking' | 'fresh' | 'failed'>('fresh');
+  const removalAsk = useRef(0);
   const [key, setKey] = useState<WebAuthnRegisterState>({ kind: 'idle' });
   const [codes, setCodes] = useState<Codes>({ kind: 'idle' });
   const [addr, setAddr] = useState<AddressListState>({ kind: 'idle' });
@@ -367,11 +370,33 @@ function SecurityPage({ api, view, navigate, refresh }: SignedInContext) {
         removing={removing}
         onAddTotp={addTotp}
         onAddKey={addKey}
+        recoveryRemaining={inv.recoveryRemaining}
+        removalCheck={removalCheck}
         onAskRemove={(kind, id) => {
           setBanner(null);
           setRemoval({ kind, id });
+          setRemovalCheck('checking');
+          const ticket = ++removalAsk.current;
+          void sec.inventory().then((result) => {
+            if (ticket !== removalAsk.current) return; // a newer ask or a cancel superseded this read
+            if (result.ok) {
+              setInv(result.data);
+              const stillThere = kind === 'totp' ? result.data.totp.some((row) => row.id === id) : result.data.keys.some((row) => row.id === id);
+              if (!stillThere) {
+                // Stale page: the method is already gone. Nothing is removed and the person is told.
+                setRemoval(undefined);
+                setBanner({ tone: 'warning', title: 'That sign-in method is already gone', body: 'The list has been refreshed. Nothing was changed.' });
+                return;
+              }
+              setRemovalCheck('fresh');
+            } else if (result.status === 401) navigate('/login');
+            else setRemovalCheck('failed');
+          });
         }}
-        onCancelRemove={() => setRemoval(undefined)}
+        onCancelRemove={() => {
+          removalAsk.current++;
+          setRemoval(undefined);
+        }}
         onConfirmRemove={confirmRemoval}
       />
       <RecoveryCodes

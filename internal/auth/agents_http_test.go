@@ -280,10 +280,26 @@ func wrongCSRF(original string) string {
 		return "A"
 	}
 	first := byte('A')
-	if original != "" && original[0] == 'A' {
+	if original[0] == 'A' { // original is nonempty here: the empty case returned above
 		first = 'B'
 	}
 	return string(first) + original[1:]
+}
+
+// P1.18.4 P114-I4: boundary inputs of the helper itself, with synthetic strings only. The
+// result differs from every nonempty input and keeps its length and tail (so only the
+// first character is wrong), and the empty input still yields a distinct nonempty token.
+func TestWrongCSRFHelperDiffersForEmptyAAndNonAInputs(t *testing.T) {
+	t.Parallel()
+	for _, in := range []string{"", "A", "B", "AA", "Abc_-", "Bbc_-", "zzzzzzzz", "A" + strings.Repeat("x", 42), "x" + strings.Repeat("A", 42)} {
+		got := wrongCSRF(in)
+		if got == in || got == "" {
+			t.Fatalf("wrongCSRF(%q) = %q must be a different, nonempty token", in, got)
+		}
+		if in != "" && (len(got) != len(in) || got[1:] != in[1:]) {
+			t.Fatalf("wrongCSRF(%q) = %q must keep the length and tail", in, got)
+		}
+	}
 }
 
 func TestWrongCSRFFixtureAlwaysDiffersFromTheOriginal(t *testing.T) { // P1.13 owner observation O1

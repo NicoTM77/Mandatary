@@ -311,4 +311,8 @@ export interface RulesScreenProps {
   onAsk: (action: LifecycleAction, id: string) => void;
   onCancel: () => void;
   onConfirm: () => void;
+  /** Show only the rules that name this subject directly (by kind and immutable id). Set from the `#subject=` link; absent shows every rule. */
+  subjectFilter?: SubjectRef | null;
+  /** Leave the subject filter and show every rule again. */
+  onClearSubjectFilter?: () => void;
 }

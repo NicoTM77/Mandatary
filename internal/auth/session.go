@@ -167,6 +167,9 @@ type Sessions struct {
 	origin   *url.URL
 	random   io.Reader
 	maxLive  int
+	// afterRecover is a test-only seam (nil in production) that runs between the committed
+	// consumption of a saved code and the derivation of the HTTP response (P1.18.4 P116-L6).
+	afterRecover func()
 }
 
 // NewSessions binds the session service to the trusted HTTPS origin already

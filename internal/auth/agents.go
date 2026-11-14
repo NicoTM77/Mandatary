@@ -95,6 +95,10 @@ type Admin struct {
 	backup *backup.Service
 	// safetyReset drops the shared self-protection proof (backup_admin.go, WithSafetyReset).
 	safetyReset atomic.Pointer[func()]
+	// afterVerify is a test-only observation seam (nil in production): it receives the opened
+	// archive this Admin owns, right after Verify, so a test can prove it is wiped on every exit
+	// path (P1.18.4 P118-L3). It never sees secrets the Verified value does not already export.
+	afterVerify func(*backup.Verified)
 }
 
 // NewAdmin binds the service to the lifecycle's repository and clock. notify, when
@@ -635,6 +639,9 @@ func (a *Admin) IssueCredential(ctx context.Context, secret []byte, agentID stri
 // exactly [now, now+overlap): the verifier rejects it at the boundary second.
 func (a *Admin) RotateCredential(ctx context.Context, secret []byte, agentID string, req RotateRequest) (RotationResult, error) {
 	var out RotationResult
+	// keptPredecessor: a non-immediate rotation left a rotated-out credential live with its
+	// grace, so an undelivered successor is worth discarding on a failed notification.
+	keptPredecessor := false
 	err := a.mutate(ctx, secret, func(ctx context.Context, q *store.Queries, c store.InstallationControl, now int64) error {
 		ag, e := usableAgent(ctx, q, c, agentID)
 		if e != nil {
@@ -669,6 +676,19 @@ func (a *Admin) RotateCredential(ctx context.Context, secret []byte, agentID str
 		rotated := map[string]bool{}
 		for _, cred := range live {
 			rotated[cred.ID] = true
+			if sole := len(live) == 1; !req.Immediate && sole && credentialStatus(c, cred, now) == CredentialOverlapping {
+				// The ONLY live credential is already inside its overlap window (its successor was
+				// revoked, or a failed rotation's undelivered successor was discarded). Two live
+				// credentials are allowed, so nothing has to be retired: the in-use credential keeps
+				// exactly its remaining approved grace. It is never extended (the overlap only
+				// shrinks) and never longer than the CURRENT configured maximum.
+				if limit := now + int64(a.settings.MaxOverlap/time.Second); cred.RotationOverlapUntil.Valid && cred.RotationOverlapUntil.Int64 > limit {
+					if n, e := q.ShortenMachineRecordOverlap(ctx, store.ShortenMachineRecordOverlapParams{ID: cred.ID, Until: sql.NullInt64{Int64: limit, Valid: true}}); e != nil || n != 1 {
+						return ErrAdminConflict
+					}
+				}
+				continue
+			}
 			if req.Immediate || credentialStatus(c, cred, now) == CredentialOverlapping {
 				if n, e := q.RetireAgentMachineRecord(ctx, store.RetireAgentMachineRecordParams{ID: cred.ID, AgentID: ag.ID, Now: sql.NullInt64{Int64: now, Valid: true}}); e != nil || n != 1 {
 					return ErrAdminConflict
@@ -692,6 +712,9 @@ func (a *Admin) RotateCredential(ctx context.Context, secret []byte, agentID str
 		for _, cred := range after {
 			if rotated[cred.ID] {
 				out.RotatedOut = append(out.RotatedOut, credentialView(c, cred, now))
+				if credentialStatus(c, cred, now) == CredentialOverlapping {
+					keptPredecessor = true
+				}
 			}
 		}
 		return nil
@@ -703,11 +726,38 @@ func (a *Admin) RotateCredential(ctx context.Context, secret []byte, agentID str
 		return RotationResult{}, err
 	}
 	if err = a.changed(ctx); err != nil {
-		clear(out.New.secret) // the rotation is durable but not acknowledged: never hand out the token
+		// The rotation is durable but not acknowledged: never hand out the token. Nobody holds
+		// it, so it is also discarded instead of being left as a live credential no one can
+		// use: that keeps the in-use predecessor's remaining grace intact for a retry (which
+		// then sees only that credential live, see above) and never counts a phantom credential
+		// against the two-live bound. Best effort: if this second write fails the state is
+		// exactly the durable rotation, still fail closed.
+		newID := out.New.Credential.ID
+		clear(out.New.secret)
 		out.New.secret = nil
+		if keptPredecessor {
+			a.discardUndeliveredCredential(context.WithoutCancel(ctx), secret, agentID, newID)
+		}
 		return RotationResult{}, err
 	}
 	return out, nil
+}
+
+// discardUndeliveredCredential revokes a credential that was durably issued by a rotation
+// whose notification failed, and only while it is still exactly what that rotation created
+// (active, never in an overlap window). Failures are deliberately silent: the caller already
+// returns the sanitized unavailable error and the durable state remains fail closed.
+func (a *Admin) discardUndeliveredCredential(ctx context.Context, secret []byte, agentID, credentialID string) {
+	_ = a.mutate(ctx, secret, func(ctx context.Context, q *store.Queries, c store.InstallationControl, now int64) error {
+		cred, e := q.GetMachineRecord(ctx, credentialID)
+		if e != nil || cred.AgentID != agentID || cred.State != "active" || cred.RotationOverlapUntil.Valid {
+			return nil // missing, foreign, already retired or already rotated out by a later call
+		}
+		if n, e := q.RetireAgentMachineRecord(ctx, store.RetireAgentMachineRecordParams{ID: cred.ID, AgentID: agentID, Now: sql.NullInt64{Int64: now, Valid: true}}); e != nil || n != 1 {
+			return ErrAdminConflict
+		}
+		return nil
+	})
 }
 
 // RevokeCredential retires one credential immediately and permanently. It is
@@ -737,8 +787,12 @@ func (a *Admin) RevokeCredential(ctx context.Context, secret []byte, agentID, cr
 	return a.changed(ctx)
 }
 
-// DisableAgent revokes every credential of the agent and then disables it. The
-// order matters: the schema forbids an active agent's credentials to outlive it.
+// DisableAgent revokes every credential of the agent and then disables it, in one
+// transaction. The order is defence in depth, not a schema guarantee: migration 00012
+// deliberately has NO trigger coupling agent state to credential state, so SQLite itself
+// would accept an active credential behind a non-active agent. What makes that state
+// harmless is the shared verifier, which rejects such a credential on every request
+// (TestCredentialBehindANonActiveAgentIsRejectedByTheVerifierNotByTheSchema).
 func (a *Admin) DisableAgent(ctx context.Context, secret []byte, agentID string) error {
 	err := a.mutate(ctx, secret, func(ctx context.Context, q *store.Queries, _ store.InstallationControl, now int64) error {
 		if !validPrincipalID(agentID) {

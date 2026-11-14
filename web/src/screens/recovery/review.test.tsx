@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { afterEach, expect, test, vi } from 'vitest';
-import { manifest, manifestApproved, manifestClean, manifestItems } from '../../gallery/recoveryFixtures';
+import { manifest, manifestApproved, manifestClean, manifestItems, sampleDigest } from '../../gallery/recoveryFixtures';
 import { ThemeProvider } from '../../theme';
 import { MAX_APPROVALS, type ApprovalState, type ManifestData, type ManifestRow, type ReviewScreenProps } from './contract';
 import { ReviewScreen } from './review';
@@ -23,11 +23,13 @@ function mount(ui: ReactElement, theme: 'light' | 'dark' = 'light') {
 
 const box = (name: string) => screen.getByRole('checkbox', { name }) as HTMLInputElement;
 const approveButton = () => screen.getByRole('button', { name: /^Approve (\d+ selected…|selected…)$/ }) as HTMLButtonElement;
-const row = (text: string) => {
-  const item = screen.getByText(text).closest('li');
-  if (!item) throw new Error(`no row for ${text}`);
+/** The row of one record by its stable kind and id (the page tags every row with it). Names can repeat across rows; ids cannot. */
+const record = (kind: string, id: string) => {
+  const item = document.querySelector(`li[data-record="${kind}:${id}"]`) as HTMLElement | null;
+  if (!item) throw new Error(`no row for ${kind}:${id}`);
   return within(item);
 };
+const digestOf = (kind: string, id: string) => sampleDigest(kind, id);
 
 /** Mounts mid-request and delivers the answer, which is the order every real outcome arrives in. */
 function answer(to: ApprovalState, extra: Partial<ReviewScreenProps> = {}) {
@@ -109,10 +111,10 @@ test('only records the service marks approvable have a checkbox; the rest say wh
   mount(<ReviewScreen {...props()} />);
   const approvable = manifestItems.filter((item) => item.decision === 'pending' && item.approvable);
   expect(screen.getAllByRole('checkbox')).toHaveLength(approvable.length);
-  const role = row('administrator role of sample-admin');
+  const role = record('role', 'r-admin');
   expect(role.queryByRole('checkbox')).toBeNull();
   expect(role.getByText(/This installation has one administrator, and the host recovery sets who it is/)).toBeTruthy();
-  const address = row('notification address of user sample-restored');
+  const address = record('address', 'addr-1');
   expect(address.queryByRole('checkbox')).toBeNull();
   expect(address.getByText(/verified again by the person it belongs to/)).toBeTruthy();
   expect(screen.getByText('Not approved here')).toBeTruthy();
@@ -120,7 +122,7 @@ test('only records the service marks approvable have a checkbox; the rest say wh
 
 test('approved records have no checkbox and are labelled Approved', () => {
   mount(<ReviewScreen {...props()} />);
-  const approved = row('sample-sam');
+  const approved = record('user', 'u-sam');
   expect(approved.queryByRole('checkbox')).toBeNull();
   expect(approved.getByText('Approved')).toBeTruthy();
 });
@@ -155,19 +157,19 @@ test('confirmation names every selected record, says all-or-nothing, and sends n
   expect(onApprove).toHaveBeenCalledTimes(1);
   // Manifest order, not click order: the service orders dependencies itself.
   expect(onApprove).toHaveBeenCalledWith([
-    { kind: 'user', id: 'u-restored' },
-    { kind: 'group', id: 'g-ops' },
+    { kind: 'user', id: 'u-restored', digest: digestOf('user', 'u-restored') },
+    { kind: 'group', id: 'g-ops', digest: digestOf('group', 'g-ops') },
   ]);
 });
 
-test('what is sent is only kind and id: no label, state, comparison or other field', () => {
+test('what is sent is only kind, id and the reviewed digest: no label, state, comparison, detail or other field', () => {
   const onApprove = vi.fn();
   mount(<ReviewScreen {...props({ onApprove })} />);
-  fireEvent.click(box('Rule ALLOW container:stop'));
+  fireEvent.click(screen.getByRole('checkbox', { name: /^Rule Deny agent sample-ci-runner \(ID a-ci\) from stopping/ }));
   fireEvent.click(approveButton());
   fireEvent.click(within(screen.getByRole('group', { name: 'Approve 1 record?' })).getByRole('button', { name: 'Approve 1 record' }));
   const [sent] = onApprove.mock.calls[0] as [Array<Record<string, unknown>>];
-  expect(Object.keys(sent[0] ?? {}).sort()).toEqual(['id', 'kind']);
+  expect(Object.keys(sent[0] ?? {}).sort()).toEqual(['digest', 'id', 'kind']);
 });
 
 test('Escape closes the confirmation and returns focus to the button that opened it; the selection is kept', () => {
@@ -202,7 +204,7 @@ test('more than the service accepts per request cannot be sent, and the page say
 
 test('a differing second-factor setting is shown side by side with the difference written out', () => {
   mount(<ReviewScreen {...props()} />);
-  const user = row('sample-restored');
+  const user = record('user', 'u-restored');
   const terms = user.getAllByRole('term').map((t) => t.textContent);
   expect(terms).toEqual(['In the file', 'Applied when approved']);
   expect(user.getByText('Second factor optional')).toBeTruthy();
@@ -212,22 +214,22 @@ test('a differing second-factor setting is shown side by side with the differenc
 
 test('an identical setting shows both sides and no warning', () => {
   mount(<ReviewScreen {...props()} />);
-  const user = row('sample-risky');
+  const user = record('user', 'u-risky');
   expect(user.getAllByText('Second factor required')).toHaveLength(2);
   expect(user.queryByText(/These differ/)).toBeNull();
 });
 
 test('a kept local Deny is explained: an Allow from the file never replaces it', () => {
   mount(<ReviewScreen {...props()} />);
-  const rule = row('ALLOW container:stop');
+  const rule = record('policy', 'p-stop');
   expect(rule.getByText(/A Deny rule with this id already existed here and was kept\. An Allow from the file never replaces it\./)).toBeTruthy();
-  const plain = row('ALLOW container:logs');
+  const plain = record('policy', 'p-logs');
   expect(plain.queryByText(/already existed here/)).toBeNull();
 });
 
 test('a record with no comparison in the service gets none: no invented imported/effective values', () => {
   mount(<ReviewScreen {...props()} />);
-  for (const label of ['sample-local-endpoint', 'sample-ops', 'sample-ci-runner']) expect(row(label).queryByRole('term'), label).toBeNull();
+  for (const [kind, id] of [['endpoint', 'ep-local'], ['group', 'g-ops'], ['agent', 'a-ci']] as const) expect(record(kind, id).queryByRole('term'), id).toBeNull();
 });
 
 test('an approved record no longer shows a comparison', () => {
@@ -239,32 +241,35 @@ test('an approved record no longer shows a comparison', () => {
 
 test('a record kept from before the restore says it was not in the file, and that a restore never deletes', () => {
   mount(<ReviewScreen {...props()} />);
-  const kept = row('sample-local-only');
+  const kept = record('user', 'u-local-only');
   expect(kept.getByText('Not in the file')).toBeTruthy();
   expect(kept.getByText(/It was here before the restore and has been switched off\. A restore never deletes anything\./)).toBeTruthy();
 });
 
-test('a compromised flag in the file is shown loudly but the page does not decide: the service still refuses it', () => {
+test('a record the service marks compromised stays visible with its reason but has no checkbox and is not part of any selection', () => {
   mount(<ReviewScreen {...props()} />);
-  const risky = row('sample-risky');
+  const risky = record('user', 'u-risky');
   expect(risky.getByText('Marked compromised in the file')).toBeTruthy();
-  expect(risky.getByRole('checkbox')).toBeTruthy();
+  expect(risky.queryByRole('checkbox')).toBeNull();
+  expect(risky.getByText(/Marked compromised, so it can’t be approved\. Mandatary also refuses any attempt to approve it\./)).toBeTruthy();
+  expect(screen.queryByRole('checkbox', { name: /sample-risky/ })).toBeNull();
+  expect(screen.getByText('Not approved here')).toBeTruthy();
 });
 
 test('source state is shown only when unusual, and always as reference that grants nothing', () => {
   mount(<ReviewScreen {...props()} />);
-  expect(row('sample-risky').getByText(/In the file it was disabled\. That is for reference only and grants nothing\./)).toBeTruthy();
-  expect(row('sample-restored').queryByText(/In the file it was/)).toBeNull();
+  expect(record('user', 'u-risky').getByText(/In the file it was disabled\. That is for reference only and grants nothing\./)).toBeTruthy();
+  expect(record('user', 'u-restored').queryByText(/In the file it was/)).toBeNull();
 });
 
 test('credential follow-ups: a pending user or agent is told nothing is restored; an approved agent links to Agent tokens', () => {
   mount(<ReviewScreen {...props()} />);
-  expect(row('sample-restored').getByText('Approving doesn’t bring back a sign-in method.')).toBeTruthy();
-  expect(row('sample-ci-runner').getByText(/Approving doesn’t bring back its tokens/)).toBeTruthy();
-  const approved = row('sample-billing-bot');
+  expect(record('user', 'u-restored').getByText('Approving doesn’t bring back a sign-in method.')).toBeTruthy();
+  expect(record('agent', 'a-ci').getByText(/Approving doesn’t bring back its tokens/)).toBeTruthy();
+  const approved = record('agent', 'a-billing');
   expect(approved.getByText(/Approved\. It has no token\./)).toBeTruthy();
   expect(approved.getByRole('link', { name: 'Agent tokens page for sample-billing-bot' }).getAttribute('href')).toBe('/agents?agent=a-billing');
-  expect(row('sample-sam').getByText('Approved. It has no sign-in method yet; none is restored.')).toBeTruthy();
+  expect(record('user', 'u-sam').getByText('Approved. It has no sign-in method yet; none is restored.')).toBeTruthy();
 });
 
 test('"See details" appears only when the container supplies a destination, and names its record', () => {
@@ -336,7 +341,7 @@ test('a conflict names each refused record and why, says nothing was approved, k
   expect(document.activeElement).toBe(alert);
   expect(screen.queryByRole('group', { name: /^Approve/ })).toBeNull();
   expect(box('Agent sample-ci-runner').checked).toBe(true);
-  expect(row('sample-ci-runner').getByText(/Not approved\. Its owner isn’t approved yet/)).toBeTruthy();
+  expect(record('agent', 'a-ci').getByText(/Not approved\. Its owner isn’t approved yet/)).toBeTruthy();
   expect(alert.textContent).not.toContain('u-restored');
 });
 

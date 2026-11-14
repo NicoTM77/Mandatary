@@ -1,6 +1,7 @@
 import type { AccountApi } from './account';
 import { isRecord, type ApiResult } from './http';
-import type { BackupMode, Comparison, ItemRef, ManifestData, ManifestKind, ManifestNeeds, ManifestRow, MfaRequirement, RestoreReportView } from '../screens/recovery/contract';
+import type { BackupMode, Comparison, ItemRef, ManifestData, ManifestKind, ManifestNeeds, ManifestRow, MfaRequirement, NamedRef, RestoreReportView, RowDetail, SelectorDetail } from '../screens/recovery/contract';
+import { OPERATIONS, type Operation } from '../screens/policy/selector';
 import { MANIFEST_KINDS, MAX_APPROVALS, RESTORE_PHRASE } from '../screens/recovery/contract';
 
 /**
@@ -32,7 +33,9 @@ const BACKUP_ID = /^[A-Za-z0-9_.-]{1,128}$/;
 const COUNT_KEY = /^[a-z][a-z_]{0,39}$/;
 const MFA: readonly string[] = ['optional', 'required', 'webauthn'];
 const NEEDS: readonly string[] = ['approval', 'credential_enrollment', 'token_reissue', 'reverification', 'none_in_phase_1'];
-const BLOCKED: readonly string[] = ['single_administrator', 'needs_reverification', 'unsupported'];
+const BLOCKED: readonly string[] = ['single_administrator', 'needs_reverification', 'unsupported', 'compromised'];
+const DIGEST = /^[0-9a-f]{64}$/;
+const MAX_NAME = 300;
 const MAX_LABEL = 300;
 
 function isCount(value: unknown): value is number {
@@ -163,6 +166,69 @@ function comparisonOf(row: { kind: ManifestKind; origin: ManifestRow['origin']; 
   return { kind: 'rule', imported: was, effective: now, localDenyKept: typeof effective.note === 'string' || (was === 'allow' && now === 'deny') };
 }
 
+function text(value: unknown, max = MAX_NAME): string | null {
+  return typeof value === 'string' && value.length <= max ? value : null;
+}
+
+function optionalText(value: unknown, max = MAX_NAME): string | null {
+  return value === undefined || value === null ? '' : text(value, max);
+}
+
+function optionalLimit(value: unknown): number | null | undefined {
+  if (value === undefined || value === null) return null;
+  return typeof value === 'number' && Number.isSafeInteger(value) && value > 0 ? value : undefined;
+}
+
+function namedRef(value: unknown, kind: NamedRef['kind']): NamedRef | null {
+  if (!isRecord(value) || value.kind !== kind) return null;
+  const id = text(value.id);
+  const name = text(value.name);
+  if (id === null || id === '' || name === null || (value.missing !== undefined && typeof value.missing !== 'boolean')) return null;
+  return { kind, id, name: name === '' ? id : name, missing: value.missing === true };
+}
+
+function selectorOf(value: unknown): SelectorDetail | null {
+  if (!isRecord(value) || (value.name_type !== 'exact' && value.name_type !== 'glob')) return null;
+  const id = text(value.id);
+  const containerName = text(value.container_name);
+  const composeProject = optionalText(value.compose_project);
+  const composeService = optionalText(value.compose_service);
+  const imagePattern = optionalText(value.image_pattern);
+  const pinnedContainerId = optionalText(value.pinned_container_id, 128);
+  const pinnedImageDigest = optionalText(value.pinned_image_digest, 128);
+  if (id === null || containerName === null || composeProject === null || composeService === null || imagePattern === null || pinnedContainerId === null || pinnedImageDigest === null) return null;
+  return { id, nameType: value.name_type, containerName, composeProject, composeService, imagePattern, pinnedContainerId, pinnedImageDigest };
+}
+
+const OPERATION_KEYS: readonly string[] = OPERATIONS.map((op) => op.key);
+
+/**
+ * The identifying detail of a rule or membership, decoded strictly. A detail the service did not send is null (the row is then not selectable);
+ * a detail that is present but malformed fails the whole manifest closed, so a half-understood description is never shown beside a checkbox.
+ */
+function detailOf(kind: ManifestKind, value: unknown): RowDetail | null | undefined {
+  if (value === undefined || value === null) return null;
+  if (!isRecord(value)) return undefined;
+  if (kind === 'user_membership' || kind === 'agent_membership') {
+    const member = namedRef(value.member, kind === 'user_membership' ? 'user' : 'agent');
+    const group = namedRef(value.group, 'group');
+    return member && group ? { kind: 'membership', member, group } : undefined;
+  }
+  if (kind === 'policy') {
+    const effect = effectOf(value.effect);
+    const subjectKind = isRecord(value.subject) && (value.subject.kind === 'user' || value.subject.kind === 'group' || value.subject.kind === 'agent') ? value.subject.kind : null;
+    const subject = subjectKind ? namedRef(value.subject, subjectKind) : null;
+    const endpoint = namedRef(value.endpoint, 'endpoint');
+    const selector = selectorOf(value.selector);
+    const logTailMax = optionalLimit(value.log_tail_max);
+    const stopTimeoutMax = optionalLimit(value.stop_timeout_max);
+    if (effect === null || typeof value.operation !== 'string' || !OPERATION_KEYS.includes(value.operation) || !subject || !endpoint || !selector || logTailMax === undefined || stopTimeoutMax === undefined) return undefined;
+    return { kind: 'rule', effect, operation: value.operation as Operation, subject, endpoint, selector, logTailMax, stopTimeoutMax };
+  }
+  // Users carry only `compromised` (shown through the comparison and blocked_reason); other kinds carry no detail.
+  return null;
+}
+
 function decodeRow(value: unknown): ManifestRow | null {
   if (!isRecord(value)) return null;
   const { kind, id, label, origin, decision } = value;
@@ -175,6 +241,8 @@ function decodeRow(value: unknown): ManifestRow | null {
   if (blocked !== undefined && blocked !== null && blocked !== '' && (typeof blocked !== 'string' || !BLOCKED.includes(blocked))) return null;
   const comparison = comparisonOf({ kind: kind as ManifestKind, origin, decision }, value.imported, value.effective);
   if (comparison === null) return null;
+  const detail = detailOf(kind as ManifestKind, value.detail);
+  if (detail === undefined || typeof value.digest !== 'string' || !DIGEST.test(value.digest)) return null;
   return {
     kind: kind as ManifestKind,
     id,
@@ -186,6 +254,8 @@ function decodeRow(value: unknown): ManifestRow | null {
     blockedReason: typeof blocked === 'string' && blocked !== '' ? (blocked as ManifestRow['blockedReason']) : null,
     needs: value.needs as ManifestNeeds,
     comparison,
+    detail,
+    digest: value.digest,
   };
 }
 
@@ -251,10 +321,10 @@ export class RecoveryApi {
     return this.#account.read(MANIFEST_PATH, decodeManifest);
   }
 
-  /** Resolves with the number of records approved. All-or-nothing on the server. Only the named kind and id are sent. */
+  /** Resolves with the number of records approved. All-or-nothing on the server. Only the named kind, id and the reviewed digest are sent. */
   approve(items: readonly ItemRef[]): Promise<ApiResult<number>> {
     const seen = new Set(items.map((item) => `${item.kind}\u0000${item.id}`));
     if (items.length === 0 || items.length > MAX_APPROVALS || seen.size !== items.length) return Promise.resolve({ ok: false, status: 400, code: 'invalid_request' });
-    return this.#account.request(APPROVALS_PATH, { body: { items: items.map((item) => ({ kind: item.kind, id: item.id })) }, decode: decodeApproved });
+    return this.#account.request(APPROVALS_PATH, { body: { items: items.map((item) => (item.digest ? { kind: item.kind, id: item.id, digest: item.digest } : { kind: item.kind, id: item.id })) }, decode: decodeApproved });
   }
 }
