@@ -882,3 +882,69 @@ func TestServiceWithoutARecorderBehavesAsBefore(t *testing.T) {
 		t.Fatalf("UsageFailures = %d", n)
 	}
 }
+
+// P1.18.4 P115-I1: a storage fault of an authorizer callback during admission
+// (Authorize) or the revalidation under the freshly registered lease keeps the
+// fail-closed refusal but is NEVER accounted as a denial: there is no policy
+// decision, so no usage event exists. The controls (a real removal of the ALLOW
+// rule at the same boundaries) are still exactly one denied event.
+func TestStorageFaultDuringAdmissionIsNeverCountedDenied(t *testing.T) {
+	type cause struct {
+		fault  func(e *env)
+		denied bool
+	}
+	causes := map[string]cause{
+		"policy-query-fault":         {func(e *env) { e.exec(`ALTER TABLE policies RENAME TO policies_x`) }, false},
+		"get-endpoint-fault":         {func(e *env) { e.exec(`ALTER TABLE endpoints RENAME TO endpoints_x`) }, false},
+		"verification-query-fault":   {func(e *env) { e.exec(`ALTER TABLE agents RENAME TO agents_x`) }, false},
+		"transaction-begin-fault":    {func(e *env) { e.repo.FailClosed() }, false},
+		"control-allow-rule-removed": {func(e *env) { e.exec(`DELETE FROM policies WHERE agent_id=?`, botID) }, true},
+	}
+	// at-admission hooks the name resolution that precedes the Authorize callback;
+	// at-revalidation hooks the immutable-ID resolution that precedes the callback
+	// revalidating the freshly registered lease.
+	for _, phase := range []string{"at-admission", "at-revalidation"} {
+		for name, c := range causes {
+			for _, op := range ops.Operations() {
+				t.Run(phase+"/"+name+"/"+string(op), func(t *testing.T) {
+					u := &usageSpy{}
+					e := newEnv(t, withUsage(u))
+					var fired atomic.Bool
+					e.spy.resolveBlock = func(_ context.Context, ref string) {
+						if (phase == "at-revalidation") == (len(ref) == 64) && fired.CompareAndSwap(false, true) {
+							c.fault(e)
+						}
+					}
+					res, err := e.svc.Execute(t.Context(), req(botCreds(), "edge-proxy", op))
+					closeLogs(res)
+					if err == nil {
+						t.Fatal("a callback fault/refusal must never dispatch")
+					}
+					if !fired.Load() {
+						t.Fatal("the fault hook never ran")
+					}
+					if c.denied {
+						if !isDenial(err) {
+							t.Fatalf("Execute = %v, want a denial", err)
+						}
+						// A default deny at admission matched no selector; the lease's own
+						// revalidation refusal carries the decision's selector.
+						sel := selEdge
+						if phase == "at-admission" {
+							sel = ""
+						}
+						wantEvents(t, u, evt(aliceID, botID, sel, op, domain.UsageDenied))
+					} else {
+						wantEvents(t, u)
+					}
+					if n := len(e.spy.operationalCalls()); n != 0 {
+						t.Fatalf("%d operational attempts", n)
+					}
+					if n := e.svc.UsageFailures(); n != 0 {
+						t.Fatalf("%d accounting failures", n)
+					}
+				})
+			}
+		}
+	}
+}

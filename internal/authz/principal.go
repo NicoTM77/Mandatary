@@ -4,6 +4,8 @@ import (
 	"context"
 	"crypto/sha256"
 	"crypto/subtle"
+	"database/sql"
+	"errors"
 	"log/slog"
 	"strings"
 	"time"
@@ -114,6 +116,18 @@ func NewStoreCredentialVerifier() CredentialVerifier {
 	return storeCredentialVerifier{}
 }
 
+// verifierQueryRefusal maps an error of a verification QUERY. A missing row is a logical
+// credential/state failure (a plain 401 refusal). Any other error is a storage/infrastructure
+// fault: it keeps the same fail-closed 401 public shape and grants nothing, but carries the
+// private fault marker so no layer attributes or accounts it as a denial of a principal
+// (P1.18.4 P115-I1).
+func verifierQueryRefusal(err error) error {
+	if errors.Is(err, sql.ErrNoRows) {
+		return newUnauthenticated(ReasonUnauthenticated)
+	}
+	return &DenialError{Base: ErrUnauthenticated, Reason: ReasonUnauthenticated, fault: true}
+}
+
 func activeInstallationControl(c store.InstallationControl) bool {
 	return c.Singleton == 1 &&
 		c.RestoreQuarantined == 0 &&
@@ -175,7 +189,7 @@ func verifyUserSession(
 		}
 		sess, err = q.GetSession(ctx, string(creds.SessionID))
 		if err != nil {
-			return VerifiedPrincipal{}, newUnauthenticated(ReasonUnauthenticated)
+			return VerifiedPrincipal{}, verifierQueryRefusal(err)
 		}
 		if subtle.ConstantTimeCompare(sess.SecretHash, secretSum[:]) != 1 {
 			return VerifiedPrincipal{}, newUnauthenticated(ReasonUnauthenticated)
@@ -183,7 +197,7 @@ func verifyUserSession(
 	} else {
 		sess, err = q.GetSessionByHash(ctx, secretSum[:])
 		if err != nil {
-			return VerifiedPrincipal{}, newUnauthenticated(ReasonUnauthenticated)
+			return VerifiedPrincipal{}, verifierQueryRefusal(err)
 		}
 	}
 
@@ -238,7 +252,7 @@ func verifyUserSession(
 	userID := domain.UserID(sess.UserID)
 	user, err := q.GetUser(ctx, sess.UserID)
 	if err != nil {
-		return VerifiedPrincipal{}, newUnauthenticated(ReasonUnauthenticated)
+		return VerifiedPrincipal{}, verifierQueryRefusal(err)
 	}
 	if user.State != "active" || user.Compromised != 0 {
 		return VerifiedPrincipal{}, newUnauthenticated(ReasonUnauthenticated)
@@ -254,7 +268,7 @@ func verifyUserSession(
 	// and any user with an administrative role requires AAL2 MFA (TD §4.1).
 	roles, err := q.ListUserAdministrativeRoles(ctx, user.ID)
 	if err != nil {
-		return VerifiedPrincipal{}, newUnauthenticated(ReasonUnauthenticated)
+		return VerifiedPrincipal{}, verifierQueryRefusal(err)
 	}
 	hasAdminRole := false
 	for _, r := range roles {
@@ -284,7 +298,7 @@ func verifyUserSession(
 	// If session_authenticators bindings are recorded, every bound authenticator must remain active.
 	boundAuths, err := q.ListSessionAuthenticators(ctx, sess.ID)
 	if err != nil {
-		return VerifiedPrincipal{}, newUnauthenticated(ReasonUnauthenticated)
+		return VerifiedPrincipal{}, verifierQueryRefusal(err)
 	}
 	for _, a := range boundAuths {
 		if a.UserID != user.ID || a.State != "active" || a.RevokedAt.Valid || a.CredentialGeneration != control.CredentialGeneration {
@@ -297,7 +311,7 @@ func verifyUserSession(
 
 	memberships, err := q.ListUserGroupMembershipsWithGroups(ctx, user.ID)
 	if err != nil {
-		return VerifiedPrincipal{}, newUnauthenticated(ReasonUnauthenticated)
+		return VerifiedPrincipal{}, verifierQueryRefusal(err)
 	}
 	var activeGroups, denyGroups []domain.GroupID
 	for _, m := range memberships {
@@ -351,7 +365,7 @@ func verifyAgentToken(
 
 	cred, err := q.GetAgentAuthRowByDigest(ctx, tokenHash)
 	if err != nil {
-		return VerifiedPrincipal{}, newUnauthenticated(ReasonUnauthenticated)
+		return VerifiedPrincipal{}, verifierQueryRefusal(err)
 	}
 	if subtle.ConstantTimeCompare(cred.TokenHash, tokenHash) != 1 {
 		return VerifiedPrincipal{}, newUnauthenticated(ReasonUnauthenticated)
@@ -393,7 +407,7 @@ func verifyAgentToken(
 	agentID := domain.AgentID(cred.AgentID)
 	agent, err := q.GetAgent(ctx, cred.AgentID)
 	if err != nil {
-		return VerifiedPrincipal{}, newUnauthenticated(ReasonUnauthenticated)
+		return VerifiedPrincipal{}, verifierQueryRefusal(err)
 	}
 	if agent.State != "active" {
 		return VerifiedPrincipal{}, newUnauthenticated(ReasonUnauthenticated)
@@ -412,7 +426,7 @@ func verifyAgentToken(
 	// never confer implicit permissions (TD §2.1, §3.1, §3.3).
 	memberships, err := q.ListAgentGroupMembershipsWithGroups(ctx, agent.ID)
 	if err != nil {
-		return VerifiedPrincipal{}, newUnauthenticated(ReasonUnauthenticated)
+		return VerifiedPrincipal{}, verifierQueryRefusal(err)
 	}
 	var activeGroups, denyGroups []domain.GroupID
 	for _, m := range memberships {

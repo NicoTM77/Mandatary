@@ -2,6 +2,7 @@ package authz
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"strings"
 	"sync"
@@ -145,6 +146,18 @@ type Authorizer struct {
 	// revalidation so concurrent notifications cannot continuously invalidate
 	// each other's in-flight revalidations (capacity 1; context-aware).
 	notifySem chan struct{}
+	// acquireSeams are deterministic barriers between the stages of AcquireLease. They are
+	// unexported, nil in production (a nil check only) and installed solely by package tests
+	// through export_test.go; they never carry data and never change a decision.
+	acquireSeams acquireSeams
+}
+
+// acquireSeams names the two stage boundaries of AcquireLease where a concurrent change
+// must be provable without timing: after Authorize returned and before the lease is
+// registered, and after the revalidation under the registered lease and before publication.
+type acquireSeams struct {
+	beforeRegister func()
+	beforePublish  func()
 }
 
 // NewAuthorizer constructs a shared default-deny Authorizer.
@@ -385,7 +398,7 @@ func (a *Authorizer) Authorize(ctx context.Context, req AuthorizeRequest) (Decis
 		// Precedence 2: Principal & Credential Status (401).
 		principal, vErr := a.verifier.VerifyPrincipal(ctx, q, control, req.Principal, now)
 		if vErr != nil {
-			decisionErr = vErr
+			decisionErr = verificationRefusal(vErr)
 			return nil
 		}
 		if req.RequireAAL2 && (principal.Kind != PrincipalUser || principal.AchievedAssurance < 2) {
@@ -399,7 +412,13 @@ func (a *Authorizer) Authorize(ctx context.Context, req AuthorizeRequest) (Decis
 		// Endpoint DB activation & authority generation check (403).
 		ep, epErr := q.GetEndpoint(ctx, req.EndpointID)
 		if epErr != nil {
-			decisionErr = newForbidden(ReasonEndpointInactive)
+			// A missing endpoint row is a logical refusal (attributed). Any other error is a
+			// storage fault: same public refusal, never attributed (P1.18.4 P115-I1).
+			if errors.Is(epErr, sql.ErrNoRows) {
+				decisionErr = newForbidden(ReasonEndpointInactive)
+			} else {
+				decisionErr = newForbiddenFault(ReasonEndpointInactive)
+			}
 			return nil
 		}
 		if ep.State != "active" || ep.Slug != "local" || ep.Transport != "unix" || ep.AuthorityGeneration <= 0 || ep.AuthorityGeneration != control.AuthorityGeneration {
@@ -506,7 +525,8 @@ func evaluatePolicies(
 		Operation:  string(op),
 	})
 	if err != nil {
-		return "", "", newForbidden(ReasonDefaultDeny)
+		// The policy query failed: a storage fault, not a default-deny decision.
+		return "", "", newForbiddenFault(ReasonDefaultDeny)
 	}
 
 	activeGroupSet := make(map[domain.GroupID]struct{}, len(principal.ActiveGroups))
@@ -711,6 +731,15 @@ func onlyContextCauses(err error) bool {
 	return pure(err)
 }
 
+// staleRefusal is the ReasonDecisionStale refusal of a lease/decision revalidation;
+// fault marks a storage fault (never attributed) instead of a logical staleness.
+func staleRefusal(fault bool) error {
+	if fault {
+		return newForbiddenFault(ReasonDecisionStale)
+	}
+	return newForbidden(ReasonDecisionStale)
+}
+
 // backendSafe reports whether backend is ready and self/peer verified.
 func backendSafe(backend docker.DockerBackend) bool {
 	return backend != nil && backend.Ready() && backend.VerificationState() == docker.StateVerified
@@ -800,7 +829,9 @@ func (a *Authorizer) validateDecisionOnce(ctx context.Context, dec Decision) (re
 
 		principal, vErr := a.verifier.VerifyPrincipal(ctx, q, control, dec.creds, now)
 		if vErr != nil {
-			validateErr = newForbidden(ReasonDecisionStale)
+			// A credential that is logically no longer valid is a (attributable) stale
+			// refusal; a storage fault of the verification is not (P1.18.4 P115-I1).
+			validateErr = staleRefusal(isFault(vErr))
 			return nil
 		}
 		if dec.requireAAL2 && (principal.Kind != PrincipalUser || principal.AchievedAssurance < 2) {
@@ -809,6 +840,10 @@ func (a *Authorizer) validateDecisionOnce(ctx context.Context, dec Decision) (re
 		}
 
 		ep, epErr := q.GetEndpoint(ctx, dec.Target.EndpointID)
+		if epErr != nil && !errors.Is(epErr, sql.ErrNoRows) {
+			validateErr = staleRefusal(true)
+			return nil
+		}
 		if epErr != nil || ep.State != "active" || ep.Slug != "local" || ep.Transport != "unix" || ep.AuthorityGeneration != control.AuthorityGeneration {
 			validateErr = newForbidden(ReasonDecisionStale)
 			return nil
@@ -826,7 +861,7 @@ func (a *Authorizer) validateDecisionOnce(ctx context.Context, dec Decision) (re
 			dec.TimeoutSeconds,
 		)
 		if evalErr != nil {
-			validateErr = newForbidden(ReasonDecisionStale)
+			validateErr = staleRefusal(isFault(evalErr))
 			return nil
 		}
 		return nil
@@ -887,6 +922,9 @@ func (a *Authorizer) AcquireLease(ctx context.Context, req AuthorizeRequest) (*L
 		cancel:     cancel,
 	}
 
+	if h := a.acquireSeams.beforeRegister; h != nil {
+		h()
+	}
 	a.mu.Lock()
 	if ctx.Err() != nil || dec.PolicyEpoch != a.policyEpoch || !a.validBindingLocked(dec) {
 		a.mu.Unlock()
@@ -903,6 +941,9 @@ func (a *Authorizer) AcquireLease(ctx context.Context, req AuthorizeRequest) (*L
 		return nil, attribute(err, &attr)
 	}
 
+	if h := a.acquireSeams.beforePublish; h != nil {
+		h()
+	}
 	a.mu.RLock()
 	// The lease is already registered, so any later policy notification
 	// revalidates it itself; an epoch-only move is not a denial here.

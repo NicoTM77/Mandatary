@@ -92,6 +92,40 @@ func newUnauthenticated(reason DenialReason) error {
 	return &DenialError{Base: ErrUnauthenticated, Reason: reason}
 }
 
+// newForbiddenFault is a fail-closed refusal with EXACTLY the public shape of
+// newForbidden(reason) (same sentinel, status, reason and text) that additionally
+// carries the private fault marker: the cause is a storage/infrastructure error of
+// a callback (verification, endpoint or policy query), never a policy decision, so
+// it is never attributed or accounted as a denial. It grants nothing.
+func newForbiddenFault(reason DenialReason) error {
+	if reason == "" {
+		reason = ReasonDefaultDeny
+	}
+	return &DenialError{Base: ErrForbidden, Reason: reason, fault: true}
+}
+
+// isFault reports whether err is a refusal marked as an infrastructure fault. Any
+// error that is not an authz DenialError at all (for example an arbitrary error of a
+// replaced CredentialVerifier) is also a fault, never a logical denial.
+func isFault(err error) bool {
+	var de *DenialError
+	if errors.As(err, &de) && de != nil {
+		return de.fault
+	}
+	return err != nil
+}
+
+// verificationRefusal normalizes a CredentialVerifier error: authz refusals pass
+// through unchanged (logical 401s stay logical, query faults keep their marker) and
+// any other error becomes a fault-marked 401, never a raw error or an attributed denial.
+func verificationRefusal(err error) error {
+	var de *DenialError
+	if errors.As(err, &de) && de != nil {
+		return err
+	}
+	return &DenialError{Base: ErrUnauthenticated, Reason: ReasonUnauthenticated, fault: true}
+}
+
 func newForbidden(reason DenialReason) error {
 	if reason == "" {
 		reason = ReasonDefaultDeny
