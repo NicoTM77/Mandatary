@@ -93,3 +93,32 @@ test('the ledger does not claim the card is accepted, merged or that C4 is satis
   assert.equal(/\bmerged by nico\b/i.test(markdown), false);
   assert.match(markdown, /not a CI result/);
 });
+
+// Round-1 review sweep (run 496): the carried items recorded in the limitation/residual/carried/nonblocking fields of the P1.01-P1.10 and C2 runs
+// must stay in the ledger with their source run identifiers, and no in-scope card may be left without a row.
+test('every in-scope card has at least one row and cross references name existing rows', () => {
+  const ids = new Set(ledger.rows.map((r) => r.id));
+  for (const card of ledger.cards.filter((c) => c.in_scope)) assert.ok(card.finding_rows.length > 0, `${card.task_id}: no row, so the coverage note would be false`);
+  for (const row of ledger.rows) for (const see of row.see_rows ?? []) assert.ok(ids.has(see), `${row.id}: see_rows names unknown row ${see}`);
+});
+
+test('the auth-card carried items found by the sweep keep their source run identifiers', () => {
+  const expected = {
+    'P108-R431-stranded-AAL1-session': 'run431',
+    'P108-R431-authorizer-revalidation-end-to-end': 'run431',
+    'P110-R440-bearer-http-evidence': 'run440',
+    'P110-R440-AgentTokenHash-presentation': 'run440',
+    'P110-R440-owner-state-cascade': 'run440',
+    'P105-R238-repository-poison': 'run238',
+    'P105-R238-normalizer-advisory-ownership': 'run238',
+    'P104-R164-nested-worktree-vcs-stamp': 'run164',
+    'P103-R132-modelled-persistence-loss': 'run132',
+    'P103-R132-soft-go-limits-no-oom-guarantee': 'run132',
+    'C2-O1-session-revocation-leases': 'run442',
+  };
+  for (const [id, run] of Object.entries(expected)) {
+    const row = ledger.rows.find((r) => r.id === id);
+    assert.ok(row, `${id}: missing`);
+    assert.ok(row.source_refs.join(' ').includes(run), `${id}: source reference ${run} not kept`);
+  }
+});

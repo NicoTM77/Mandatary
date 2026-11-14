@@ -8,10 +8,10 @@
   "ops_dispositions": 113
  },
  "status_counts": {
-  "already_resolved": 48,
+  "already_resolved": 56,
   "fixed_here": 37,
-  "bounded_limitation": 30,
-  "future_gate": 17
+  "bounded_limitation": 40,
+  "future_gate": 19
  },
  "excluded": [
   {
@@ -2491,11 +2491,18 @@
   {
    "id": "DEP-ESLINT-MINIMATCH",
    "group": "deps",
-   "source_card": "P1.01-P1.07",
+   "source_card": "P1.01-P1.07/P1.09",
    "status": "fixed_here",
    "title": "Dev-only minimatch advisory GHSA-g3hv-75wg-m249 (7.0.0 - 11.0.0) via eslint 10.14.0, carried with a 2026-11-29 deadline",
    "source_refs": [
-    "P1.01-P1.07 repeated disclosures"
+    "P1.01 run60 nonblocking (deadline 2026-11-29)",
+    "P1.02 run96/run97",
+    "P1.03 run101/run132 nonblocking_residuals",
+    "P1.04 run163/run164",
+    "P1.05 run237/run238 security_residuals",
+    "P1.06 run241/run278/run279",
+    "P1.07 run338/run373 residuals",
+    "P1.09 run436 unrelated_advisories_not_called_not_fixed (4 moderate)"
    ],
    "disposition": "npm audit reports one advisory chain (minimatch, @eslint/config-array, eslint), not three findings, and the exposure was dev-tool only (lint, not shipped). The same pinned 10.x family fixes it: eslint 10.14.0 -> 10.15.0 (not a semver-major change) pulls @eslint/config-array 0.23.6 and minimatch 11.0.8. No override, no audit-fix --force, no other direct tool moved. npm audit: 0 vulnerabilities; lockfile integrity (npm ci, npm ls --all), typecheck, lint, 753 vitest tests, build and 51 script tests pass.",
    "tests": [
@@ -2514,11 +2521,14 @@
   {
    "id": "DEP-GO-X-NET-CRYPTO",
    "group": "deps",
-   "source_card": "P1.01-P1.07",
+   "source_card": "P1.01-P1.07/P1.09",
    "status": "fixed_here",
    "title": "Required-module advisories GO-2026-6866/GO-2026-6860 (x/net/html) and GO-2026-5932 (x/crypto/openpgp), never reachable",
    "source_refs": [
-    "P1.01-P1.07 \"then-unimported Go/OpenPGP advisories\""
+    "P1.01-P1.07 \"then-unimported Go/OpenPGP advisories\"",
+    "P1.05 run237/run238 GO-2026-5932",
+    "P1.07 run338/run373 three module-only HTML/OpenPGP advisories",
+    "P1.09 run432 GO-2026-6859; run436 GO-2026-6866/GO-2026-6860"
    ],
    "disposition": "The application imports only x/net/publicsuffix and x/crypto/argon2, so none was reachable. The modules moved to the fixed releases anyway (x/net 0.62.0, x/crypto 0.59.0, x/sys 0.50.0 as x/crypto requires): govulncheck now reports no vulnerabilities and no module-level findings; the frozen password data check, internal/auth password/address tests, cmd, store and config tests pass. A test refuses any tracked Go file that imports x/net/html or x/crypto/openpgp.",
    "tests": [
@@ -2540,7 +2550,10 @@
    "status": "fixed_here",
    "title": "GO-2026-6094 (cel-go 0.28.0, an uncalled indirect module of the pinned sqlc generator)",
    "source_refs": [
-    "P1.01-P1.07 repeated disclosures"
+    "P1.01-P1.07 repeated disclosures",
+    "P1.02 run96/run97 residual_risks (GO-2026-6094, cel-go 0.28.0)",
+    "P1.03 run132 nonblocking_residuals",
+    "P1.09 run436"
    ],
    "disposition": "Resolved in the generator's own module (cel-go 0.30.0 plus the go.yaml.in/yaml/v3 line go mod tidy then needs). sqlc stays v1.31.1, `sqlc diff --no-remote` shows no generated-output change and both tool-security scans are clean. The earlier \"not reachable, keep pinned\" assessment in docs/sqlc-dependencies.md is marked superseded.",
    "tests": [
@@ -2588,6 +2601,380 @@
    ]
   },
   {
+   "id": "P108-R431-stranded-AAL1-session",
+   "group": "auth",
+   "source_card": "P1.08",
+   "status": "bounded_limitation",
+   "title": "An AAL1 session issued before its factor became unusable stays valid until normal expiry or revocation (probe P-H)",
+   "source_refs": [
+    "P1.08 run431 nonblocking[1]; /opt/data/scratch/mandatary-p108-review431/review-report.md:70 (probe P-H)",
+    "P1.08 run430 limits[3] (same as 027c1b1)"
+   ],
+   "disposition": "Approved residual design limit. Such a session is bounded by the idle and 12 hour absolute lifetimes and by explicit revocation, and it carries no sensitive authority: sensitive writes require the account's required-assurance floor and step-up, and the factor that became unusable cannot satisfy it. Revoking sessions on every factor-state change would alter the approved session lifecycle, so no code change is made; the parity of the two verifiers (TestSkipMFASessionParityAfterFactorBecomesUnusable) is the regression that keeps the floor identical on the issuance and verification sides.",
+   "rationale": "Changing it would change the approved session lifecycle (architecture). The residual grants nothing beyond what the same session had before the factor became unusable.",
+   "current_source": [
+    "internal/auth/session_authz_test.go",
+    "docs/sessions-browser-security.md"
+   ]
+  },
+  {
+   "id": "P108-R431-authorizer-revalidation-end-to-end",
+   "group": "auth",
+   "source_card": "P1.08",
+   "status": "already_resolved",
+   "title": "Authorizer decision-revalidation path was not executed end-to-end with real sessions (verifier parity only)",
+   "source_refs": [
+    "P1.08 run431 nonblocking[2]; /opt/data/scratch/mandatary-p108-review431/review-report.md:70",
+    "P1.08 run430 limits[2]",
+    "C2 run442 fixtures H09-H09e"
+   ],
+   "disposition": "Executed end-to-end by later work: the C2 checkpoint (run442, H09-H09e, both toolchains) shows logout makes fresh Authorize return 401, every earlier Decision fail ValidateDecision and the lease fail Revalidate with its context cancelled while a peer session is unaffected. The permanent in-repo tests drive real issued sessions through the shared Authorizer and the operations service.",
+   "current_source": [
+    "internal/auth/operations_service_test.go",
+    "internal/auth/session_authz_test.go"
+   ],
+   "acceptance": [
+    "TestOpsFollowStreamEndsOnEveryRealSessionRevocationPath (C2R-O1) and TestIssuedSessionsAreAcceptedAndRejectedIdenticallyByTheAuthorizerVerifier; C2 run442 report H09-H09e (reviewer probe, recorded evidence)."
+   ]
+  },
+  {
+   "id": "P108-R428-ambiguous-revoked-floor",
+   "group": "auth",
+   "source_card": "P1.08",
+   "status": "bounded_limitation",
+   "title": "Existing ambiguous revoked second factors keep the assurance floor at 2; such accounts need the approved restricted recovery",
+   "source_refs": [
+    "P1.08 run428 limits[2]"
+   ],
+   "disposition": "Approved conservative rule, documented and tested in docs/sessions-browser-security.md (retirement provenance, migration 00010 semantics): a NULL retirement reason is never backfilled and recovery settles the ambiguous rows to recovery_replacement in the same transaction that activates the verified replacement. AUTH-08-L4 adds the pre-confirmation warning for the related last-working-factor case; the floor is not lowered.",
+   "rationale": "Lowering the floor for ambiguous history would weaken the approved assurance rule.",
+   "current_source": [
+    "docs/sessions-browser-security.md",
+    "internal/store/migrations/00010_retirement_provenance.sql"
+   ]
+  },
+  {
+   "id": "P108-R428-down-migration-provenance",
+   "group": "auth",
+   "source_card": "P1.08",
+   "status": "bounded_limitation",
+   "title": "Down migration 00010 drops retirement provenance; unsuitable for databases that already hold it",
+   "source_refs": [
+    "P1.08 run428 limits[3]"
+   ],
+   "disposition": "Documented in docs/sessions-browser-security.md (Migration semantics): Down drops the column and should not be used on a database that already holds provenance, the same posture as every other additive column.",
+   "rationale": "Additive-column posture shared by every migration; a down path that preserved provenance would need a new schema element.",
+   "current_source": [
+    "docs/sessions-browser-security.md",
+    "internal/store/migrations/00010_retirement_provenance.sql"
+   ]
+  },
+  {
+   "id": "P108-R425-deferred-integrations",
+   "group": "auth",
+   "source_card": "P1.08",
+   "status": "already_resolved",
+   "title": "Deferred by P1.08: P1.09 setup/recovery sessions, P1.16 adapters, P1.14 agent bearer, no mounted product routes",
+   "source_refs": [
+    "P1.08 run425 limits[0],[1],[3]"
+   ],
+   "disposition": "Delivered by the owning later cards: P1.09 (setup and recovery sessions), P1.14 (REST/MCP adapters and agent bearer, tests/adapters), P1.16 (web sign-in and account security) and P1.17/P1.18 (management and restore routes). The production TLS topology and session-row retention parts of the same deferral are retained in P108-R425-tls-retention.",
+   "current_source": [
+    "tests/adapters/transport_test.go",
+    "internal/auth/session_http.go",
+    "internal/auth/recovery_http.go"
+   ],
+   "acceptance": [
+    "P1.09, P1.14 and P1.16 are merged on main at the audit baseline; their adapter, setup and sign-in suites run in every hosted Baseline job."
+   ]
+  },
+  {
+   "id": "P108-R425-tls-retention",
+   "group": "gate",
+   "source_card": "P1.08",
+   "status": "future_gate",
+   "owner": "P1.19",
+   "owner_task": "t_7f9cfaf3",
+   "title": "Trusted TLS topology and session-row retention policy (deferred by P1.08 to P1.19/P1.20); Phase 3 session UI is a later phase",
+   "source_refs": [
+    "P1.08 run425 limits[3]"
+   ],
+   "disposition": "The application sets Secure cookies and trusts no forwarded protocol; trusted TLS/proxy topology evidence and the bounded session-row retention/deletion policy belong to production composition and release acceptance. The later-phase session-management UI is not Phase 1 scope.",
+   "missing_evidence": "Production composition showing HTTPS termination in front of the application, and the retention/deletion behaviour for session rows on the supported runtime.",
+   "valid_earlier_evidence": "Application-level origin/Secure-cookie/forwarded-header tests (TestHostAndForwardedHeadersAreNotTrusted); they do not prove deployment topology.",
+   "current_source": [
+    "docs/sessions-browser-security.md"
+   ]
+  },
+  {
+   "id": "P110-R440-bearer-http-evidence",
+   "group": "auth",
+   "source_card": "P1.10",
+   "status": "already_resolved",
+   "title": "No REST/MCP bearer HTTP evidence for agent credentials (carried to P1.14)",
+   "source_refs": [
+    "P1.10 run440 carried_limits[0]; /opt/data/scratch/mandatary-p110-review440/review-report.md (Carried limits)",
+    "P1.10 run439 risks[1]"
+   ],
+   "disposition": "Resolved by P1.14: the REST and MCP adapters authenticate Authorization: Bearer agent tokens through one gateway and the adapter matrix exercises granted, missing, malformed, empty and duplicated Authorization headers against the real transports.",
+   "current_source": [
+    "internal/api/gateway.go",
+    "tests/adapters/matrix_test.go",
+    "tests/adapters/mcp_dupkey_test.go"
+   ],
+   "acceptance": [
+    "P1.14 is merged on main at the audit baseline; the bearer cases in tests/adapters/matrix_test.go run in every hosted Baseline job."
+   ]
+  },
+  {
+   "id": "P110-R440-AgentTokenHash-presentation",
+   "group": "auth",
+   "source_card": "P1.10",
+   "status": "already_resolved",
+   "title": "PrincipalCredentials.AgentTokenHash in-process presentation of a stored hash; adapters must populate only AgentToken",
+   "source_refs": [
+    "P1.10 run440 carried_limits[1]",
+    "P1.10 run439 risks[2]"
+   ],
+   "disposition": "Resolved in merged source: the only adapter-side constructor of PrincipalCredentials (internal/api/gateway.go) sets AgentToken only; AgentTokenHash is read solely inside internal/authz/principal.go and the ops service redaction guard, and the redaction test pins that a presented hash is never logged.",
+   "current_source": [
+    "internal/api/gateway.go",
+    "internal/authz/principal.go",
+    "internal/ops/redaction_test.go"
+   ],
+   "acceptance": [
+    "internal/ops/redaction_test.go exercises AgentTokenHash with a canary; a search of internal/api and internal/mcp finds no AgentTokenHash use."
+   ]
+  },
+  {
+   "id": "P110-R440-owner-state-cascade",
+   "group": "auth",
+   "source_card": "P1.10",
+   "status": "already_resolved",
+   "title": "No owner-state cascade: a disabled or compromised owner's agents remained usable (probe R5, carried to P1.17)",
+   "source_refs": [
+    "P1.10 run440 carried_limits[2]",
+    "P1.10 run439 risks[3]"
+   ],
+   "disposition": "Resolved by P1.17: disabling a user ends its sessions and revokes the agents it owns, and enabling an agent requires an active owner and issues no token; the cascade rule is documented at the head of identity_admin.go.",
+   "current_source": [
+    "internal/auth/identity_admin.go",
+    "internal/auth/identity_admin_test.go"
+   ],
+   "acceptance": [
+    "TestDisablingAUserEndsItsSessionsAndRevokesTheAgentsItOwns and TestAgentEnableRequiresAnActiveOwnerAndIssuesNoToken (internal/auth/identity_admin_test.go)."
+   ]
+  },
+  {
+   "id": "P105-R238-repository-poison",
+   "group": "auth",
+   "source_card": "P1.05",
+   "status": "bounded_limitation",
+   "title": "Repository poison is a handle-local terminal denial, not persistent recovery of an unrecorded protective report",
+   "source_refs": [
+    "P1.05 run237 limitations[2]",
+    "P1.05 run238 limitations[2]"
+   ],
+   "disposition": "Approved fail-closed design, documented in docs/password-authentication.md and docs/storage-repository.md: after an uncertain protective write the handle denies every later proof and acknowledgement, and repair or reconciliation (reopen after storage repair, the explicit protective retry) is required before authentication resumes. Nothing is inferred as delivered.",
+   "rationale": "Fail-closed is the approved safety property; a silent persistent recovery of an unrecorded report would have to guess state.",
+   "current_source": [
+    "docs/password-authentication.md",
+    "docs/storage-repository.md"
+   ]
+  },
+  {
+   "id": "P105-R238-normalizer-advisory-ownership",
+   "group": "auth",
+   "source_card": "P1.05",
+   "status": "bounded_limitation",
+   "owner_card": "Phase 0.05 maintenance policy (t_92c5c52c) as stated in docs/password-authentication.md",
+   "title": "The frozen copied Unicode normalizer keeps explicit upstream-advisory maintenance ownership; module scans alone do not remediate copied source",
+   "source_refs": [
+    "P1.05 run238 security_residuals[3]; /opt/data/scratch/mandatary-p105-review238/review-report.md (Not an advisory-free graph)"
+   ],
+   "disposition": "Ownership is recorded in docs/password-authentication.md: project maintainers/coder own the copied component, the independent reviewer owns update acceptance, the weekly advisory/monthly patch/quarterly support review and the two-business-day/immediate-exploitation triage apply, and upstream x/text security fixes are examined explicitly against the retained closure. `make password-check` verifies the frozen data hashes. A repertoire or canonical-byte change needs a new immutable profile. The release candidate advisory inventory (P1.20 GATE-QUALIFICATION) must include this component.",
+   "rationale": "Approved frozen Unicode 17 profile (AUTH-UNICODE17-NFC); the maintenance cadence is the existing Phase 0.05 policy.",
+   "current_source": [
+    "docs/password-authentication.md",
+    "scripts/regenerate-password-nfc.py"
+   ]
+  },
+  {
+   "id": "P104-R164-nested-worktree-vcs-stamp",
+   "group": "gate",
+   "source_card": "P1.04",
+   "status": "future_gate",
+   "owner": "P1.20",
+   "owner_task": "t_836268ff",
+   "title": "Go 1.26 nested-worktree VCS stamping walks past the .git file to the enclosing checkout; the compatibility stamp must not be used for release provenance",
+   "source_refs": [
+    "P1.04 run164 limitations[2]; /opt/data/scratch/mandatary-p104-review164/review-report.md"
+   ],
+   "disposition": "Builds made from a nested managed worktree (as every card branch here is) can carry the enclosing checkout's VCS revision. Release provenance must come from a clean exact-head checkout. This is a release-evidence obligation; no workflow or toolchain change is made here.",
+   "missing_evidence": "For the release candidate: a build from a clean, non-nested detached checkout of the exact head whose `go version -m` shows the matching vcs.revision and vcs.modified=false, recorded in the release pack.",
+   "valid_earlier_evidence": "Hosted CI builds run from a plain checkout and the P1.04 supplemental clean detached exact-head build (50 executable probes); neither is the release candidate build."
+  },
+  {
+   "id": "P103-R132-modelled-persistence-loss",
+   "group": "auth",
+   "source_card": "P1.03",
+   "status": "bounded_limitation",
+   "title": "Modelled persistence loss and actual sync calls are not physical power-cut, controller or filesystem certification",
+   "source_refs": [
+    "P1.03 run101 remaining_limitations[2]",
+    "P1.03 run132 limitations[2]; /opt/data/scratch/mandatary-p103-review132/review-report.md"
+   ],
+   "disposition": "Stated in docs/storage-repository.md and docs/usage-accounting.md: the model assumes sync is honoured; no power-cut, filesystem, controller, firmware, network-filesystem or production Unraid guarantee is claimed. Qualification of the supported storage remains in GATE-QUALIFICATION (P1.20).",
+   "rationale": "A software fixture cannot certify hardware durability; the limit is stated, not weakened.",
+   "current_source": [
+    "docs/storage-repository.md",
+    "docs/usage-accounting.md"
+   ]
+  },
+  {
+   "id": "P103-R132-soft-go-limits-no-oom-guarantee",
+   "group": "auth",
+   "source_card": "P1.03",
+   "status": "bounded_limitation",
+   "title": "Soft Go memory limits are not whole-job caps; reclaim events rose but no OOM kill was observed; no no-OOM guarantee",
+   "source_refs": [
+    "P1.03 run132 limitations[3]"
+   ],
+   "disposition": "Resource protections for protected local runs (GOMEMLIMIT/GOGC, CPU affinity, sequential heavy jobs, finite address-space allowance) are described in docs/sqlc-dependencies.md and the mandatary-local-gates guidance; they reduce, but do not guarantee against, memory pressure. Footprint is measured in P1.20/C5 (GATE-FOOTPRINT-RELEASE).",
+   "rationale": "Go soft limits are advisory to the runtime; a guarantee would require a cgroup hard cap that belongs to deployment.",
+   "current_source": [
+    "docs/sqlc-dependencies.md"
+   ]
+  },
+  {
+   "id": "HIST-local-scanner-allocation-failures",
+   "group": "auth",
+   "source_card": "P1.05/P1.06/P1.07/P1.09",
+   "status": "bounded_limitation",
+   "title": "Historical local source govulncheck/golangci-lint allocation failures, combined-command timeouts and the pre-fix GO-2026-6859 local report remain failures, never passes",
+   "source_refs": [
+    "P1.05 run238 limitations[3]",
+    "P1.06 run241 limitations[0],[1]; run278 risks_limitations[0]; run279 risks_limitations[1],[2]",
+    "P1.07 run338/340/373 remaining_risks_limits (native allocation failures)",
+    "P1.09 run432 security_notes[0] (GO-2026-6859 local report)"
+   ],
+   "disposition": "Preserved as failed local attempts with the exact-head hosted Security job as the scanner gate on each card. Superseded for the current dependency graph by DEP-GO-X-NET-CRYPTO (govulncheck reports no vulnerabilities after the module bumps) and by the pinned scanners running in the hosted Security job of this PR. See P112-scanner-resource-disposition for the same rule on P1.12.",
+   "rationale": "A resource-limited local failure is not evidence either way; the rule is that hosted exact-head scanner execution decides.",
+   "current_source": [
+    "docs/sqlc-dependencies.md"
+   ]
+  },
+  {
+   "id": "P102-R97-structural-only-acceptance",
+   "group": "auth",
+   "source_card": "P1.02",
+   "status": "bounded_limitation",
+   "title": "P1.02 accepted structural SQL constraints only, not runtime authentication, authorization, current-generation or trusted-clock enforcement",
+   "source_refs": [
+    "P1.02 run96 limitations[0],[1]",
+    "P1.02 run97 limitations[0]; /opt/data/scratch/mandatary-p102-review97/review97-report.md (Residual risk and limits)"
+   ],
+   "disposition": "A scope statement of the P1.02 acceptance, not an open defect: runtime repository, encryption, authentication, authorization and accounting were delivered and independently accepted by P1.03, P1.05-P1.11 and P1.15; runtime power-loss durability remains P103-R132-modelled-persistence-loss.",
+   "rationale": "The structural schema card never claimed runtime enforcement; each runtime claim is evidenced by its own owning card.",
+   "current_source": [
+    "docs/storage-repository.md"
+   ]
+  },
+  {
+   "id": "C2-O1-session-revocation-leases",
+   "group": "auth",
+   "source_card": "C2",
+   "status": "already_resolved",
+   "title": "Session revocation paths did not call Authorizer.NotifyPolicyChange; an active lease stayed live until the next Revalidate (probe C2R-O1)",
+   "source_refs": [
+    "C2 run442 nonblocking O1 (Info, for P1.13); /opt/data/scratch/mandatary-c2-checkpoint-r442/c2-checkpoint-report.md:171-190"
+   ],
+   "disposition": "Resolved by P1.13: follow streams end on every real session revocation path (logout, saved-code recovery entry, MFA-reset issuance, protective reports) within the bounded pull interval, and the push path through ops.NotifyAuthorityChange is documented in docs/operations.md. The production wiring of the push is retained in P113-N1-session-push (P1.19).",
+   "current_source": [
+    "internal/auth/operations_service_test.go",
+    "docs/operations.md"
+   ],
+   "acceptance": [
+    "TestOpsFollowStreamEndsOnEveryRealSessionRevocationPath (C2R-O1), required by the P1.13 card."
+   ],
+   "see_rows": [
+    "P113-N1-session-push"
+   ]
+  },
+  {
+   "id": "C2-carried-items-and-limits",
+   "group": "auth",
+   "source_card": "C2",
+   "status": "already_resolved",
+   "title": "C2 carried C1 O1/O2, P1.11 L1-L4, P1.08 L4, P1.10 L1-L4 and its limitations (no real Docker, hosted arm64 only, split Go 1.26.11 auth run, no REST/MCP at that time)",
+   "source_refs": [
+    "C2 run442 nonblocking carried (Low/Info); run442 limitations[0]-[5]"
+   ],
+   "disposition": "Each carried item has its own row in this ledger (see_rows). The C2 limitations were scope statements of that checkpoint: REST/MCP adapters arrived in P1.14 and are covered by P110-R440-bearer-http-evidence; real Docker and mail stay outside this card by the common contract; platform and release qualification stays in GATE-QUALIFICATION.",
+   "acceptance": [
+    "See the listed rows for the evidence of each carried item."
+   ],
+   "see_rows": [
+    "C1-O1-preauth-metadata",
+    "C1-O2-attempt-spy",
+    "P111-L1-direct-api-contract",
+    "P111-L2-joined-generic-fault",
+    "P111-L3-safe-logger-regression",
+    "P111-NIT-matrix-row",
+    "AUTH-08-L4",
+    "AUTH-10-L1",
+    "AUTH-10-L2",
+    "AUTH-10-L3",
+    "AUTH-10-L4",
+    "P110-R440-bearer-http-evidence",
+    "GATE-QUALIFICATION"
+   ]
+  },
+  {
+   "id": "AUTH-HIST-CLOSED-FINDINGS",
+   "group": "auth",
+   "source_card": "P1.02-P1.10",
+   "status": "already_resolved",
+   "title": "Findings closed by independent re-review: P1.03 F1/F2, P1.05 F1/F2, P1.06 F1-F5 (F4 Low), P1.07 F1-F3, P1.08 F1-F3 and L1-L3, P1.09 F1 (L1/L2/L6/L7 are AUTH-09-L1-L2-L6-L7)",
+   "source_refs": [
+    "P1.03 run132 findings_closed",
+    "P1.05 run238 findings_closed",
+    "P1.06 run279 findings_closed",
+    "P1.07 run373 findings_closed",
+    "P1.08 run431 findings_closed",
+    "P1.09 run437/438"
+   ],
+   "disposition": "Historical controls closed by the named re-review runs with permanent regression suites; they are not reopened and the suites stay part of make check.",
+   "current_source": [
+    "internal/store",
+    "internal/auth/session_authz_test.go",
+    "internal/auth/session_http_test.go"
+   ],
+   "acceptance": [
+    "The closing review run recorded for each finding; the regression suites run in every hosted Baseline job."
+   ]
+  },
+  {
+   "id": "GOV-SETTLED",
+   "group": "gate",
+   "source_card": "Phase 0.01-0.11, 0.13 and workflow validation (t_6d68940e)",
+   "status": "bounded_limitation",
+   "title": "Phase 0 contracts are requirements, not executed product evidence; later-phase boundaries stay later-phase",
+   "source_refs": [
+    "P1.18.4 card body GOV-SETTLED",
+    "Phase 0.08 t_01261cf2 run6 deferred_until Phase 2 acceptance (general notifications/webhooks)",
+    "Phase 0.11 t_6cfc4cb1 extension boundaries",
+    "Phase 0.13 t_ddd96736 run19 F1 (Medium) and F2 (Low, PR 2 body) resolved; limitations: design-only review",
+    "t_6d68940e run1/run2 limitations (shared GitHub App identity; no application tests existed)"
+   ],
+   "disposition": "No separately evidenced unsettled governance decision remains in these cards. Their findings were closed at the cited review runs (Phase 0.13 F1 and F2). Phase 0.08 general notifications/webhooks and the Phase 0.11 extension boundaries stay intentionally later-phase; no Phase 2+ scope is added to call a decision resolved. Public name/licence clearance is GOV-PUBLIC and the release evidence gates are GATE-QUALIFICATION, GATE-PRODUCTION-PACKAGING and GATE-FOOTPRINT-RELEASE.",
+   "rationale": "The Phase 0 cards are design contracts reviewed as design-only; product evidence belongs to the Phase 1 cards and the release gates.",
+   "current_source": [
+    "roadmap.md",
+    "technical-decisions.md"
+   ]
+  },
+  {
    "id": "AUTH-09-L4-L5",
    "group": "auth",
    "source_card": "P1.09",
@@ -2623,7 +3010,9 @@
    "group": "gate",
    "source_card": "P1.01-P1.10 / SUP",
    "source_refs": [
-    "P1.01-P1.10 repeated disclaimers (SUP requirements, NIST/FIPS wording); supported matrix in support-and-deployment-matrix.md"
+    "P1.01-P1.10 repeated disclaimers (SUP requirements, NIST/FIPS wording); supported matrix in support-and-deployment-matrix.md",
+    "P1.07 run338/run340/run373 (physical device, provider, biometric/PAD/erasure, sync, transport, approved-RBG unknowns)",
+    "P1.05 run237/run238 (NIST/FIPS/AAL, validated RBG, pepper/hardware custody)"
    ],
    "status": "future_gate",
    "owner": "P1.20",
@@ -2671,7 +3060,8 @@
    "group": "gate",
    "source_card": "P1.01-P1.07",
    "source_refs": [
-    "P1.01-P1.07 repeated CodeQL alert-inventory disclosures"
+    "P1.01-P1.07 repeated CodeQL alert-inventory disclosures",
+    "P1.03 run101 remaining_limitations[1], run131/run132 (authorized-App HTTP 403 on the full alert inventory)"
    ],
    "status": "future_gate",
    "owner": "P1.20",
@@ -2722,11 +3112,14 @@
    "comments": 13,
    "runs": 35,
    "finding_rows": [
+    "AUTH-HIST-CLOSED-FINDINGS",
     "DEP-ESLINT-MINIMATCH",
     "DEP-GO-X-NET-CRYPTO",
     "DEP-SQLC-CEL-GO",
     "GATE-CODEQL-INVENTORY",
-    "GATE-QUALIFICATION"
+    "GATE-QUALIFICATION",
+    "P103-R132-modelled-persistence-loss",
+    "P103-R132-soft-go-limits-no-oom-guarantee"
    ]
   },
   {
@@ -2737,11 +3130,13 @@
    "comments": 3,
    "runs": 2,
    "finding_rows": [
+    "AUTH-HIST-CLOSED-FINDINGS",
     "DEP-ESLINT-MINIMATCH",
     "DEP-GO-X-NET-CRYPTO",
     "DEP-SQLC-CEL-GO",
     "GATE-CODEQL-INVENTORY",
-    "GATE-QUALIFICATION"
+    "GATE-QUALIFICATION",
+    "P104-R164-nested-worktree-vcs-stamp"
    ]
   },
   {
@@ -2752,12 +3147,16 @@
    "comments": 18,
    "runs": 74,
    "finding_rows": [
+    "AUTH-HIST-CLOSED-FINDINGS",
     "AUTH-UNICODE17-NFC",
     "DEP-ESLINT-MINIMATCH",
     "DEP-GO-X-NET-CRYPTO",
     "DEP-SQLC-CEL-GO",
     "GATE-CODEQL-INVENTORY",
-    "GATE-QUALIFICATION"
+    "GATE-QUALIFICATION",
+    "HIST-local-scanner-allocation-failures",
+    "P105-R238-normalizer-advisory-ownership",
+    "P105-R238-repository-poison"
    ]
   },
   {
@@ -2768,11 +3167,13 @@
    "comments": 9,
    "runs": 37,
    "finding_rows": [
+    "AUTH-HIST-CLOSED-FINDINGS",
     "DEP-ESLINT-MINIMATCH",
     "DEP-GO-X-NET-CRYPTO",
     "DEP-SQLC-CEL-GO",
     "GATE-CODEQL-INVENTORY",
-    "GATE-QUALIFICATION"
+    "GATE-QUALIFICATION",
+    "P102-R97-structural-only-acceptance"
    ]
   },
   {
@@ -2783,11 +3184,13 @@
    "comments": 12,
    "runs": 41,
    "finding_rows": [
+    "AUTH-HIST-CLOSED-FINDINGS",
     "DEP-ESLINT-MINIMATCH",
     "DEP-GO-X-NET-CRYPTO",
     "DEP-SQLC-CEL-GO",
     "GATE-CODEQL-INVENTORY",
-    "GATE-QUALIFICATION"
+    "GATE-QUALIFICATION",
+    "HIST-local-scanner-allocation-failures"
    ]
   },
   {
@@ -2798,11 +3201,13 @@
    "comments": 16,
    "runs": 94,
    "finding_rows": [
+    "AUTH-HIST-CLOSED-FINDINGS",
     "DEP-ESLINT-MINIMATCH",
     "DEP-GO-X-NET-CRYPTO",
     "DEP-SQLC-CEL-GO",
     "GATE-CODEQL-INVENTORY",
-    "GATE-QUALIFICATION"
+    "GATE-QUALIFICATION",
+    "HIST-local-scanner-allocation-failures"
    ]
   },
   {
@@ -2815,7 +3220,14 @@
    "finding_rows": [
     "AUTH-08-L1-L2-L3",
     "AUTH-08-L4",
-    "GATE-QUALIFICATION"
+    "AUTH-HIST-CLOSED-FINDINGS",
+    "GATE-QUALIFICATION",
+    "P108-R425-deferred-integrations",
+    "P108-R425-tls-retention",
+    "P108-R428-ambiguous-revoked-floor",
+    "P108-R428-down-migration-provenance",
+    "P108-R431-authorizer-revalidation-end-to-end",
+    "P108-R431-stranded-AAL1-session"
    ]
   },
   {
@@ -2830,7 +3242,11 @@
     "AUTH-09-L3",
     "AUTH-09-L4-L5",
     "AUTH-CI-BUDGET",
-    "GATE-QUALIFICATION"
+    "AUTH-HIST-CLOSED-FINDINGS",
+    "DEP-ESLINT-MINIMATCH",
+    "DEP-GO-X-NET-CRYPTO",
+    "GATE-QUALIFICATION",
+    "HIST-local-scanner-allocation-failures"
    ]
   },
   {
@@ -2846,7 +3262,11 @@
     "AUTH-10-L3",
     "AUTH-10-L4",
     "AUTH-CI-BUDGET",
-    "GATE-QUALIFICATION"
+    "AUTH-HIST-CLOSED-FINDINGS",
+    "GATE-QUALIFICATION",
+    "P110-R440-AgentTokenHash-presentation",
+    "P110-R440-bearer-http-evidence",
+    "P110-R440-owner-state-cascade"
    ]
   },
   {
@@ -3050,7 +3470,10 @@
    "in_scope": true,
    "comments": 1,
    "runs": 1,
-   "finding_rows": []
+   "finding_rows": [
+    "C2-O1-session-revocation-leases",
+    "C2-carried-items-and-limits"
+   ]
   },
   {
    "task_id": "t_2ebd562e",
@@ -3059,7 +3482,12 @@
    "in_scope": true,
    "comments": 1,
    "runs": 1,
-   "finding_rows": []
+   "finding_rows": [
+    "OPS-O1-arm64-budget",
+    "OPS-P119-composition",
+    "OPS-WebKit-select-CSP",
+    "OPS-no-conformance-and-future-bounds"
+   ]
   },
   {
    "task_id": "t_1bb7a4c3",
@@ -3088,7 +3516,19 @@
    "in_scope": true,
    "comments": 0,
    "runs": 1,
-   "finding_rows": []
+   "finding_rows": [
+    "OPS-A11Y-no-conformance",
+    "OPS-O1-arm64-budget",
+    "OPS-SUP04-real-matrix",
+    "P116-I1-singular-codes",
+    "P116-L1-mobile-focus",
+    "P116-L2-expired-recovery-copy",
+    "P116-L3-notice-least-privilege",
+    "P116-L4-unverifiable-contrast",
+    "P116-L5-address-storage-fault",
+    "P116-L6-postcommit-recovery-view",
+    "P116-O4-TOTP-provisioning"
+   ]
   },
   {
    "task_id": "t_1ed3ed83",
@@ -3097,7 +3537,19 @@
    "in_scope": true,
    "comments": 0,
    "runs": 1,
-   "finding_rows": []
+   "finding_rows": [
+    "OPS-A11Y-no-conformance",
+    "OPS-O1-arm64-budget",
+    "OPS-SUP04-real-matrix",
+    "P116-I1-singular-codes",
+    "P116-L1-mobile-focus",
+    "P116-L2-expired-recovery-copy",
+    "P116-L3-notice-least-privilege",
+    "P116-L4-unverifiable-contrast",
+    "P116-L5-address-storage-fault",
+    "P116-L6-postcommit-recovery-view",
+    "P116-O4-TOTP-provisioning"
+   ]
   },
   {
    "task_id": "t_e8d6fdb5",
@@ -3106,7 +3558,19 @@
    "in_scope": true,
    "comments": 0,
    "runs": 1,
-   "finding_rows": []
+   "finding_rows": [
+    "OPS-A11Y-no-conformance",
+    "OPS-O1-arm64-budget",
+    "OPS-SUP04-real-matrix",
+    "P116-I1-singular-codes",
+    "P116-L1-mobile-focus",
+    "P116-L2-expired-recovery-copy",
+    "P116-L3-notice-least-privilege",
+    "P116-L4-unverifiable-contrast",
+    "P116-L5-address-storage-fault",
+    "P116-L6-postcommit-recovery-view",
+    "P116-O4-TOTP-provisioning"
+   ]
   },
   {
    "task_id": "t_3ab2f0ae",
@@ -3115,7 +3579,19 @@
    "in_scope": true,
    "comments": 0,
    "runs": 8,
-   "finding_rows": []
+   "finding_rows": [
+    "OPS-A11Y-no-conformance",
+    "OPS-O1-arm64-budget",
+    "OPS-SUP04-real-matrix",
+    "P116-I1-singular-codes",
+    "P116-L1-mobile-focus",
+    "P116-L2-expired-recovery-copy",
+    "P116-L3-notice-least-privilege",
+    "P116-L4-unverifiable-contrast",
+    "P116-L5-address-storage-fault",
+    "P116-L6-postcommit-recovery-view",
+    "P116-O4-TOTP-provisioning"
+   ]
   },
   {
    "task_id": "t_bb9cfd69",
@@ -3124,7 +3600,19 @@
    "in_scope": true,
    "comments": 0,
    "runs": 1,
-   "finding_rows": []
+   "finding_rows": [
+    "P117-F1-detached-inventory",
+    "P117-L1-inventory-deadline",
+    "P117-accepted-ui-decisions",
+    "P117-note-encoded-route-guard",
+    "P117-note-generation-guards",
+    "P117-note-large-list-effective-access",
+    "P117-note-nav-and-route-integration",
+    "P117-note-no-endpoint-enable",
+    "P117-note-no-undisable-user",
+    "P117-note-rule-link",
+    "P117-note-structural-audit-preconditioning"
+   ]
   },
   {
    "task_id": "t_334fc695",
@@ -3133,7 +3621,19 @@
    "in_scope": true,
    "comments": 0,
    "runs": 1,
-   "finding_rows": []
+   "finding_rows": [
+    "P117-F1-detached-inventory",
+    "P117-L1-inventory-deadline",
+    "P117-accepted-ui-decisions",
+    "P117-note-encoded-route-guard",
+    "P117-note-generation-guards",
+    "P117-note-large-list-effective-access",
+    "P117-note-nav-and-route-integration",
+    "P117-note-no-endpoint-enable",
+    "P117-note-no-undisable-user",
+    "P117-note-rule-link",
+    "P117-note-structural-audit-preconditioning"
+   ]
   },
   {
    "task_id": "t_17ea8437",
@@ -3142,7 +3642,24 @@
    "in_scope": true,
    "comments": 1,
    "runs": 1,
-   "finding_rows": []
+   "finding_rows": [
+    "P118-F1-host-ceremony",
+    "P118-F2-reset-hook",
+    "P118-L1-zeroization",
+    "P118-L2-failed-import-reset",
+    "P118-L3-admin-defer-wipe",
+    "P118-Oa-stale-active-runbook",
+    "P118-Ob-wizard-browser",
+    "P118-note-compromised-checkbox",
+    "P118-note-cookie-substring-flake",
+    "P118-note-native-picker-and-procedure",
+    "P118-note-no-archive-preview",
+    "P118-note-no-login-quarantine-signal",
+    "P118-note-person-reenrollment",
+    "P118-note-refusal-docs",
+    "P118-note-runbook-pointer",
+    "P118-note-unconfirmed-result"
+   ]
   },
   {
    "task_id": "t_48695952",
@@ -3151,7 +3668,24 @@
    "in_scope": true,
    "comments": 0,
    "runs": 2,
-   "finding_rows": []
+   "finding_rows": [
+    "P118-F1-host-ceremony",
+    "P118-F2-reset-hook",
+    "P118-L1-zeroization",
+    "P118-L2-failed-import-reset",
+    "P118-L3-admin-defer-wipe",
+    "P118-Oa-stale-active-runbook",
+    "P118-Ob-wizard-browser",
+    "P118-note-compromised-checkbox",
+    "P118-note-cookie-substring-flake",
+    "P118-note-native-picker-and-procedure",
+    "P118-note-no-archive-preview",
+    "P118-note-no-login-quarantine-signal",
+    "P118-note-person-reenrollment",
+    "P118-note-refusal-docs",
+    "P118-note-runbook-pointer",
+    "P118-note-unconfirmed-result"
+   ]
   },
   {
    "task_id": "t_dda7b4e2",
@@ -3160,7 +3694,24 @@
    "in_scope": true,
    "comments": 0,
    "runs": 1,
-   "finding_rows": []
+   "finding_rows": [
+    "P118-F1-host-ceremony",
+    "P118-F2-reset-hook",
+    "P118-L1-zeroization",
+    "P118-L2-failed-import-reset",
+    "P118-L3-admin-defer-wipe",
+    "P118-Oa-stale-active-runbook",
+    "P118-Ob-wizard-browser",
+    "P118-note-compromised-checkbox",
+    "P118-note-cookie-substring-flake",
+    "P118-note-native-picker-and-procedure",
+    "P118-note-no-archive-preview",
+    "P118-note-no-login-quarantine-signal",
+    "P118-note-person-reenrollment",
+    "P118-note-refusal-docs",
+    "P118-note-runbook-pointer",
+    "P118-note-unconfirmed-result"
+   ]
   },
   {
    "task_id": "t_3064b26e",
@@ -3178,7 +3729,9 @@
    "in_scope": true,
    "comments": 0,
    "runs": 2,
-   "finding_rows": []
+   "finding_rows": [
+    "GOV-SETTLED"
+   ]
   },
   {
    "task_id": "t_e4f5bb4f",
@@ -3187,7 +3740,9 @@
    "in_scope": true,
    "comments": 1,
    "runs": 1,
-   "finding_rows": []
+   "finding_rows": [
+    "GOV-SETTLED"
+   ]
   },
   {
    "task_id": "t_b5a17cdc",
@@ -3196,7 +3751,9 @@
    "in_scope": true,
    "comments": 3,
    "runs": 1,
-   "finding_rows": []
+   "finding_rows": [
+    "GOV-SETTLED"
+   ]
   },
   {
    "task_id": "t_281bba7b",
@@ -3205,7 +3762,9 @@
    "in_scope": true,
    "comments": 1,
    "runs": 1,
-   "finding_rows": []
+   "finding_rows": [
+    "GOV-SETTLED"
+   ]
   },
   {
    "task_id": "t_1af7c0f2",
@@ -3214,7 +3773,9 @@
    "in_scope": true,
    "comments": 3,
    "runs": 1,
-   "finding_rows": []
+   "finding_rows": [
+    "GOV-SETTLED"
+   ]
   },
   {
    "task_id": "t_92c5c52c",
@@ -3223,7 +3784,9 @@
    "in_scope": true,
    "comments": 3,
    "runs": 1,
-   "finding_rows": []
+   "finding_rows": [
+    "GOV-SETTLED"
+   ]
   },
   {
    "task_id": "t_239f5e2a",
@@ -3232,7 +3795,9 @@
    "in_scope": true,
    "comments": 3,
    "runs": 1,
-   "finding_rows": []
+   "finding_rows": [
+    "GOV-SETTLED"
+   ]
   },
   {
    "task_id": "t_4f91fc1d",
@@ -3241,7 +3806,9 @@
    "in_scope": true,
    "comments": 1,
    "runs": 1,
-   "finding_rows": []
+   "finding_rows": [
+    "GOV-SETTLED"
+   ]
   },
   {
    "task_id": "t_01261cf2",
@@ -3250,7 +3817,9 @@
    "in_scope": true,
    "comments": 2,
    "runs": 1,
-   "finding_rows": []
+   "finding_rows": [
+    "GOV-SETTLED"
+   ]
   },
   {
    "task_id": "t_4725c0a6",
@@ -3259,7 +3828,9 @@
    "in_scope": true,
    "comments": 1,
    "runs": 1,
-   "finding_rows": []
+   "finding_rows": [
+    "GOV-SETTLED"
+   ]
   },
   {
    "task_id": "t_e4846cd1",
@@ -3268,7 +3839,9 @@
    "in_scope": true,
    "comments": 3,
    "runs": 1,
-   "finding_rows": []
+   "finding_rows": [
+    "GOV-SETTLED"
+   ]
   },
   {
    "task_id": "t_6cfc4cb1",
@@ -3277,7 +3850,9 @@
    "in_scope": true,
    "comments": 1,
    "runs": 1,
-   "finding_rows": []
+   "finding_rows": [
+    "GOV-SETTLED"
+   ]
   },
   {
    "task_id": "t_86e68ae0",
@@ -3287,7 +3862,8 @@
    "comments": 1,
    "runs": 1,
    "finding_rows": [
-    "GOV-PUBLIC"
+    "GOV-PUBLIC",
+    "GOV-SETTLED"
    ]
   },
   {
@@ -3297,7 +3873,9 @@
    "in_scope": true,
    "comments": 12,
    "runs": 5,
-   "finding_rows": []
+   "finding_rows": [
+    "GOV-SETTLED"
+   ]
   },
   {
    "task_id": "t_7f9cfaf3",
@@ -3310,6 +3888,7 @@
     "GATE-PRODUCTION-PACKAGING",
     "OPS-P119-composition",
     "OPS-production-restart-runtime",
+    "P108-R425-tls-retention",
     "P112-event-reconnect-contract",
     "P113-N1-session-push",
     "P115-D4",
@@ -3330,6 +3909,7 @@
     "GATE-QUALIFICATION",
     "OPS-SUP04-real-matrix",
     "OPS-WebKit-select-CSP",
+    "P104-R164-nested-worktree-vcs-stamp",
     "P112-advisory-inventory-carry",
     "P115-O1-sync-write-cost",
     "P116-O4-TOTP-provisioning"
