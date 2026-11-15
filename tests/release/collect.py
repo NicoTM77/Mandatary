@@ -24,13 +24,16 @@ TOPLEVEL = re.compile(r"^--- (PASS|FAIL|SKIP): (Test\w+)\b")
 
 def rows(path):
     out = {}
-    if not os.path.exists(path):
-        return out
-    for ln in open(path):
-        p = ln.rstrip("\n").split("\t")
+    for ln in read(path).splitlines():
+        p = ln.split("\t")
         if len(p) == 3:
             out[p[0]] = (int(p[1]), int(p[2]))
     return out
+
+
+def load_json(path):
+    with open(path) as fh:
+        return json.load(fh)
 
 
 def read(path):
@@ -129,7 +132,7 @@ def browsers(d):
 def scan(trivy_path, sbom_path, version_path, arch):
     res = []
     try:
-        tr = json.load(open(trivy_path))
+        tr = load_json(trivy_path)
     except (OSError, ValueError):
         tr = None
     if tr is None or not isinstance(tr.get("Results"), list) or not tr["Results"]:
@@ -139,7 +142,7 @@ def scan(trivy_path, sbom_path, version_path, arch):
         targets = [r.get("Target") for r in tr["Results"]]
         res.append(result("SCAN-TRIVY-" + arch, not vulns, "%s; %d result target(s) scanned (%s); HIGH/CRITICAL findings: %d%s" % (read(version_path).strip().splitlines()[0] if read(version_path) else "version unrecorded", len(targets), ", ".join(map(str, targets))[:160], len(vulns), (" -> " + ", ".join(sorted({v.get("VulnerabilityID", "?") for v in vulns}))[:200]) if vulns else "")))
     try:
-        sb = json.load(open(sbom_path))
+        sb = load_json(sbom_path)
         comps = sb.get("components") or []
         ok = sb.get("bomFormat") == "CycloneDX" and len(comps) > 0
         res.append(result("SCAN-SBOM-" + arch, ok, "%s %s, %d components" % (sb.get("bomFormat"), sb.get("specVersion"), len(comps))))
@@ -152,7 +155,7 @@ def jobs(path):
     """Hosted CI: the jobs API document of one workflow run (`gh api repos/.../actions/runs/ID/jobs`). A job counts only when it
     completed with conclusion `success`; skipped, cancelled, neutral and in-progress jobs are FAIL, never a pass."""
     try:
-        doc = json.load(open(path))
+        doc = load_json(path)
         js = doc["jobs"]
     except (OSError, ValueError, KeyError, TypeError):
         return {"results": [result("HOSTED-JOBS", False, "no jobs document")]}

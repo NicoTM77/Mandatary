@@ -457,6 +457,10 @@ class Report(unittest.TestCase):
                 json.dump({"results": [{"id": "A", "status": "PASS"}]}, fh)
             with open(os.path.join(ev, "manifest.json"), "w") as fh:
                 json.dump({"release_candidate": {"head": "x"}, "artifacts": {"r": {"file": "r.json", "kind": "results", "source": "test"}}}, fh)
+            def sums():
+                with open(os.path.join(ev, "SHA256SUMS"), "w") as sf:
+                    sf.write("".join("%s  %s\n" % (report.sha256_file(os.path.join(ev, n)), n) for n in ("manifest.json", "r.json")))
+            sums()
             crit = os.path.join(d, "criteria.json")
             with open(crit, "w") as fh:
                 json.dump({"criteria": [{"id": "C", "group": "g", "text": "t", "evidence": ["A@r"]}]}, fh)
@@ -469,8 +473,17 @@ class Report(unittest.TestCase):
             self.assertEqual(run("--check").returncode, 1)
             run()
             with open(os.path.join(ev, "r.json"), "w") as fh:
-                json.dump({"results": [{"id": "A", "status": "FAIL"}]}, fh)  # the evidence changed after the report was written
+                json.dump({"results": [{"id": "A", "status": "FAIL"}]}, fh)  # the evidence changed after SHA256SUMS and the report were written
+            r = run("--check")
+            self.assertNotEqual(r.returncode, 0)
+            self.assertIn("SHA256SUMS", r.stderr)
+            sums()  # re-sealed but the report was not regenerated: still stale
             self.assertEqual(run("--check").returncode, 1)
+            self.assertEqual(run().returncode, 0)
+            self.assertEqual(run("--check").returncode, 0)
+            with open(os.path.join(ev, "extra.log"), "w") as fh:
+                fh.write("an unlisted file")
+            self.assertNotEqual(run("--check").returncode, 0)  # a file nobody sealed
 
 
 if __name__ == "__main__":

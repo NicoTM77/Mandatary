@@ -57,8 +57,38 @@ def evaluate(criteria, results, digests):
     return rows
 
 
+def verify_sums(evdir):
+    """Every committed evidence file (raw logs included) is listed in SHA256SUMS with its digest, so an edited log is detected even when it
+    is not one of the linked results files. Returns a list of problems (empty = consistent)."""
+    path = os.path.join(evdir, "SHA256SUMS")
+    if not os.path.exists(path):
+        return ["SHA256SUMS is missing"]
+    listed, problems = {}, []
+    with open(path) as fh:
+        for ln in fh:
+            if not ln.strip():
+                continue
+            digest, _, name = ln.rstrip("\n").partition("  ")
+            listed[name] = digest
+    for name, digest in sorted(listed.items()):
+        f = os.path.join(evdir, name)
+        if not os.path.exists(f):
+            problems.append("listed but missing: " + name)
+        elif sha256_file(f) != digest:
+            problems.append("digest mismatch: " + name)
+    on_disk = set()
+    for root, _, files in os.walk(evdir):
+        for fn in files:
+            rel = os.path.relpath(os.path.join(root, fn), evdir)
+            if rel != "SHA256SUMS":
+                on_disk.add(rel)
+    problems += ["not listed: " + n for n in sorted(on_disk - set(listed))]
+    return problems
+
+
 def load_evidence(evdir):
-    manifest = json.load(open(os.path.join(evdir, "manifest.json")))
+    with open(os.path.join(evdir, "manifest.json")) as fh:
+        manifest = json.load(fh)
     results, digests, meta = {}, {}, {}
     for name, a in manifest["artifacts"].items():
         path = os.path.join(evdir, a["file"])
@@ -67,7 +97,8 @@ def load_evidence(evdir):
         digests[name] = sha256_file(path)
         meta[name] = a
         if a["kind"] == "results":
-            doc = json.load(open(path))
+            with open(path) as fh:
+                doc = json.load(fh)
             for r in doc.get("results", []):
                 results["%s@%s" % (r["id"], name)] = r["status"]
     return manifest, results, digests, meta
@@ -124,12 +155,26 @@ def render(manifest, rows, digests, meta, results):
             links = "<br>".join("%s `%s` %s" % ("✔" if l["link"] == "PASS" else ("✘" if l["link"] == "FAIL" else "?"), l["ref"].split("@")[0] + "@" + l["ref"].split("@")[1], (l["digest"] or "no digest")[:12]) for l in r["links"]) or "none"
             w("| %s | %s | **%s** | %s | %s |" % (r["id"], r["text"].replace("|", "\\|"), r["status"], links, (r.get("limits") or "").replace("|", "\\|")))
         w("")
+    if manifest.get("findings"):
+        w("## 4. Findings recorded by this run")
+        w("")
+        w("These are observations made while producing the evidence. They are not criteria and are not hidden by the verdict above; each names where it is evidenced and what it needs.")
+        w("")
+        for f in manifest["findings"]:
+            w("### %s - %s" % (f["id"], f["title"]))
+            w("")
+            w(f["detail"])
+            w("")
     return "\n".join(L) + "\n"
 
 
 def build(evdir, criteria_path):
+    problems = verify_sums(evdir)
+    if problems:
+        raise SystemExit("evidence is not consistent with SHA256SUMS: " + "; ".join(problems[:5]))
     manifest, results, digests, meta = load_evidence(evdir)
-    criteria = json.load(open(criteria_path))["criteria"]
+    with open(criteria_path) as fh:
+        criteria = json.load(fh)["criteria"]
     rows = evaluate(criteria, results, digests)
     return manifest, rows, digests, meta, results
 
@@ -145,7 +190,10 @@ def main():
     text = render(manifest, rows, digests, meta, results)
     ok, n = verdict(rows)
     if a.check:
-        have = open(a.out).read() if os.path.exists(a.out) else None
+        have = None
+        if os.path.exists(a.out):
+            with open(a.out) as fh:
+                have = fh.read()
         if have != text:
             print("STALE: %s does not match the committed evidence" % a.out, file=sys.stderr)
             return 1
