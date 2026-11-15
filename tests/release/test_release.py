@@ -269,6 +269,14 @@ class Collect(unittest.TestCase):
         self.assertEqual(set(got.values()), {"PASS"}, got)
         self.assertEqual(set(got), {"GATE-GOVULNCHECK", "GATE-GOTEST", "GATE-GOFMT", "GATE-NODE-SCRIPTS", "GATE-WEB-VITEST", "GATE-NPM-AUDIT"})  # steps that did not run have no entry
 
+    def test_the_product_tree_comparison_passes_only_when_nothing_differs(self):
+        same = self.tree({"product-tree.txt": "compared 8c1a55a..0d8b431 over cmd internal web\n"})
+        self.assertEqual(self.by_id(collect.gates(same)), {"GATE-PRODUCT-TREE": "PASS"})
+        differs = self.tree({"product-tree.txt": "compared 8c1a55a..0d8b431 over cmd internal web\ninternal/auth/x.go\n"})
+        self.assertEqual(self.by_id(collect.gates(differs)), {"GATE-PRODUCT-TREE": "FAIL"})
+        empty = self.tree({"product-tree.txt": ""})
+        self.assertEqual(self.by_id(collect.gates(empty)), {"GATE-PRODUCT-TREE": "FAIL"})  # no comparison recorded is not "no difference"
+
     def test_a_gate_that_exited_zero_without_its_evidence_is_a_failure(self):
         d = self.tree({"gates.tsv": "govulncheck\t0\t5\ngotest-short\t0\t9\n", "govulncheck.log": "scanner crashed\n", "gotest-short.log": "ok  \tgithub.com/x/p\t0.1s\n",
                        "web.tsv": "vitest\t0\t9\nnpm-audit\t0\t1\n", "vitest.log": "no summary\n", "npm-audit.json": "not json"})

@@ -100,6 +100,10 @@ def gates(d):
     if "npm-audit" in w:
         hc, total = npm_high_critical(read(os.path.join(d, "npm-audit.json")))
         res.append(result("GATE-NPM-AUDIT", w["npm-audit"][0] == 0 and hc == 0, "npm audit --audit-level=high: exit %d; high+critical %s of %s advisories" % (w["npm-audit"][0], hc, total)))
+    tree = os.path.join(d, "product-tree.txt")
+    if os.path.exists(tree):
+        lines = [ln for ln in read(tree).splitlines() if ln.strip()]
+        res.append(result("GATE-PRODUCT-TREE", len(lines) >= 1 and lines[0].startswith("compared ") and len(lines) == 1, "%s; %d product file(s) differ" % (lines[0] if lines else "no comparison recorded", max(len(lines) - 1, 0))))
     return {"results": res}
 
 

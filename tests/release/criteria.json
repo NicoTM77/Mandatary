@@ -35,7 +35,7 @@
     {"id": "SH-9b", "group": "Shared release criteria", "text": "Operator documentation, configuration examples, supported-version policy and known limitations match the delivered release (mechanical checks; accuracy of prose is a reviewer judgment).",
      "evidence": ["REL-DOCS-LINKS@vm-amd64", "REL-DOCS-DEPLOY@vm-amd64", "REL-DOCS-LIMITS@vm-amd64", "REL-DOCS-README-LIMITS@vm-amd64"]},
     {"id": "SH-10", "group": "Shared release criteria", "text": "Acceptance results are recorded against a versioned release artifact (exact commit, image digest and binary digest); undelivered later-phase features are unavailable, not insecure stubs.",
-     "evidence": ["REL-IMG-01@vm-amd64", "REL-MCP-UNSUPPORTED@vm-amd64", "REL-MATRIX-RAW@vm-amd64", "REL-DOCS-UNAVAILABLE@vm-amd64"]},
+     "evidence": ["REL-IMG-01@vm-amd64", "GATE-PRODUCT-TREE@gates", "REL-MCP-UNSUPPORTED@vm-amd64", "REL-MATRIX-RAW@vm-amd64", "REL-DOCS-UNAVAILABLE@vm-amd64"]},
     {"id": "P1-E1", "group": "Phase 1 exit criteria", "text": "From a clean Compose deployment: bootstrap an administrator, create a user/group and agent identity, grant a function on test container A, and call it through both the API and a real MCP client.",
      "evidence": ["REL-SETUP-setup-complete@vm-amd64", "REL-ID-01@vm-amd64", "REL-ID-02@vm-amd64", "REL-ID-03@vm-amd64", "REL-ID-04@vm-amd64", "REL-ID-05@vm-amd64", "REL-ID-06@vm-amd64", "REL-MATRIX-POS@vm-amd64", "REL-MATRIX-PARITY@vm-amd64"]},
     {"id": "P1-E2", "group": "Phase 1 exit criteria", "text": "Denials for an unauthenticated caller, a second ungranted function, test container B and each unsupported operation; policy/credential revocation; no alternate forwarding bypass (no daemon event on B, on Mandatary itself or on its labelled peer).",
