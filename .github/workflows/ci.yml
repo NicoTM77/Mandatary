@@ -122,12 +122,98 @@ jobs:
           printf 'TMPDIR=%s\n' "$test_root" >> "$GITHUB_ENV"
           stat -c '%a %u:%g %n' / /home "$HOME" "$test_root"
       - run: uname -m && make install build GOFLAGS="-mod=readonly -p=4" GOMAXPROCS=4 GOMEMLIMIT=12GiB GOGC=100 && go test -race -timeout=30m -count=1 -v ./...
+  # Production image (P1.19): built and RUN natively on each supported CPU (a cross-compile alone is not evidence), on a
+  # disposable hosted VM that is its own isolated Docker daemon (security-contracts.md S1.4: no production socket). The
+  # acceptance harness (tests/image/acceptance.py) exercises the image facts, hardening, the SELF readiness matrix against
+  # the real daemon and the full Compose + TLS proxy + TLS SMTP fixture + setup flow. Trivy (pinned by digest, run as an
+  # unprivileged container over an image tarball, never given the Docker socket) is the TD 2.3 image gate: any HIGH or
+  # CRITICAL finding, or a scanner/DB failure, fails the job.
+  image:
+    name: Image (${{ matrix.platform }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-24.04
+            arch: amd64
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm
+            arch: arm64
+    env:
+      TRIVY_IMAGE: ghcr.io/aquasecurity/trivy@sha256:8f6bb947dbc528902e11f2f5be52f7b519f6a39d5d148f41166f2040499768fb
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Record the build host
+        run: |
+          uname -m
+          docker version --format 'server={{.Server.Version}} api={{.Server.APIVersion}} {{.Server.Os}}/{{.Server.Arch}}'
+          docker compose version
+          git rev-parse HEAD
+          # The isolation identity the harness must find (S1.4): this job's own disposable daemon, named explicitly.
+          id=$(docker --host unix:///var/run/docker.sock info --format '{{.ID}}')
+          test -n "$id"
+          printf 'FIXTURE_DOCKER_HOST=unix:///var/run/docker.sock\nFIXTURE_DAEMON_ID=%s\n' "$id" >> "$GITHUB_ENV"
+      - name: Isolation guard tests (hermetic, fake docker)
+        run: python3 tests/image/test_isolation.py
+      - name: Build the image and the host-helper artifact
+        run: |
+          set -euo pipefail
+          sha=$(git rev-parse HEAD)
+          docker build --platform ${{ matrix.platform }} --build-arg VCS_REF="$sha" -t mandatary-ci:${{ matrix.arch }} .
+          docker build --platform ${{ matrix.platform }} --target host-binary --build-arg VCS_REF="$sha" --output type=local,dest="$RUNNER_TEMP/out" .
+          docker image inspect mandatary-ci:${{ matrix.arch }} --format 'id={{.Id}} size={{.Size}} arch={{.Architecture}}'
+      - name: Isolation negative scenario (a daemon that is not the declared fixture is refused before anything is created)
+        run: |
+          set -euo pipefail
+          before="$(docker ps -aq | sort | tr '\n' ' ')|$(docker network ls -q | sort | tr '\n' ' ')|$(docker volume ls -q | sort | tr '\n' ' ')"
+          work="$RUNNER_TEMP/iso-negative"
+          rc=0
+          python3 tests/image/acceptance.py --image mandatary-ci:${{ matrix.arch }} --platform ${{ matrix.platform }} --repo . \
+            --docker-host "$FIXTURE_DOCKER_HOST" --expect-daemon-id "NOT-THE-DECLARED-FIXTURE-DAEMON" \
+            --work "$work" --sha "$(git rev-parse HEAD)" --results "$RUNNER_TEMP/iso-negative.json" || rc=$?
+          test "$rc" -eq 1
+          python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); assert [r["id"] for r in d["results"]]==["ISO-00"] and d["results"][0]["status"]=="FAIL", d' "$RUNNER_TEMP/iso-negative.json"
+          test ! -e "$work"
+          after="$(docker ps -aq | sort | tr '\n' ' ')|$(docker network ls -q | sort | tr '\n' ' ')|$(docker volume ls -q | sort | tr '\n' ' ')"
+          test "$before" = "$after"
+      - name: Image acceptance (hardening, SELF, Compose + TLS proxy + SMTP, SETUP)
+        run: |
+          set -euo pipefail
+          work=$(mktemp -d "$HOME/mandatary-image.XXXXXXXX")
+          mkdir -p "$RUNNER_TEMP/evidence"
+          python3 tests/image/acceptance.py --image mandatary-ci:${{ matrix.arch }} --platform ${{ matrix.platform }} --repo . \
+            --docker-host "$FIXTURE_DOCKER_HOST" --expect-daemon-id "$FIXTURE_DAEMON_ID" \
+            --work "$work" --host-binary "$RUNNER_TEMP/out/mandatary" --sha "$(git rev-parse HEAD)" \
+            --results "$RUNNER_TEMP/evidence/results-${{ matrix.arch }}.json"
+      - name: SBOM and Trivy HIGH/CRITICAL gate
+        run: |
+          set -euo pipefail
+          ev="$RUNNER_TEMP/evidence"; mkdir -p "$ev"; chmod 0777 "$ev"
+          docker save mandatary-ci:${{ matrix.arch }} -o "$ev/image.tar"; chmod 0644 "$ev/image.tar"
+          trivy() { docker run --rm --cap-drop ALL --security-opt no-new-privileges:true --read-only --tmpfs /tmp -e TRIVY_CACHE_DIR=/cache -v trivy-cache:/cache -v "$ev:/work" "$TRIVY_IMAGE" "$@"; }
+          trivy --version | tee "$ev/trivy-version.txt"
+          trivy image --input /work/image.tar --format cyclonedx --output /work/sbom-${{ matrix.arch }}.cdx.json
+          trivy image --input /work/image.tar --severity HIGH,CRITICAL --exit-code 1 --format json --output /work/trivy-high-critical-${{ matrix.arch }}.json
+          rm -f "$ev/image.tar"
+          sha256sum "$ev"/*
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: ${{ always() }}
+        with:
+          name: image-evidence-${{ matrix.arch }}
+          path: ${{ runner.temp }}/evidence
+          if-no-files-found: warn
+          retention-days: 30
   security:
     name: Security
     # Fail-closed aggregation: the Security check (already required) can only pass
     # when every Baseline and every negative-control job passed. always() makes it
     # run and turn red, rather than silently skip, when an upstream job failed.
-    needs: [baseline, negative-control]
+    needs: [baseline, negative-control, image]
     if: ${{ always() }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -139,11 +225,12 @@ jobs:
       GOGC: '100'
       BASELINE_RESULT: ${{ needs.baseline.result }}
       NEGATIVE_CONTROL_RESULT: ${{ needs.negative-control.result }}
+      IMAGE_RESULT: ${{ needs.image.result }}
     steps:
-      - name: Require every Baseline and negative-control job to have passed
+      - name: Require every Baseline, negative-control and image job to have passed
         run: |
-          printf 'baseline=%s negative-control=%s\n' "$BASELINE_RESULT" "$NEGATIVE_CONTROL_RESULT"
-          [[ "$BASELINE_RESULT" == success && "$NEGATIVE_CONTROL_RESULT" == success ]]
+          printf 'baseline=%s negative-control=%s image=%s\n' "$BASELINE_RESULT" "$NEGATIVE_CONTROL_RESULT" "$IMAGE_RESULT"
+          [[ "$BASELINE_RESULT" == success && "$NEGATIVE_CONTROL_RESULT" == success && "$IMAGE_RESULT" == success ]]
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false

@@ -1,0 +1,39 @@
+# Acceptance-only overlay for tests/image/acceptance.py (scenario STACK). Never a deployment example.
+# It adds what the production file deliberately lacks: a TLS SMTP receiver fixture (synthetic `.test`
+# addresses, nothing leaves the isolated Docker host), the fixture CA for verified-TLS delivery, and the
+# service identity mapped to the invoking test user so the same-binary host helper can reach the bind mount
+# without root (security-contracts.md §S3.1b step 2).
+services:
+  mandatary:
+    user: "${ACC_UID}:${ACC_GID}"
+    environment:
+      # Go reads SSL_CERT_FILE instead of the system roots: the fixture CA is the only trust anchor.
+      SSL_CERT_FILE: /certs/ca.crt
+    volumes:
+      - type: bind
+        source: ${ACC_CERTS_DIR}
+        target: /certs
+        read_only: true
+
+  smtp:
+    image: docker.io/axllent/mailpit:v1.33.1@sha256:aef2aacc11f075ec0fb6874275ee4a421e688e11a96ebb296134d1735c7761ce
+    user: "${ACC_UID}:${ACC_GID}"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    tmpfs: ["/tmp:uid=${ACC_UID},gid=${ACC_GID},mode=0700"]
+    environment:
+      MP_DATABASE: /tmp/mailpit.db
+      MP_SMTP_TLS_CERT: /certs/smtp.crt
+      MP_SMTP_TLS_KEY: /certs/smtp.key
+      MP_SMTP_REQUIRE_STARTTLS: "true"
+    volumes:
+      - type: bind
+        source: ${ACC_CERTS_DIR}
+        target: /certs
+        read_only: true
+    ports:
+      - "127.0.0.1:${ACC_MAILPIT_PORT}:8025"
+    networks:
+      edge:
+        aliases: [smtp.test]

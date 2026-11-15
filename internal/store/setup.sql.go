@@ -35,6 +35,25 @@ func (q *Queries) ActivateConfirmedAddress(ctx context.Context, arg ActivateConf
 	return result.RowsAffected()
 }
 
+const activateFreshLocalEndpoint = `-- name: ActivateFreshLocalEndpoint :execrows
+UPDATE endpoints SET state = 'active', authority_generation = (SELECT authority_generation FROM installation_control WHERE singleton = 1)
+WHERE slug = 'local' AND transport = 'unix' AND state = 'quarantined' AND authority_generation = 0
+  AND (SELECT authority_generation FROM installation_control WHERE singleton = 1) > 0
+`
+
+// Runs only inside the first-administrator commit, in the same transaction as UnlockInstallation (it
+// fails if that did not just lift every generation to 1). The seeded local endpoint is still quarantined
+// at generation zero; it becomes a valid policy target at the installation's current authority generation.
+// It never touches a restored endpoint (a restore leaves generations above zero and reapproves
+// explicitly), a disabled endpoint, or any other slug, and it grants no operation by itself.
+func (q *Queries) ActivateFreshLocalEndpoint(ctx context.Context) (int64, error) {
+	result, err := q.db.ExecContext(ctx, activateFreshLocalEndpoint)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
 const activateProvenTOTP = `-- name: ActivateProvenTOTP :execrows
 UPDATE authenticators SET state = 'active', credential_generation = ?1, bound_at = ?2, changed_at = ?2
 WHERE id = ?3 AND kind = 'totp' AND state = 'pending' AND last_accepted_totp_step IS NOT NULL

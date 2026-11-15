@@ -2,6 +2,15 @@
 
 ## Scope and safety
 
+> **Current state (P1.19).** The paragraph below records the original P1.01 skeleton and is kept as
+> history; its list of what the binary lacks is **no longer current**. The binary now composes setup, sign-in,
+> policy administration, REST, MCP, the Docker backend (a real unix-socket backend only when
+> `MANDATARY_DOCKER_SOCKET` is set, or the in-memory mock when `MANDATARY_DEV_MOCK_DOCKER=true`; with neither it
+> serves no Docker surface), usage accounting and backup/restore. The default listener is still loopback
+> `127.0.0.1:8080` (`MANDATARY_ADMIN_LISTEN_ADDR`). The Phase 4 operations listener is refused at startup.
+> The production image and Compose are described in [docs/deployment.md](docs/deployment.md). Mandatary is
+> still in active development and the roadmap is not complete.
+
 P1.01 is a **development skeleton**, not a Docker-access product. It embeds a
 React 19 / TypeScript / Vite / Tailwind SPA in a static Go binary. The listener
 is fixed to `127.0.0.1:8080`; only `/` and compiled `/assets/*` files are served.
@@ -151,7 +160,8 @@ required for the exact head.
 The negative control runs as its own job per pinned Go version (`Negative control
 (Go 1.27.4)` and `(Go 1.26.11)`), on separate runners in parallel with Baseline and
 independent of it, so the positive and negative full-suite runs no longer share one
-30-minute job. The Security check depends on every Baseline and negative-control job
+30-minute job. The Security check depends on every Baseline, negative-control and Image job (P1.19: the production image is built
+and run natively on `linux/amd64` and `linux/arm64`, with a digest-pinned Trivy HIGH/CRITICAL gate and a CycloneDX SBOM)
 and fails (not skips) unless all of them succeeded, so a failing negative control
 blocks through the already-required Security check without any repository-setting
 change. Branch protection is not altered by this file; making the two new check

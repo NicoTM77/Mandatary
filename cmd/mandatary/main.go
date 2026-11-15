@@ -7,10 +7,13 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
+	"os/signal"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/NicoTM77/Mandatary/internal/api"
@@ -26,8 +29,14 @@ func developmentServer(logger *slog.Logger) *http.Server {
 }
 
 func developmentServerWith(logger *slog.Logger, handler http.Handler) *http.Server {
+	return serverFor(config.DefaultAdminListenAddr, logger, handler)
+}
+
+// serverFor builds the one HTTP server with bounded I/O. Long-lived follow and MCP streams extend
+// their own per-write deadline; the server-wide bounds stay small.
+func serverFor(addr string, logger *slog.Logger, handler http.Handler) *http.Server {
 	return &http.Server{
-		Addr:              "127.0.0.1:8080",
+		Addr:              addr,
 		Handler:           logging.HTTP(logger, handler),
 		ErrorLog:          slog.NewLogLogger(logger.Handler(), slog.LevelError),
 		ReadHeaderTimeout: 5 * time.Second,
@@ -47,7 +56,7 @@ const maintenanceInterval = 30 * time.Second
 // invalid operator configuration. It never issues a token on restart, after
 // expiry, or when the store is not an eligible empty one; it logs only the
 // configured secret-free setup URL.
-func startSetup(ctx context.Context, logger *slog.Logger, c config.Config, repo *store.Repository) (http.Handler, func(), bool) {
+func startSetup(ctx context.Context, logger *slog.Logger, c config.Config, repo *store.Repository, p *product) (http.Handler, func(), bool) {
 	static := web.Handler()
 	noop := func() {}
 	if c.PublicOrigin == "" {
@@ -96,7 +105,7 @@ func startSetup(ctx context.Context, logger *slog.Logger, c config.Config, repo 
 	// and factor services, which are built from the notice settings). Without it
 	// nothing is half-mounted: the paths fall through to the static 404/405.
 	if lifecycle != nil {
-		browser, ok := accountBrowser(lifecycle, c.PublicOrigin)
+		browser, ok := accountBrowser(lifecycle, c.PublicOrigin, repo, p)
 		if !ok {
 			return nil, noop, false
 		}
@@ -134,7 +143,7 @@ func startSetup(ctx context.Context, logger *slog.Logger, c config.Config, repo 
 // origin's host and the only allowed origin is the origin itself, never a Host or
 // forwarded header. When that pair is not acceptable to the WebAuthn service (an IP
 // literal, a public suffix) no key route exists at all rather than a weaker one.
-func accountBrowser(lifecycle *auth.Lifecycle, publicOrigin string) (*auth.Browser, bool) {
+func accountBrowser(lifecycle *auth.Lifecycle, publicOrigin string, repo *store.Repository, p *product) (*auth.Browser, bool) {
 	var keys *auth.WebAuthnService
 	if u, err := url.Parse(publicOrigin); err == nil {
 		if service, err := auth.NewWebAuthn(lifecycle, auth.WebAuthnSettings{RPID: u.Hostname(), Origins: []string{publicOrigin}}); err == nil {
@@ -152,11 +161,23 @@ func accountBrowser(lifecycle *auth.Lifecycle, publicOrigin string) (*auth.Brows
 	if err := auth.RegisterSecurityRoutes(browser, sessions); err != nil {
 		return nil, false
 	}
-	// No authorizer exists in this build to push policy changes to (the executor and
-	// its leases arrive with C3/P1.19), so the change notification is nil: every
-	// revocation is durable and enforced on the next verification.
-	admin, err := auth.NewAdmin(lifecycle, auth.DefaultAdminSettings(), nil)
+	// With a Docker backend composed, policy changes are pushed to the shared service so streams
+	// end at once; without one nothing is dispatched and every revocation is durable and enforced on
+	// the next verification. Restore and endpoint reapproval drop the self-protection proof through the
+	// same shared authorizer, and the read-only container source is the authorizer's own view.
+	var notify func(context.Context) error
+	if p != nil {
+		notify = p.notify
+	}
+	admin, err := auth.NewAdmin(lifecycle, auth.DefaultAdminSettings(), notify)
 	if err != nil {
+		return nil, false
+	}
+	if p != nil {
+		admin.WithTargetSource(p.targets).WithSafetyReset(p.safetyReset)
+	}
+	svc, err := newBackupService(repo)
+	if err != nil || admin.SetBackup(svc) != nil {
 		return nil, false
 	}
 	adminHTTP, err := auth.NewAdminHTTP(admin)
@@ -200,24 +221,40 @@ func run(ctx context.Context, getenv func(string) string, stdout io.Writer, serv
 		logger.Error(logging.StartupFailed, "stage", "storage")
 		return 1
 	}
-	handler, stopSetup, ok := startSetup(ctx, logger, c, repository)
+	surface, ok := composeProduct(ctx, logger, c, repository, productOptions{})
+	if !ok {
+		_ = repository.Close()
+		logger.Error(logging.StartupFailed, "stage", "configuration")
+		return 1
+	}
+	stopProduct := func() {
+		if surface != nil {
+			surface.stop()
+		}
+	}
+	handler, stopSetup, ok := startSetup(ctx, logger, c, repository, surface)
 	if !ok {
 		stopSetup()
+		stopProduct()
 		_ = repository.Close()
 		logger.Error(logging.StartupFailed, "stage", "configuration")
 		return 1
 	}
 	result := 0
 	logger.Info(logging.ServerStarted)
-	// Reserve /api and /mcp: nothing under them may fall through to the static site or
-	// the setup mux. The adapters need an executor (real Docker backend, endpoint
-	// registry), which is composed by later rows; until then both answer the common 404.
-	handler = api.Compose(nil, nil, handler)
-	if err := serve(developmentServerWith(logger, handler)); err != nil && !errors.Is(err, http.ErrServerClosed) {
+	// Reserve /api and /mcp: nothing under them may fall through to the static site or the setup mux.
+	// With no Docker backend configured both adapters are absent and answer the common 404.
+	var rest, mcp http.Handler
+	if surface != nil {
+		rest, mcp = surface.rest, surface.mcp
+	}
+	handler = api.Compose(rest, mcp, handler)
+	if err := serve(serverFor(c.AdminListenAddr, logger, handler)); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		logger.Error(logging.ServerFailed, "stage", "listener")
 		result = 1
 	}
 	stopSetup() // stop background work before the repository closes
+	stopProduct()
 	if err := repository.Close(); err != nil {
 		logger.Error(logging.StorageCloseFailed)
 		result = 1
@@ -229,5 +266,15 @@ func main() {
 	if len(os.Args) > 1 {
 		os.Exit(runCLI(productionCLI(os.Args[1:])))
 	}
-	os.Exit(run(context.Background(), os.Getenv, os.Stdout, func(s *http.Server) error { return s.ListenAndServe() }))
+	// SIGTERM (the container stop signal) and SIGINT end the server gracefully so storage closes cleanly.
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	code := run(ctx, os.Getenv, os.Stdout, func(s *http.Server) error {
+		ln, err := net.Listen("tcp", s.Addr)
+		if err != nil {
+			return err
+		}
+		return serveUntilDone(ctx, s, ln, shutdownGrace)
+	})
+	stop()
+	os.Exit(code)
 }

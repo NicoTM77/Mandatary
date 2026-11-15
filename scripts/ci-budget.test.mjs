@@ -58,8 +58,34 @@ test('the budget increase did not touch parallelism, memory, check names, action
   assert.match(workflow, /go test -race -timeout=30m -count=1 -v \.\/\.\.\./, 'the arm64 per-test timeout is unchanged');
 });
 
-test('the security job still requires every Baseline and negative-control job to have passed', () => {
+test('the security job still requires every Baseline, negative-control and image job to have passed', () => {
   const security = workflow.slice(workflow.indexOf('  security:'));
-  assert.match(security, /needs:/);
-  assert.match(security, /Require every Baseline and negative-control job to have passed/);
+  assert.match(security, /needs: \[baseline, negative-control, image\]/);
+  assert.match(security, /Require every Baseline, negative-control and image job to have passed/);
+  assert.match(security, /"\$BASELINE_RESULT" == success && "\$NEGATIVE_CONTROL_RESULT" == success && "\$IMAGE_RESULT" == success/);
+});
+
+// P1.19: the production image is built AND run on both supported CPUs (never cross-compile only), the scanner is pinned by digest and
+// is never handed the Docker socket, and a HIGH/CRITICAL finding fails the job.
+test('the image job covers both CPUs natively and gates on a digest-pinned Trivy HIGH/CRITICAL scan', () => {
+  const image = job('image');
+  assert.equal(minutes(image), 40);
+  assert.match(image, /name: Image \(\$\{\{ matrix\.platform \}\}\)/);
+  assert.match(image, /platform: linux\/amd64\n\s+runner: ubuntu-24\.04\n/);
+  assert.match(image, /platform: linux\/arm64\n\s+runner: ubuntu-24\.04-arm\n/);
+  assert.match(image, /TRIVY_IMAGE: ghcr\.io\/aquasecurity\/trivy@sha256:[0-9a-f]{64}/);
+  assert.match(image, /--severity HIGH,CRITICAL --exit-code 1/);
+  assert.match(image, /tests\/image\/acceptance\.py/);
+  // The scanner step is isolated: it never sees the Docker socket. (The acceptance step must name its fixture daemon
+  // explicitly, S1.4, so the socket path legitimately appears elsewhere in the job as an --docker-host argument; it must
+  // never be bind-mounted into a container by the workflow itself.)
+  const scanner = image.slice(image.indexOf('- name: SBOM and Trivy'), image.indexOf('- uses: actions/upload-artifact'));
+  assert.match(scanner, /trivy image --input/, 'the scanner step was not found');
+  assert.doesNotMatch(scanner, /docker\.sock/, 'the scanner step is never given the Docker socket');
+  assert.doesNotMatch(image, /-v\s+\S*docker\.sock/, 'the workflow never bind-mounts the Docker socket');
+  assert.doesNotMatch(image, /--privileged/);
+  // S1.4: the acceptance run names its fixture daemon and its identity; there is no ambient fallback.
+  assert.match(image, /acceptance\.py[^\n]*\\\n[^\n]*--docker-host "\$FIXTURE_DOCKER_HOST" --expect-daemon-id "\$FIXTURE_DAEMON_ID"/);
+  assert.match(image, /python3 tests\/image\/test_isolation\.py/);
+  assert.match(image, /NOT-THE-DECLARED-FIXTURE-DAEMON/);
 });

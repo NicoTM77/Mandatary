@@ -21,12 +21,12 @@
   `ContainerSummary`) and fail-closed sanitizers for environment variables,
   labels, command arguments, mount sources, and SDK/transport errors.
 
-The `cmd/mandatary` binary remains the loopback-only static skeleton; P1.12 does
-not expose HTTP/MCP routes or enable `MANDATARY_DOCKER_SOCKET` /
-`MANDATARY_DEV_MOCK_DOCKER` in `internal/config`. Shared execution/rate-limiting
-is owned by **P1.13**, REST/MCP transport wiring by **P1.14**, UI views by
-**P1.16**, and container/OpenRC packaging and live-container isolation evidence
-by **P1.19**.
+P1.12 itself did not expose routes or enable the settings; the `cmd/mandatary` composition root now does (P1.19): with
+`MANDATARY_DOCKER_SOCKET` it wires the real SDK adapter, with `MANDATARY_DEV_MOCK_DOCKER=true` the mock, and with
+neither no Docker surface. A verifier runs `VerifySelf` at start, after every loss of proof and as a periodic inventory
+heartbeat, and readiness (`/api/v1/readyz`) is true only while the proof is verified. Shared execution/rate-limiting is
+owned by **P1.13**, REST/MCP transport wiring by **P1.14**, UI views by **P1.16**, and the image, Compose files and
+live-container isolation evidence by **P1.19** ([deployment.md](deployment.md)).
 
 ## Self-protection and deployment identity binding (§S1)
 
@@ -134,7 +134,7 @@ cancellation cannot mask an independently returned transport fault.
 | `SELF-10` Shared safety state under concurrency | `TestSELF10_SharedSafetyStateConcurrentAccess` | P1.13, P1.14 |
 | `SELF-11` Private cgroup namespace + instance-UUID binding | `TestSELF11_PrivateCgroupInstanceUUIDBindingAndOverlap`, `TestParseCgroupContainerID` | P1.19 (container packaging) |
 | `SELF-12` All-state protected peers (`created`..`dead`) | `TestSELF12_AllStateProtectedPeersDeniedAndHidden` | P1.13, P1.14 |
-| `SELF-13` Mock isolation & no native real-socket exemption | `TestSELF13_MockIsolationAndNoImplicitSocketAccess` | P1.14, P1.19 |
+| `SELF-13` Mock isolation & no native real-socket exemption | `TestSELF13_MockIsolationAndNoImplicitSocketAccess`; composed binary: `TestSELFNativeEvidenceWithARealSocketNeverVerifies` (native cgroup v1, native cgroup v2 and an absent `/proc/self/cgroup` stay unready even with a matching binding), `TestSELFContainerEvidenceWithARealSocketStillVerifies` (positive controls) | P1.14, P1.19 |
 | `SUP-03` Engine API `>= 1.44` negotiation | `TestEngineAPINegotiationAndMinimum144` | P1.19 (live Engine matrix) |
 | TD §§1.1–1.2 Inspect allowlists, secret/entropy redaction, error redaction | `TestInspectStatusAllowlistAndUnknownFields`, `TestInspectConfigEnvCommandMountAndResourceSanitization`, `TestTransportAndSDKErrorsRedacted` | P1.13, P1.14, P1.16 |
 | TD §§1.2, 5, 10.4 Operation catalog, parameter bounds, SDK & mock parity | `TestOperationParameterBounds`, `TestSDKAdapterAllowedOperationsAndBounds`, `TestMockBackendFullLifecycleAndFaultInjection` | P1.13, P1.14 |

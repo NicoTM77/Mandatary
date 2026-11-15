@@ -5,3 +5,7 @@
 /.toolchains/
 /.worktrees/
 *.log
+
+# Python bytecode from tests/image
+__pycache__/
+*.pyc
