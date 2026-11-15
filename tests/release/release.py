@@ -47,6 +47,9 @@ def _terminate(signum, frame):
 
 def stage(c, name, fn):
     t0 = time.time()
+    if name in (c.a.skip or "").split(","):  # diagnostics only: a skipped stage yields no result, so no criterion can link to it (never a pass)
+        c.ev.setdefault("stage_seconds", {})[name] = "skipped"
+        return True
     try:
         fn(c)
         c.ev.setdefault("stage_seconds", {})[name] = round(time.time() - t0, 1)
@@ -125,6 +128,7 @@ def main():
     ap.add_argument("--load-seconds", type=int, default=60)
     ap.add_argument("--idle-window", type=int, default=300, help="seconds of RSS curve per idle measurement")
     ap.add_argument("--docker-host", required=True)
+    ap.add_argument("--skip", default="", help="comma list of stage names to skip (diagnostics only; the final evidence run never skips)")
     ap.add_argument("--expect-daemon-id")
     ap.add_argument("--expect-daemon-name")
     a = ap.parse_args()

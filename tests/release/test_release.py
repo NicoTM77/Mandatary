@@ -361,7 +361,7 @@ class Criteria(unittest.TestCase):
 
     def test_the_named_release_criteria_are_all_present(self):
         have = {c["id"] for c in self.crit}
-        for want in ("SH-1", "SH-2a", "SH-2b", "SH-2c", "SH-3", "SH-4", "SH-5", "SH-6", "SH-7a", "SH-7b", "SH-7c", "SH-8", "SH-9a", "SH-9b", "SH-10", "P1-E1", "P1-E2", "P1-E3", "P1-E4", "P1-E5"):
+        for want in ("SH-1", "SH-2a", "SH-2b", "SH-2c", "SH-2d", "SH-3", "SH-4", "SH-5", "SH-6", "SH-7a", "SH-7b", "SH-7c", "SH-8", "SH-9a", "SH-9b", "SH-10", "P1-E1", "P1-E2", "P1-E3", "P1-E4", "P1-E5"):
             self.assertIn(want, have)
 
 

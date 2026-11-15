@@ -1,5 +1,6 @@
 """P1.20 release acceptance, part 2: latency and the synchronous usage-write cost, idle/load footprint, exact usage
 counts, restart and crash durability."""
+import re
 import threading
 import time
 
@@ -139,11 +140,16 @@ def load(c: Ctx, seconds):
     rec = {"peak_reset_before_window": reset, "clients": {"rest_pollers": 10, "mcp_sessions": 10, "follow_streams": 5}, "seconds": round(wall, 1), "rest": dict(rest), "rest_error_classes": dict(classes), "rest_latency": footprint.latency_summary(lat),
            "mcp": m, "mcp_error": mcp_out.get("err"), "streams": dict(streams), "VmRSS_peak_sampled": peak_rss, "VmRSS_before": before.get("VmRSS"), "VmRSS_after": after.get("VmRSS"),
            "VmHWM_after": after.get("VmHWM"), "cgroup": cg, "rss_samples": len(samples)}
+    rec["service_log_safety_lines"] = [ln[:240] for ln in dep.logs().splitlines() if re.search(r"unverified|safety|heartbeat|backend", ln, re.I)][-12:]
     c.ev["footprint"]["load"] = rec
     hwm = after.get("VmHWM", 0)
-    c.check("REL-LOAD-RUN", "benchmark workload ran: 10 REST + 10 real-MCP polling clients and 5 active follow streams for %.0f s with no failed call" % wall,
-            not mcp_out.get("err") and rest["errors"] == 0 and m.get("errors", 1) == 0 and streams["opened"] == 5 and streams["failed"] == 0 and rest["status"] > 0 and rest["logs"] > 0 and m.get("ok", 0) > 0 and m.get("ok") == m.get("calls") and (m.get("by_op") or {}).get("container_logs", 0) > 0,
-            "rest ok %d err %d %s, mcp %s, streams %s %s" % (rest["status"] + rest["logs"], rest["errors"], dict(classes), {k: m.get(k) for k in ("calls", "ok", "errors", "error_samples", "by_error")}, streams, mcp_out.get("err", "")))
+    ran = (not mcp_out.get("err") and streams["opened"] == 5 and streams["failed"] == 0 and rest["status"] > 0 and rest["logs"] > 0 and m.get("ok", 0) > 0
+           and (m.get("by_op") or {}).get("container_logs", 0) > 0)
+    c.check("REL-LOAD-RUN", "benchmark workload ran for %.0f s: 10 REST + 10 real-MCP polling clients and 5 follow streams, answered with %d REST and %d MCP successes (the footprint below is measured over exactly this window)" % (wall, rest["status"] + rest["logs"], m.get("ok", 0)),
+            ran, "rest ok %d, mcp ok %s, streams %s %s" % (rest["status"] + rest["logs"], m.get("ok"), streams, mcp_out.get("err", "")))
+    stable = ran and rest["errors"] == 0 and m.get("errors", 1) == 0
+    c.check("REL-LOAD-STABLE", "the service keeps authorizing legitimate calls under the workload: no non-200 REST answer and no MCP tool error in %.0f s" % wall, stable,
+            "rest errors %d %s; mcp %s; service log lines: %s" % (rest["errors"], dict(classes), {k: m.get(k) for k in ("calls", "ok", "errors", "by_error")}, "; ".join(rec["service_log_safety_lines"][-3:])[:300]))
     c.check("REL-FOOT-LOAD", "RSS under the benchmark workload <= 150 MB (peak sampled %.2f MB; kernel high-water mark VmHWM %.2f MB %s)" % (
         peak_rss / footprint.MB, hwm / footprint.MB, "reset at the start of the window" if reset else "since process start (the reset was not permitted)"),
             footprint.within(max(peak_rss, hwm), footprint.BUDGET_LOAD_RSS_BYTES), "budget 150 MB; %d RSS samples at 1 Hz; rss before %.2f MB after %.2f MB" % (len(samples), (before.get("VmRSS") or 0) / footprint.MB, (after.get("VmRSS") or 0) / footprint.MB))
@@ -153,7 +159,7 @@ def load(c: Ctx, seconds):
     c.tally.add("load2", "logs", A, "allowed", streams["load2"])
 
 
-def read_usage(c: Ctx, label, stop_first=True):
+def read_usage(c: Ctx, label, stop_first=True, rebaseline=False):
     """Stop the service gracefully (the WAL is checkpointed), read the rollups read-only and compare them with the
     tally of everything the harness did. The service is started again afterwards."""
     dep = c.dep
@@ -176,6 +182,11 @@ def read_usage(c: Ctx, label, stop_first=True):
                             "diffs": diffs[:20], "hourly_diffs": hdiffs[:20]}
     c.check("REL-USAGE-" + label, "exact usage totals per (agent, owner user, selector, operation) after %s: %d accounted outcomes in %d tuples match the executed sequence" % (label, c.tally.events(), len(exp)),
             not diffs and not hdiffs and code == 0, "graceful exit %s; %s" % (code, "; ".join((diffs + hdiffs)[:4])))
+    if rebaseline and (diffs or hdiffs):
+        # The mismatch above is reported (and FAILS its check). Later checks continue from what the store really holds, so one anomaly is one
+        # failure and not four, and each later stage is still compared exactly against its own additions.
+        c.tally.t = {k: list(v) for k, v in daily.items()}
+        c.ev["usage"][label]["rebaselined_to_measured"] = True
     cap = 1000
     c.check("REL-USAGE-RING-" + label, "recent-event ring is bounded (<= %d), holds no payload column, and the database passes integrity and foreign-key checks" % cap,
             recent <= cap and not any(x in cols for x in ("payload", "container_name", "token", "ip", "message")) and integrity == "ok" and not fk, "recent=%d integrity=%s fk=%d cols=%s" % (recent, integrity, len(fk), cols))
@@ -187,7 +198,7 @@ def persistence(c: Ctx):
     A, B = c.names["A"], c.names["B"]
     dep = c.dep
     # a graceful stop/start: the credential, the policy and the administrator survive; setup stays closed
-    ctl = read_usage(c, "AFTER-WORKLOAD")
+    ctl = read_usage(c, "AFTER-WORKLOAD", rebaseline=True)
     measure_idle(c, "after-restart")  # a restart of an installation that already holds data (no first-start setup work)
     r_ok = c.rest.op("a", "status", A)
     r_no = c.rest.op("a", "status", B)
