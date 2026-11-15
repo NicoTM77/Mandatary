@@ -271,6 +271,7 @@ type loadReport struct {
 	P95      float64          `json:"p95_ms"`
 	P99      float64          `json:"p99_ms"`
 	ErrorSet []string         `json:"error_samples,omitempty"`
+	ByErr    map[string]int64 `json:"by_error,omitempty"` // tool error results by "code/reason": a protective answer is told apart from a failure
 }
 
 func (e *env) load(ctx context.Context, l loadSpec) loadReport {
@@ -283,6 +284,7 @@ func (e *env) load(ctx context.Context, l loadSpec) loadReport {
 	var lat []float64
 	byOp := map[string]int64{}
 	samples := map[string]bool{}
+	byErr := map[string]int64{}
 	var wg sync.WaitGroup
 	t0 := time.Now()
 	for w := 0; w < l.Workers; w++ {
@@ -319,6 +321,15 @@ func (e *env) load(ctx context.Context, l loadSpec) loadReport {
 						samples["call: "+sanitize(err)] = true
 					} else {
 						samples["tool error result"] = true
+						var eo struct {
+							Error struct {
+								Code   string `json:"code"`
+								Reason string `json:"reason"`
+							} `json:"error"`
+						}
+						if raw, merr := json.Marshal(out.StructuredContent); merr == nil && json.Unmarshal(raw, &eo) == nil {
+							byErr[eo.Error.Code+"/"+eo.Error.Reason]++
+						}
 					}
 					mu.Unlock()
 				} else {
@@ -340,7 +351,7 @@ func (e *env) load(ctx context.Context, l loadSpec) loadReport {
 		}
 		return lat[int(float64(len(lat)-1)*p)]
 	}
-	rep := loadReport{Workers: l.Workers, Seconds: time.Since(t0).Seconds(), Calls: calls.Load(), OK: okc.Load(), Errors: errc.Load(), ByOp: byOp, P50: pct(0.5), P95: pct(0.95), P99: pct(0.99)}
+	rep := loadReport{Workers: l.Workers, Seconds: time.Since(t0).Seconds(), Calls: calls.Load(), OK: okc.Load(), Errors: errc.Load(), ByOp: byOp, ByErr: byErr, P50: pct(0.5), P95: pct(0.95), P99: pct(0.99)}
 	for k := range samples {
 		rep.ErrorSet = append(rep.ErrorSet, k)
 	}

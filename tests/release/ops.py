@@ -45,6 +45,7 @@ def load(c: Ctx, seconds):
     stop = threading.Event()
     lock = threading.Lock()
     rest = {"status": 0, "logs": 0, "errors": 0}
+    classes = {}  # (http status, error code) of every non-200 answer, so a protective answer is told apart from a failure
     lat = []
     samples = []
     streams = {"load1": 0, "load2": 0, "opened": 0, "failed": 0, "frames": 0}
@@ -57,10 +58,13 @@ def load(c: Ctx, seconds):
             n += 1
             path = "/api/v1/endpoints/local/containers/%s/%s" % (A, "status" if op == "status" else "logs?tail=3")
             t0 = time.time()
+            code = ""
             try:
-                st, _, _ = cl.req("GET", path, bearer=c.tokens["load1"])
-            except OSError:
-                st = 0
+                st, _, body = cl.req("GET", path, bearer=c.tokens["load1"])
+                if st != 200 and isinstance(body, dict):
+                    code = str((body.get("error") or {}).get("code", ""))
+            except OSError as ex:
+                st, code = 0, type(ex).__name__
             d = (time.time() - t0) * 1000
             with lock:
                 if st == 200:
@@ -68,6 +72,7 @@ def load(c: Ctx, seconds):
                     lat.append(d)
                 else:
                     rest["errors"] += 1
+                    classes["%s/%s" % (st, code)] = classes.get("%s/%s" % (st, code), 0) + 1
             time.sleep(0.2)
 
     def streamer(who):
@@ -131,14 +136,14 @@ def load(c: Ctx, seconds):
     m = mcp_out.get("r") or {}
     by_op = m.get("by_op", {}) if isinstance(m, dict) else {}
     peak_rss = max(samples) if samples else 0
-    rec = {"peak_reset_before_window": reset, "clients": {"rest_pollers": 10, "mcp_sessions": 10, "follow_streams": 5}, "seconds": round(wall, 1), "rest": dict(rest), "rest_latency": footprint.latency_summary(lat),
+    rec = {"peak_reset_before_window": reset, "clients": {"rest_pollers": 10, "mcp_sessions": 10, "follow_streams": 5}, "seconds": round(wall, 1), "rest": dict(rest), "rest_error_classes": dict(classes), "rest_latency": footprint.latency_summary(lat),
            "mcp": m, "mcp_error": mcp_out.get("err"), "streams": dict(streams), "VmRSS_peak_sampled": peak_rss, "VmRSS_before": before.get("VmRSS"), "VmRSS_after": after.get("VmRSS"),
            "VmHWM_after": after.get("VmHWM"), "cgroup": cg, "rss_samples": len(samples)}
     c.ev["footprint"]["load"] = rec
     hwm = after.get("VmHWM", 0)
     c.check("REL-LOAD-RUN", "benchmark workload ran: 10 REST + 10 real-MCP polling clients and 5 active follow streams for %.0f s with no failed call" % wall,
             not mcp_out.get("err") and rest["errors"] == 0 and m.get("errors", 1) == 0 and streams["opened"] == 5 and streams["failed"] == 0 and rest["status"] > 0 and rest["logs"] > 0 and m.get("ok", 0) > 0 and m.get("ok") == m.get("calls") and (m.get("by_op") or {}).get("container_logs", 0) > 0,
-            "rest ok %d err %d, mcp %s, streams %s %s" % (rest["status"] + rest["logs"], rest["errors"], {k: m.get(k) for k in ("calls", "ok", "errors", "error_samples")}, streams, mcp_out.get("err", "")))
+            "rest ok %d err %d %s, mcp %s, streams %s %s" % (rest["status"] + rest["logs"], rest["errors"], dict(classes), {k: m.get(k) for k in ("calls", "ok", "errors", "error_samples", "by_error")}, streams, mcp_out.get("err", "")))
     c.check("REL-FOOT-LOAD", "RSS under the benchmark workload <= 150 MB (peak sampled %.2f MB; kernel high-water mark VmHWM %.2f MB %s)" % (
         peak_rss / footprint.MB, hwm / footprint.MB, "reset at the start of the window" if reset else "since process start (the reset was not permitted)"),
             footprint.within(max(peak_rss, hwm), footprint.BUDGET_LOAD_RSS_BYTES), "budget 150 MB; %d RSS samples at 1 Hz; rss before %.2f MB after %.2f MB" % (len(samples), (before.get("VmRSS") or 0) / footprint.MB, (after.get("VmRSS") or 0) / footprint.MB))
