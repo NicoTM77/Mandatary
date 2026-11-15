@@ -30,20 +30,36 @@ def image_facts(c: Ctx):
             facts["revision_label"] == a.sha and "%s/%s" % (facts["os"], facts["architecture"]) == a.platform, "%s %s/%s" % (facts["revision_label"], facts["os"], facts["architecture"]))
     # compressed size: a real OCI archive with gzip layers built from the same source; its blob sizes are what a registry stores.
     oci = a.oci_archive
+    method = "sum of the sizes of the manifest, config and gzip layer blobs of `buildx --output type=oci,compression=gzip` for " + a.platform
+    diff_ids = None
     if not oci:
         oci = os.path.join(e.work, "image-oci.tar")
         p = e.docker("buildx", "build", "--platform", a.platform, "--build-arg", "VCS_REF=" + a.sha, "--provenance=false", "--sbom=false",
                      "--output", "type=oci,dest=%s,compression=gzip,force-compression=true" % oci, e.repo, check=False, timeout=900)
         if p.returncode != 0:
-            c.check("REL-FOOT-IMG", "compressed image size within 60 MB", False, "buildx failed: " + e.scrub(p.stderr[-300:]))
-            return
-    total, layers = footprint.oci_compressed_size(oci)
-    c.ev["footprint"]["image"] = {"compressed": footprint.units(total), "budget": footprint.units(footprint.BUDGET_IMAGE_BYTES), "layers": layers, "oci_archive_sha256": sha256(oci),
-                                  "method": "sum of the sizes of the manifest, config and gzip layer blobs of `buildx --output type=oci,compression=gzip` for " + a.platform}
-    c.check("REL-FOOT-IMG", "compressed image <= 60 MB (sum of real gzip OCI blobs)", footprint.within(total, footprint.BUDGET_IMAGE_BYTES),
+            # The `docker` buildx driver cannot export OCI. Fall back to the archive of the very image under test, compressed here.
+            c.ev["footprint"]["oci_export_error"] = e.scrub(p.stderr[-200:])
+            save = os.path.join(e.work, "image-save.tar")
+            sp = e.docker("save", a.image, "-o", save, check=False, timeout=600)
+            if sp.returncode != 0:
+                c.check("REL-FOOT-IMG", "compressed image size within 60 MB", False, "buildx failed (%s) and docker save failed: %s" % (c.ev["footprint"]["oci_export_error"], e.scrub(sp.stderr[-200:])))
+                return
+            try:
+                total, layers, diff_ids = footprint.save_compressed_size(save)
+            except (ValueError, KeyError, OSError) as ex:
+                c.check("REL-FOOT-IMG", "compressed image size within 60 MB", False, "docker save archive unreadable: %s" % ex)
+                return
+            oci = save
+            method = ("ESTIMATE: this daemon's buildx driver cannot export OCI, so every layer of `docker save` of the image under test is gzip-compressed (level 6, the default of "
+                      "docker push) and summed with the config and manifest; a registry's own compressor can differ by a few percent")
+    if diff_ids is None:
+        total, layers = footprint.oci_compressed_size(oci)
+        diff_ids = oci_diff_ids(oci)
+    c.ev["footprint"]["image"] = {"compressed": footprint.units(total), "budget": footprint.units(footprint.BUDGET_IMAGE_BYTES), "layers": layers, "archive_sha256": sha256(oci), "method": method}
+    c.check("REL-FOOT-IMG", "compressed image <= 60 MB (%s)" % ("sum of real gzip OCI blobs" if "ESTIMATE" not in method else "estimate from docker save, gzip level 6"), footprint.within(total, footprint.BUDGET_IMAGE_BYTES),
             "%.2f MB (%.2f MiB), budget 60 MB, %d layers" % (total / footprint.MB, total / footprint.MIB, len(layers)))
-    same = oci_diff_ids(oci) == facts["rootfs_layers"]
-    c.check("REL-FOOT-SAME", "the measured OCI archive has exactly the uncompressed layers (diffIDs) of the image under test", same, "" if same else "diffIDs differ: the measured archive is not proven to be the tested image")
+    same = diff_ids == facts["rootfs_layers"]
+    c.check("REL-FOOT-SAME", "the measured archive has exactly the uncompressed layers (diffIDs) of the image under test", same, "" if same else "diffIDs differ: the measured archive is not proven to be the tested image")
 
 
 def sha256(path):

@@ -150,3 +150,32 @@ def fsync_latency(directory, n=200):
         os.close(fd)
         os.unlink(path)
     return latency_summary(ms)
+
+
+def save_compressed_size(save_tar, level=6):
+    """Registry-equivalent compressed size computed from a `docker save` archive (docker or OCI layout) when the daemon cannot
+    export an OCI archive with gzip layers (buildx's `docker` driver). Every layer tar is gzip-compressed at `level` (6 is the
+    default of Go's compress/gzip and of docker push) and counted with the config blob and the manifest. This is an ESTIMATE of
+    what a registry stores (the compressor, not the content, can differ by a few percent); the report names the method.
+    Returns (total, layers, diff_ids)."""
+    import zlib
+    with tarfile.open(save_tar) as t:
+        names = set(t.getnames())
+
+        def read(name):
+            return t.extractfile(name).read()
+
+        def gz_size(name):
+            comp, n = zlib.compressobj(level, zlib.DEFLATED, 31), 0
+            fh = t.extractfile(name)
+            for chunk in iter(lambda: fh.read(1 << 20), b""):
+                n += len(comp.compress(chunk))
+            return n + len(comp.flush())
+        if "manifest.json" in names:
+            raw = read("manifest.json")
+            entry = json.loads(raw)[0]
+            cfg_raw = read(entry["Config"])
+            layers = [{"file": name, "size": gz_size(name)} for name in entry["Layers"]]
+            total = len(raw) + len(cfg_raw) + sum(x["size"] for x in layers)
+            return total, layers, json.loads(cfg_raw)["rootfs"]["diff_ids"]
+        raise ValueError("unrecognised image archive layout")

@@ -113,6 +113,46 @@ class Oci(unittest.TestCase):
         self.assertLess(total, 50_000)  # the 50 kB attestation would have pushed it over
 
 
+class SaveSize(unittest.TestCase):
+    def archive(self, layers, diff_ids=("sha256:aa",), with_manifest=True):
+        buf = io.BytesIO()
+        with tarfile.open(fileobj=buf, mode="w") as t:
+            def add(name, data):
+                ti = tarfile.TarInfo(name)
+                ti.size = len(data)
+                t.addfile(ti, io.BytesIO(data))
+            cfg = json.dumps({"rootfs": {"diff_ids": list(diff_ids)}}).encode()
+            add("cfg.json", cfg)
+            names = []
+            for i, data in enumerate(layers):
+                add("l%d/layer.tar" % i, data)
+                names.append("l%d/layer.tar" % i)
+            if with_manifest:
+                add("manifest.json", json.dumps([{"Config": "cfg.json", "Layers": names}]).encode())
+        return buf.getvalue(), len(cfg)
+
+    def measure(self, raw):
+        with tempfile.NamedTemporaryFile(suffix=".tar") as fh:
+            fh.write(raw)
+            fh.flush()
+            return footprint.save_compressed_size(fh.name)
+
+    def test_the_size_is_every_layer_compressed_plus_config_and_manifest(self):
+        compressible, random = b"a" * 1_000_000, os.urandom(50_000)
+        raw, cfg_len = self.archive([compressible, random], diff_ids=("sha256:aa", "sha256:bb"))
+        total, layers, diff_ids = self.measure(raw)
+        self.assertEqual(diff_ids, ["sha256:aa", "sha256:bb"])
+        self.assertLess(layers[0]["size"], 5_000)  # a megabyte of one byte really is compressed: the figure is not the uncompressed size
+        self.assertGreater(layers[1]["size"], 49_000)  # random data does not shrink
+        self.assertGreater(total, layers[0]["size"] + layers[1]["size"] + cfg_len)  # the manifest is counted as well
+        self.assertLess(total, 1_000_000)
+
+    def test_an_unrecognised_archive_is_an_error_not_a_size(self):
+        raw, _ = self.archive([b"x"], with_manifest=False)
+        with self.assertRaises(ValueError):
+            self.measure(raw)
+
+
 class Outcomes(unittest.TestCase):
     def test_rest_classification(self):
         self.assertEqual(matrix.norm_rest(200, {"a": 1}), (200, "", ""))

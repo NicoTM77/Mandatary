@@ -108,7 +108,7 @@ class Deployment:
             raise DeployError("compose " + " ".join(args) + ": " + self.e.scrub(p.stderr[-300:]))
         return p
 
-    def up(self, image=None):
+    def _write_env(self, image=None):
         e, a = self.e, self.e.a
         env = {
             "MANDATARY_IMAGE": image or a.image, "MANDATARY_INSTANCE_UUID": self.bind, "MANDATARY_PUBLIC_ORIGIN": self.origin,
@@ -120,8 +120,23 @@ class Deployment:
         }
         with open(self.envfile, "w", opener=lambda p, f: os.open(p, f, 0o600)) as fh:
             fh.write("".join("%s=%s\n" % kv for kv in env.items()))
+
+    def up(self, image=None):
+        e = self.e
         e.stacks.append({"down": self._cmd() + ["down", "-v", "--timeout", "10"]})
-        self.compose("up", "-d")
+        # A host port chosen a moment earlier can be taken by another process before Compose binds it (observed on shared hosted runners):
+        # that is a harness race, not a product result, so only that exact failure is retried, on fresh ports, before anything has started.
+        for attempt in range(4):
+            self.origin = "https://%s:%d" % (stack.HOST, self.port)
+            self._write_env(image)
+            try:
+                self.compose("up", "-d")
+                break
+            except DeployError as ex:
+                if attempt == 3 or not re.search(r"failed to bind host port|address already in use", str(ex)):
+                    raise
+                self.compose("down", "-v", "--timeout", "10", check=False)
+                self.port, self.mp_port = stack.free_port(), stack.free_port()
         self.mand = self.compose("ps", "-q", "mandatary").stdout.strip()
         self.proxy = self.compose("ps", "-q", "proxy").stdout.strip()
         e.containers += [c for c in (self.mand, self.proxy) if c]
