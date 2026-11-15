@@ -79,3 +79,28 @@ def verify(endpoint, expect_id=None, expect_name=None):
     if expect_name and ident["Name"] != expect_name:
         raise Refused("the daemon name is not the declared fixture daemon")
     return ident
+
+
+def unsafe_ancestors(path):
+    """Directories above `path` (and `path` itself when it exists) that the product's storage walk would refuse
+    (internal/store/files.go): not owned by root or the invoking user, writable by group or others, or a
+    symbolic link. Returns [(directory, reason)]. The harness creates its own state directories 0700 whatever the
+    umask, but it cannot repair ancestors its caller made, so it names them up front instead of letting every
+    state-dependent check fail one by one."""
+    bad = []
+    absolute = os.path.abspath(path)
+    parts = absolute.strip("/").split("/")
+    current = "/"
+    for part in [""] + parts:
+        current = os.path.join(current, part) if part else "/"
+        try:
+            st = os.lstat(current)
+        except FileNotFoundError:
+            break
+        if stat.S_ISLNK(st.st_mode):
+            bad.append((current, "is a symbolic link"))
+        elif st.st_uid not in (0, os.getuid()):
+            bad.append((current, "is owned by another user"))
+        elif st.st_mode & 0o022:
+            bad.append((current, "is group/world-writable (mode %04o)" % (st.st_mode & 0o7777)))
+    return bad

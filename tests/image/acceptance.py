@@ -437,9 +437,57 @@ class Env:
         un = settle_unready(n, 12)
         r.check("SELF-07", "unreachable daemon socket: readiness false, no crash, process stays live", un and self.inspect(n)["State"]["Running"])
         self.drop(n)
+        self.self_native(bind)
         for c in (peer_created, peer_stopped):
             self.drop(c)
         self.reclaim(base)
+
+    def self_native(self, bind):
+        """SELF-13N: no native real-socket exception. The binary run directly on the host (not in a container)
+        with a real socket and the instance UUID of a real, labelled container borrowed from the daemon's
+        inventory must never verify: it is not that container."""
+        r = self.res
+        if not self.a.host_binary:
+            r.blocked("SELF-13N", "native process with a real socket never verifies", "--host-binary not provided")
+            return
+        if os.getuid() == 0:
+            r.blocked("SELF-13N", "native process with a real socket never verifies", "the harness runs as root; the helper would drop privileges first")
+            return
+        victim = self.track(self.pfx + "-self-victim")
+        self.docker("create", "--name", victim, "--label", SELF_LABEL + "=true", "--label", BIND_LABEL + "=" + bind, "--pull", "never", self.a.image)
+        base, key = self.prepare_state("self13n", os.getuid(), os.getgid())
+        port = 20000 + secrets.randbelow(20000)
+        env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "MANDATARY_DATA_DIR": base + "/data", "MANDATARY_MASTER_KEY_FILE": base + "/keys/master.key",
+               "MANDATARY_ADMIN_LISTEN_ADDR": "127.0.0.1:%d" % port, "MANDATARY_DOCKER_SOCKET": self.ep, "MANDATARY_SELF_INSTANCE_UUID": bind}
+        logpath = os.path.join(base, "native.log")
+        with open(logpath, "w") as logf:
+            proc = subprocess.Popen([self.a.host_binary], env=env, stdout=logf, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL)
+        try:
+            def probe(path):
+                try:
+                    c = http.client.HTTPConnection("127.0.0.1", port, timeout=3)
+                    c.request("GET", path)
+                    return c.getresponse().status
+                except OSError:
+                    return None
+            alive = self.wait(lambda: probe("/") == 200, 20)
+            codes = []
+            for _ in range(14):  # >= 2 verification retries: it must not become ready by retrying
+                time.sleep(1)
+                codes.append(probe("/api/v1/readyz"))
+            with open(logpath) as fh:
+                lg = fh.read()
+            r.check("SELF-13N", "binary run natively with a real socket and a borrowed instance UUID: live, readiness never true (no native exception)",
+                    alive and proc.poll() is None and set(codes) == {503} and "docker backend unverified" in lg and "docker backend verified" not in lg.replace("unverified", ""),
+                    "alive=%s codes=%s" % (alive, sorted(set(map(str, codes)))))
+        finally:
+            proc.terminate()
+            try:
+                proc.wait(timeout=20)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+            self.drop(victim)
+            self.reclaim(base)
 
     # ---- STACK ----------------------------------------------------------------------------------------
     def scenario_priv(self):
@@ -579,6 +627,14 @@ def main():
     except isolation.Refused as e:
         print("FAIL ISO-00 the Docker endpoint is not an approved isolated fixture daemon -- " + str(e), flush=True)
         item = {"id": "ISO-00", "name": "the Docker endpoint is not an approved isolated fixture daemon", "status": "FAIL", "detail": str(e)}
+        return write({"task": "t_7f9cfaf3", "source_sha": a.sha, "image": a.image, "platform": a.platform, "seconds": round(time.time() - started),
+                      "pass": 0, "not_pass": 1, "results": [item]})
+    unsafe = isolation.unsafe_ancestors(a.work)
+    if unsafe:  # the product refuses state beneath such a directory: say so once instead of failing dozens of checks
+        why = "; ".join("%s %s" % kv for kv in unsafe)
+        print("FAIL WORK-00 the --work path is not under owner-only directories -- " + why, flush=True)
+        item = {"id": "WORK-00", "name": "the --work path is not under owner-only directories (product storage rule)", "status": "FAIL",
+                "detail": why + "; create the parent with umask 022 / chmod go-w"}
         return write({"task": "t_7f9cfaf3", "source_sha": a.sha, "image": a.image, "platform": a.platform, "seconds": round(time.time() - started),
                       "pass": 0, "not_pass": 1, "results": [item]})
     env = Env(a)

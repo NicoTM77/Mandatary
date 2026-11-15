@@ -44,7 +44,8 @@ GOOD = {"ID": "FIXTURE-DAEMON-ID-0001", "Name": "mandatary-test-vm", "OperatingS
 
 class Fixture:
     def __init__(self, tc, infos):
-        self.tmp = tempfile.mkdtemp(prefix="isotest")
+        # Under $HOME, not /tmp: the harness (like the product) refuses a --work path beneath a world-writable directory.
+        self.tmp = tempfile.mkdtemp(prefix="isotest", dir=os.path.expanduser("~"))
         tc.addCleanup(lambda: shutil.rmtree(self.tmp, ignore_errors=True))
         self.bin = os.path.join(self.tmp, "bin")
         os.makedirs(self.bin)
@@ -138,6 +139,19 @@ class GuardTests(unittest.TestCase):
         with self.assertRaises(isolation.Refused):
             isolation.verify("unix://" + self.fx.tmp + "/absent.sock", expect_id=GOOD["ID"])
 
+    def test_unsafe_ancestors_are_reported_and_safe_ones_are_not(self):
+        safe = os.path.join(self.fx.tmp, "safe")
+        os.makedirs(safe, mode=0o700)
+        self.assertEqual(isolation.unsafe_ancestors(os.path.join(safe, "work")), [])
+        os.chmod(safe, 0o770)
+        self.assertEqual([d for d, _ in isolation.unsafe_ancestors(os.path.join(safe, "work"))], [safe])
+        os.chmod(safe, 0o707)
+        self.assertEqual([d for d, _ in isolation.unsafe_ancestors(os.path.join(safe, "work"))], [safe])
+        os.chmod(safe, 0o700)
+        link = os.path.join(self.fx.tmp, "link")
+        os.symlink(safe, link)
+        self.assertEqual([d for d, _ in isolation.unsafe_ancestors(os.path.join(link, "work"))], [link])
+
     def test_the_ambient_endpoint_is_never_used(self):
         os.environ["DOCKER_HOST"] = "tcp://203.0.113.9:2375"
         os.environ["DOCKER_CONTEXT"] = "production"
@@ -194,6 +208,24 @@ class HarnessTests(unittest.TestCase):
         for c in fx.calls():
             verb = [a for a in c["argv"][2:] if not a.startswith("-")][0]
             self.assertNotIn(verb, ("rm", "stop", "network", "kill", "compose"), "cleanup ran on a changed daemon: %s" % c["argv"])
+
+    def test_a_group_writable_parent_of_the_work_directory_is_named_before_anything_is_created(self):
+        fx = Fixture(self, [GOOD])
+        parent = os.path.join(fx.tmp, "shared")
+        os.makedirs(parent)
+        os.chmod(parent, 0o775)  # what `mkdir -p` makes under umask 0002
+        results = os.path.join(fx.tmp, "results.json")
+        work = os.path.join(parent, "work")
+        p = subprocess.run([sys.executable, os.path.join(HERE, "acceptance.py"), "--image", "mandatary:test", "--platform", "linux/amd64",
+                            "--repo", fx.tmp, "--work", work, "--sha", "0" * 40, "--scenarios", "IMG", "--results", results,
+                            "--docker-host", fx.endpoint, "--expect-daemon-id", GOOD["ID"]], capture_output=True, text=True, env=fx.env, timeout=120)
+        self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
+        with open(results) as fh:
+            doc = json.load(fh)
+        self.assertEqual([i["id"] for i in doc["results"]], ["WORK-00"])
+        self.assertIn("0775", doc["results"][0]["detail"])
+        self.assertFalse(os.path.exists(work))
+        self.assertEqual({c["argv"][2] for c in fx.calls()}, {"info"})
 
     def test_every_docker_call_names_the_explicit_endpoint(self):
         fx = Fixture(self, [GOOD])
