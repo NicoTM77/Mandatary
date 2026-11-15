@@ -91,7 +91,7 @@ def gates(d):
         res.append(result("GATE-GOTEST", g["gotest-short"][0] == 0 and pk >= 15 and bad == 0, "go test -count=1 ./cmd/... ./internal/... ./tests/...: exit %d, %d packages ok, %d failures" % (g["gotest-short"][0], pk, bad)))
     rc("releasepytest", g, "GATE-RELEASE-HARNESS-TESTS", "tests/release/test_release.py (hermetic harness tests)")
     rc("imagepytest", g, "GATE-ISOLATION-TESTS", "tests/image/test_isolation.py (isolation guard tests)")
-    rc("ci-budget", g, "GATE-CI-BUDGET", "node --test scripts/ci-budget.test.mjs")
+    rc("node-scripts", g, "GATE-NODE-SCRIPTS", "node --test scripts/*.test.mjs (CI budgets, toolchain pins, ledger, dependency residuals, generation)")
     rc("typecheck", w, "GATE-WEB-TYPECHECK", "tsc --noEmit")
     rc("eslint", w, "GATE-WEB-LINT", "eslint --max-warnings 0")
     if "vitest" in w:

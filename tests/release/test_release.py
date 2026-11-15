@@ -223,11 +223,11 @@ class Collect(unittest.TestCase):
     GOOD_GO = "".join("ok  \tgithub.com/x/p%d\t0.1s\n" % i for i in range(20))
 
     def test_gates_pass_only_with_exit_zero_and_the_evidence_the_gate_exists_to_produce(self):
-        d = self.tree({"gates.tsv": "govulncheck\t0\t5\ngotest-short\t0\t9\ngofmt\t0\t0\n", "govulncheck.log": "No vulnerabilities found.\n", "gotest-short.log": self.GOOD_GO,
+        d = self.tree({"gates.tsv": "govulncheck\t0\t5\ngotest-short\t0\t9\ngofmt\t0\t0\nnode-scripts\t0\t3\n", "govulncheck.log": "No vulnerabilities found.\n", "gotest-short.log": self.GOOD_GO,
                        "web.tsv": "vitest\t0\t9\nnpm-audit\t0\t1\n", "vitest.log": " Test Files  3 passed (3)\n      Tests  10 passed (10)\n", "npm-audit.json": json.dumps({"metadata": {"vulnerabilities": {"high": 0, "critical": 0, "low": 2}}})})
         got = self.by_id(collect.gates(d))
         self.assertEqual(set(got.values()), {"PASS"}, got)
-        self.assertEqual(set(got), {"GATE-GOVULNCHECK", "GATE-GOTEST", "GATE-GOFMT", "GATE-WEB-VITEST", "GATE-NPM-AUDIT"})  # steps that did not run have no entry
+        self.assertEqual(set(got), {"GATE-GOVULNCHECK", "GATE-GOTEST", "GATE-GOFMT", "GATE-NODE-SCRIPTS", "GATE-WEB-VITEST", "GATE-NPM-AUDIT"})  # steps that did not run have no entry
 
     def test_a_gate_that_exited_zero_without_its_evidence_is_a_failure(self):
         d = self.tree({"gates.tsv": "govulncheck\t0\t5\ngotest-short\t0\t9\n", "govulncheck.log": "scanner crashed\n", "gotest-short.log": "ok  \tgithub.com/x/p\t0.1s\n",
