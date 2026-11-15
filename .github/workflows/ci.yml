@@ -166,8 +166,11 @@ jobs:
           printf 'FIXTURE_DOCKER_HOST=unix:///var/run/docker.sock\nFIXTURE_DAEMON_ID=%s\n' "$id" >> "$GITHUB_ENV"
       - name: Isolation guard tests (hermetic, fake docker)
         run: python3 tests/image/test_isolation.py
-      - name: Release harness tests (hermetic - budgets, outcome classes, usage tally, OCI size, report consistency)
-        run: python3 tests/release/test_release.py
+      - name: Release harness tests and report consistency (hermetic - budgets, outcome classes, usage tally, OCI size; the committed report must match its sealed evidence)
+        run: |
+          set -euo pipefail
+          python3 tests/release/test_release.py
+          python3 tests/release/report.py --evidence docs/release/evidence --criteria tests/release/criteria.json --out docs/release/phase1-release-acceptance.md --check
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version: '1.27.4'

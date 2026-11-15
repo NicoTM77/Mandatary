@@ -1,0 +1,2408 @@
+{
+ "task": "t_836268ff",
+ "source_sha": "6774f12cce6d48e36ca69b174171fe22c2488d46",
+ "image": "p120-mandatary:6774f12cce6d",
+ "platform": "linux/amd64",
+ "prefix": "p1206552",
+ "seconds": 211,
+ "evidence": {
+  "environment": {
+   "docker_server": "29.9.3",
+   "api": "1.56",
+   "os_arch": "linux/amd64",
+   "kernel": "7.0.0-43-generic",
+   "os": "Ubuntu 26.04.1 LTS",
+   "cpus": 4,
+   "memory_bytes": 3557892096,
+   "storage_driver": "overlayfs",
+   "cgroup": "systemd v2",
+   "compose": "5.7.1",
+   "daemon_id": "ec06eb10-04b6-4f1b-bbb6-d336994db8ae",
+   "fsync_4k_work_filesystem": {
+    "n": 200,
+    "p50_ms": 0.985,
+    "p95_ms": 3.347,
+    "p99_ms": 4.759,
+    "mean_ms": 1.277
+   },
+   "host_cpus": 4,
+   "compose_project": "p1206552mstk"
+  },
+  "image": {
+   "id": "sha256:6999e50228c428684383e7eaa9517f1f2afef509c8d67dad9453c4cfd4fdf226",
+   "repo_digests": [
+    "p120-mandatary@sha256:6999e50228c428684383e7eaa9517f1f2afef509c8d67dad9453c4cfd4fdf226"
+   ],
+   "architecture": "amd64",
+   "os": "linux",
+   "revision_label": "6774f12cce6d48e36ca69b174171fe22c2488d46",
+   "rootfs_layers": [
+    "sha256:9486261b5a13f63ca6904b36721527ac8f19df53d300560138d69ae9b4c203de",
+    "sha256:621c35e751a51a9a9dc3e80aa0b7fe8be2a93402ea6ccd307d30852cd7776cda",
+    "sha256:b64fe4bb89ff075efc03878811052cbaf4f9dd891aed968e9ed6993fedf1f4a7",
+    "sha256:b5764396d8d3f88c6c91b8e97022f147ec721afcf85710d96775922e0df881af",
+    "sha256:275a30dd8ce958b21daa9ad962c6fbc09f98306ee2f486b65c9075dc257b1412",
+    "sha256:4d049f83d9cf21d1f5cc0e11deaf36df02790d0e60c1a3829538fb4b61685368",
+    "sha256:af5aa97ebe6ce1604747ec1e21af7136ded391bcabe4acef882e718a87c86bcc",
+    "sha256:6f1cdceb6a3146f0ccb986521156bef8a422cdbb0863396f7f751f575ba308f4",
+    "sha256:bd3cdfae1d3fdd83a2231d608969b38b82349777c2fff9a7c12d54f8ac5c9b38",
+    "sha256:4cde6b0bb6f50a5f255eef7b2a42162c661cf776b803225dcac9a659e396bb6b",
+    "sha256:ad51d0769d16ba578106a177987dfe3d2e02c1668c852b795b2f6b024068242a",
+    "sha256:f0e42608573850bddc6e1dcabb8a6ea34676a336964b3dbf006a4451f448be9f",
+    "sha256:0762a1f6557d1e88a761ab05aa7f65a10dc0e559913ea13befb873d907e1a396",
+    "sha256:ab74a915691fe0ec9789330844d258046a8d3cfecf9f93f1d8661bcb95240329",
+    "sha256:0706b2a36e546df5aee3553e81aef0b31cfdb9cd8fff5d71ff19b1fb58f8e73a"
+   ],
+   "docker_size_bytes": 41504401
+  },
+  "footprint": {
+   "image": {
+    "compressed": {
+     "bytes": 12418705,
+     "MB": 12.42,
+     "MiB": 11.84
+    },
+    "budget": {
+     "bytes": 60000000,
+     "MB": 60.0,
+     "MiB": 57.22
+    },
+    "layers": [
+     {
+      "digest": "sha256:2cc7ee286bf3a9e6af5f71756d7fc8e22e23ce65fec9047d774511ffcef79fa8",
+      "size": 124525,
+      "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip"
+     },
+     {
+      "digest": "sha256:c172f21841dff4c8cf45cde46589c1c2616cefe7e819965e92e6d3475c428aa0",
+      "size": 12675,
+      "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip"
+     },
+     {
+      "digest": "sha256:fc4330146a1cc76e06ce6def693f5da42c16e2615be6f49e1ea5b6e249ff8262",
+      "size": 290159,
+      "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip"
+     },
+     {
+      "digest": "sha256:777e9d0975e474519f4f14ff87e547cbb8f9fff4cfc4f1a147ac81906880e503",
+      "size": 257706,
+      "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip"
+     },
+     {
+      "digest": "sha256:d6b1b89eccacc15c2420b2776d72c1dae334a00805ed9af54bf2f71e4d536f28",
+      "size": 32093,
+      "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip"
+     },
+     {
+      "digest": "sha256:2780920e5dbfbe103d03a583ed75345306e572ec5a48cb10361f046767d9f29a",
+      "size": 67,
+      "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip"
+     },
+     {
+      "digest": "sha256:7c12895b777bcaa8ccae0605b4de635b68fc32d60fa08f421dc3818bf55ee212",
+      "size": 188,
+      "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip"
+     },
+     {
+      "digest": "sha256:3214acf345c0cc6bbdb56b698a41ccdefc624a09d6beb0d38b5de0b2303ecaf4",
+      "size": 123,
+      "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip"
+     },
+     {
+      "digest": "sha256:52630fc75a18675c530ed9eba5f55eca09b03e91bd5bc15307918bbc1a7e7296",
+      "size": 162,
+      "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip"
+     },
+     {
+      "digest": "sha256:dd64bf2dd177757451a98fcdc999a339c35dee5d9872d8f4dc69c8f3c4dd0112",
+      "size": 80,
+      "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip"
+     },
+     {
+      "digest": "sha256:b839dfae01f66e15c6a8b63520557ed315bdfe036342fa7a0c537259f10d7a9a",
+      "size": 351,
+      "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip"
+     },
+     {
+      "digest": "sha256:c3c9c2f21e6c3293a061cee538a81f4cb29ea224f43d075750ec702b923b77d7",
+      "size": 312,
+      "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip"
+     },
+     {
+      "digest": "sha256:ec1b04bf2eb2122e86781f791b03ea0cf6588694e0f4a88245250224c186cdf0",
+      "size": 142002,
+      "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip"
+     },
+     {
+      "digest": "sha256:3e8afd1d86ab40d0ad23a469bb7d79d66f369f286cb4ab8fbe9f54a06d9b3084",
+      "size": 98,
+      "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip"
+     },
+     {
+      "digest": "sha256:29f3f332618144fbf7fb04d27973f16d8878174cae80ba789fcc594403bc7423",
+      "size": 11550089,
+      "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip"
+     }
+    ],
+    "archive_sha256": "06f5203daf60a1aabdc7aa547b811acd05697562c5444df499e5f9f2065acc52",
+    "method": "sum of the sizes of the manifest, config and gzip layer blobs of `buildx --output type=oci,compression=gzip` for linux/amd64"
+   },
+   "latency": {
+    "unauth_401": {
+     "n": 150,
+     "p50_ms": 42.995,
+     "p95_ms": 44.03,
+     "p99_ms": 45.134,
+     "mean_ms": 43.117
+    },
+    "denied_accounted": {
+     "n": 150,
+     "p50_ms": 96.94,
+     "p95_ms": 109.272,
+     "p99_ms": 115.219,
+     "mean_ms": 98.877
+    },
+    "allowed_accounted": {
+     "n": 150,
+     "p50_ms": 181.741,
+     "p95_ms": 206.624,
+     "p99_ms": 247.549,
+     "mean_ms": 184.491
+    },
+    "usage_write_cost_estimate_p50_ms": 53.945,
+    "note": "denied_accounted - unauth_401 = authorization + one synchronous durable usage write, measured through the TLS proxy on the isolated host; not a microbenchmark of the write alone"
+   },
+   "load": {
+    "peak_reset_before_window": true,
+    "clients": {
+     "rest_pollers": 10,
+     "mcp_sessions": 10,
+     "follow_streams": 5
+    },
+    "seconds": 43.0,
+    "rest": {
+     "status": 85,
+     "logs": 84,
+     "errors": 38
+    },
+    "rest_error_classes": {
+     "403/forbidden": 38
+    },
+    "rest_latency": {
+     "n": 169,
+     "p50_ms": 1960.473,
+     "p95_ms": 3824.901,
+     "p99_ms": 4168.159,
+     "mean_ms": 2143.963
+    },
+    "mcp": {
+     "workers": 10,
+     "seconds": 42.135093728,
+     "calls": 182,
+     "ok": 140,
+     "errors": 42,
+     "by_op": {
+      "container_logs": 70,
+      "container_status": 70
+     },
+     "p50_ms": 1745.544,
+     "p95_ms": 5301.161,
+     "p99_ms": 5376.732,
+     "error_samples": [
+      "tool error result"
+     ],
+     "by_error": {
+      "forbidden/default_deny": 8,
+      "forbidden/safety_unverified": 34
+     }
+    },
+    "mcp_error": null,
+    "streams": {
+     "load1": 3,
+     "load2": 2,
+     "opened": 5,
+     "failed": 0,
+     "frames": 84
+    },
+    "VmRSS_peak_sampled": 40448000,
+    "VmRSS_before": 32530432,
+    "VmRSS_after": 35422208,
+    "VmHWM_after": 41148416,
+    "cgroup": {
+     "memory.current": 22761472,
+     "memory.peak": 245100544,
+     "memory.max": "max"
+    },
+    "rss_samples": 43,
+    "service_log_safety_lines": [
+     "mandatary-1  | {\"time\":\"2026-11-15T15:32:13.685920825Z\",\"level\":\"INFO\",\"msg\":\"docker backend verified\"}"
+    ]
+   }
+  },
+  "matrix": {
+   "cases": 94,
+   "table": [
+    {
+     "id": "X-a-status-A",
+     "who": "a",
+     "op": "status",
+     "expect": "200//",
+     "rest": [
+      200,
+      "",
+      ""
+     ],
+     "mcp": [
+      200,
+      "",
+      ""
+     ]
+    },
+    {
+     "id": "X-a-config-A",
+     "who": "a",
+     "op": "config",
+     "expect": "200//",
+     "rest": [
+      200,
+      "",
+      ""
+     ],
+     "mcp": [
+      200,
+      "",
+      ""
+     ]
+    },
+    {
+     "id": "X-a-logs-A",
+     "who": "a",
+     "op": "logs",
+     "expect": "200//",
+     "rest": [
+      200,
+      "",
+      ""
+     ],
+     "mcp": [
+      200,
+      "",
+      ""
+     ]
+    },
+    {
+     "id": "X-a-restart-A",
+     "who": "a",
+     "op": "restart",
+     "expect": "200//",
+     "rest": [
+      200,
+      "",
+      ""
+     ],
+     "mcp": [
+      200,
+      "",
+      ""
+     ]
+    },
+    {
+     "id": "X-a-stop-A",
+     "who": "a",
+     "op": "stop",
+     "expect": "200//",
+     "rest": [
+      200,
+      "",
+      ""
+     ],
+     "mcp": [
+      200,
+      "",
+      ""
+     ]
+    },
+    {
+     "id": "X-a-start-A",
+     "who": "a",
+     "op": "start",
+     "expect": "200//",
+     "rest": [
+      200,
+      "",
+      ""
+     ],
+     "mcp": [
+      200,
+      "",
+      ""
+     ]
+    },
+    {
+     "id": "X-a-status-B",
+     "who": "a",
+     "op": "status",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-a-config-B",
+     "who": "a",
+     "op": "config",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-a-logs-B",
+     "who": "a",
+     "op": "logs",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-a-restart-B",
+     "who": "a",
+     "op": "restart",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-a-stop-B",
+     "who": "a",
+     "op": "stop",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-a-start-B",
+     "who": "a",
+     "op": "start",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-ro-status-A",
+     "who": "ro",
+     "op": "status",
+     "expect": "200//",
+     "rest": [
+      200,
+      "",
+      ""
+     ],
+     "mcp": [
+      200,
+      "",
+      ""
+     ]
+    },
+    {
+     "id": "X-ro-config-A",
+     "who": "ro",
+     "op": "config",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-ro-logs-A",
+     "who": "ro",
+     "op": "logs",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-ro-restart-A",
+     "who": "ro",
+     "op": "restart",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-ro-stop-A",
+     "who": "ro",
+     "op": "stop",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-ro-start-A",
+     "who": "ro",
+     "op": "start",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-ro-status-B",
+     "who": "ro",
+     "op": "status",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-ro-config-B",
+     "who": "ro",
+     "op": "config",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-ro-logs-B",
+     "who": "ro",
+     "op": "logs",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-ro-restart-B",
+     "who": "ro",
+     "op": "restart",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-ro-stop-B",
+     "who": "ro",
+     "op": "stop",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-ro-start-B",
+     "who": "ro",
+     "op": "start",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-none-status-A",
+     "who": "none",
+     "op": "status",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-none-config-A",
+     "who": "none",
+     "op": "config",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-none-logs-A",
+     "who": "none",
+     "op": "logs",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-none-restart-A",
+     "who": "none",
+     "op": "restart",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-none-stop-A",
+     "who": "none",
+     "op": "stop",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-none-start-A",
+     "who": "none",
+     "op": "start",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-none-status-B",
+     "who": "none",
+     "op": "status",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-none-config-B",
+     "who": "none",
+     "op": "config",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-none-logs-B",
+     "who": "none",
+     "op": "logs",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-none-restart-B",
+     "who": "none",
+     "op": "restart",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-none-stop-B",
+     "who": "none",
+     "op": "stop",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-none-start-B",
+     "who": "none",
+     "op": "start",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-dn-status-A",
+     "who": "dn",
+     "op": "status",
+     "expect": "200//",
+     "rest": [
+      200,
+      "",
+      ""
+     ],
+     "mcp": [
+      200,
+      "",
+      ""
+     ]
+    },
+    {
+     "id": "X-dn-config-A",
+     "who": "dn",
+     "op": "config",
+     "expect": "200//",
+     "rest": [
+      200,
+      "",
+      ""
+     ],
+     "mcp": [
+      200,
+      "",
+      ""
+     ]
+    },
+    {
+     "id": "X-dn-logs-A",
+     "who": "dn",
+     "op": "logs",
+     "expect": "200//",
+     "rest": [
+      200,
+      "",
+      ""
+     ],
+     "mcp": [
+      200,
+      "",
+      ""
+     ]
+    },
+    {
+     "id": "X-dn-restart-A",
+     "who": "dn",
+     "op": "restart",
+     "expect": "200//",
+     "rest": [
+      200,
+      "",
+      ""
+     ],
+     "mcp": [
+      200,
+      "",
+      ""
+     ]
+    },
+    {
+     "id": "X-dn-stop-A",
+     "who": "dn",
+     "op": "stop",
+     "expect": "200//",
+     "rest": [
+      200,
+      "",
+      ""
+     ],
+     "mcp": [
+      200,
+      "",
+      ""
+     ]
+    },
+    {
+     "id": "X-dn-start-A",
+     "who": "dn",
+     "op": "start",
+     "expect": "200//",
+     "rest": [
+      200,
+      "",
+      ""
+     ],
+     "mcp": [
+      200,
+      "",
+      ""
+     ]
+    },
+    {
+     "id": "X-dn-status-B",
+     "who": "dn",
+     "op": "status",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-dn-config-B",
+     "who": "dn",
+     "op": "config",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-dn-logs-B",
+     "who": "dn",
+     "op": "logs",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-dn-restart-B",
+     "who": "dn",
+     "op": "restart",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-dn-stop-B",
+     "who": "dn",
+     "op": "stop",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-dn-start-B",
+     "who": "dn",
+     "op": "start",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-grp-status-A",
+     "who": "grp",
+     "op": "status",
+     "expect": "200//",
+     "rest": [
+      200,
+      "",
+      ""
+     ],
+     "mcp": [
+      200,
+      "",
+      ""
+     ]
+    },
+    {
+     "id": "X-grp-config-A",
+     "who": "grp",
+     "op": "config",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-grp-logs-A",
+     "who": "grp",
+     "op": "logs",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-grp-restart-A",
+     "who": "grp",
+     "op": "restart",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-grp-stop-A",
+     "who": "grp",
+     "op": "stop",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-grp-start-A",
+     "who": "grp",
+     "op": "start",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-grp-status-B",
+     "who": "grp",
+     "op": "status",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-grp-config-B",
+     "who": "grp",
+     "op": "config",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-grp-logs-B",
+     "who": "grp",
+     "op": "logs",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-grp-restart-B",
+     "who": "grp",
+     "op": "restart",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-grp-stop-B",
+     "who": "grp",
+     "op": "stop",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-grp-start-B",
+     "who": "grp",
+     "op": "start",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "P-wild-status-B",
+     "who": "wild",
+     "op": "status",
+     "expect": "200//",
+     "rest": [
+      200,
+      "",
+      ""
+     ],
+     "mcp": [
+      200,
+      "",
+      ""
+     ]
+    },
+    {
+     "id": "P-wild-logs-B",
+     "who": "wild",
+     "op": "logs",
+     "expect": "200//",
+     "rest": [
+      200,
+      "",
+      ""
+     ],
+     "mcp": [
+      200,
+      "",
+      ""
+     ]
+    },
+    {
+     "id": "S-self-name-status",
+     "who": "wild",
+     "op": "status",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "S-self-name-config",
+     "who": "wild",
+     "op": "config",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "S-self-name-logs",
+     "who": "wild",
+     "op": "logs",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "S-self-name-stop",
+     "who": "wild",
+     "op": "stop",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "S-self-name-restart",
+     "who": "wild",
+     "op": "restart",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "S-self-name-start",
+     "who": "wild",
+     "op": "start",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "S-self-id-status",
+     "who": "wild",
+     "op": "status",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "S-self-id-config",
+     "who": "wild",
+     "op": "config",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "S-self-id-logs",
+     "who": "wild",
+     "op": "logs",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "S-self-id-stop",
+     "who": "wild",
+     "op": "stop",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "S-self-id-restart",
+     "who": "wild",
+     "op": "restart",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "S-self-id-start",
+     "who": "wild",
+     "op": "start",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "S-peer-name-status",
+     "who": "wild",
+     "op": "status",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "S-peer-name-config",
+     "who": "wild",
+     "op": "config",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "S-peer-name-logs",
+     "who": "wild",
+     "op": "logs",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "S-peer-name-stop",
+     "who": "wild",
+     "op": "stop",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "S-peer-name-restart",
+     "who": "wild",
+     "op": "restart",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "S-peer-name-start",
+     "who": "wild",
+     "op": "start",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "S-peer-id-status",
+     "who": "wild",
+     "op": "status",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "S-peer-id-config",
+     "who": "wild",
+     "op": "config",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "S-peer-id-logs",
+     "who": "wild",
+     "op": "logs",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "S-peer-id-stop",
+     "who": "wild",
+     "op": "stop",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "S-peer-id-restart",
+     "who": "wild",
+     "op": "restart",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "S-peer-id-start",
+     "who": "wild",
+     "op": "start",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "T-missing-status",
+     "who": "wild",
+     "op": "status",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "T-missing-stop",
+     "who": "wild",
+     "op": "stop",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "E-unknown-endpoint",
+     "who": "wild",
+     "op": "status",
+     "expect": "403/forbidden/safety_unverified|endpoint_inactive|default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "safety_unverified"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "safety_unverified"
+     ]
+    },
+    {
+     "id": "U-no-credential",
+     "who": "",
+     "op": "status",
+     "expect": "401/unauthenticated/",
+     "rest": [
+      401,
+      "unauthenticated",
+      ""
+     ],
+     "mcp": [
+      401,
+      "unauthenticated",
+      ""
+     ]
+    },
+    {
+     "id": "U-garbage-wellformed",
+     "who": "literal:mdt_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+     "op": "status",
+     "expect": "401/unauthenticated/",
+     "rest": [
+      401,
+      "unauthenticated",
+      ""
+     ],
+     "mcp": [
+      401,
+      "unauthenticated",
+      ""
+     ]
+    },
+    {
+     "id": "U-garbage-malformed",
+     "who": "literal:not-a-token",
+     "op": "stop",
+     "expect": "401/unauthenticated/",
+     "rest": [
+      401,
+      "unauthenticated",
+      ""
+     ],
+     "mcp": [
+      401,
+      "unauthenticated",
+      ""
+     ]
+    },
+    {
+     "id": "U-no-credential-stop",
+     "who": "",
+     "op": "stop",
+     "expect": "401/unauthenticated/",
+     "rest": [
+      401,
+      "unauthenticated",
+      ""
+     ],
+     "mcp": [
+      401,
+      "unauthenticated",
+      ""
+     ]
+    },
+    {
+     "id": "D-backend-error-start-C",
+     "who": "wild",
+     "op": "start",
+     "expect": "502/backend_failed/ or 400/invalid_request/",
+     "rest": [
+      400,
+      "invalid_request",
+      ""
+     ],
+     "mcp": [
+      400,
+      "invalid_request",
+      ""
+     ]
+    }
+   ],
+   "raw": [
+    {
+     "id": "I-tail-zero",
+     "path": "/api/v1/endpoints/local/containers/p1206552-a/logs?tail=0",
+     "method": "GET",
+     "expect": "400/invalid_request/",
+     "rest": [
+      400,
+      "invalid_request",
+      ""
+     ]
+    },
+    {
+     "id": "I-tail-huge",
+     "path": "/api/v1/endpoints/local/containers/p1206552-a/logs?tail=999999",
+     "method": "GET",
+     "expect": "400/invalid_request/",
+     "rest": [
+      400,
+      "invalid_request",
+      ""
+     ]
+    },
+    {
+     "id": "I-unknown-param-all",
+     "path": "/api/v1/endpoints/local/containers/p1206552-a/status?all=true",
+     "method": "GET",
+     "expect": "400/invalid_request/",
+     "rest": [
+      400,
+      "invalid_request",
+      ""
+     ]
+    },
+    {
+     "id": "I-unknown-param-force",
+     "path": "/api/v1/endpoints/local/containers/p1206552-a/status?force=1",
+     "method": "GET",
+     "expect": "400/invalid_request/",
+     "rest": [
+      400,
+      "invalid_request",
+      ""
+     ]
+    },
+    {
+     "id": "I-repeat-param",
+     "path": "/api/v1/endpoints/local/containers/p1206552-a/logs?tail=1&tail=2",
+     "method": "GET",
+     "expect": "400/invalid_request/",
+     "rest": [
+      400,
+      "invalid_request",
+      ""
+     ]
+    },
+    {
+     "id": "I-follow-numeric",
+     "path": "/api/v1/endpoints/local/containers/p1206552-a/logs?follow=1",
+     "method": "GET",
+     "expect": "400/invalid_request/",
+     "rest": [
+      400,
+      "invalid_request",
+      ""
+     ]
+    },
+    {
+     "id": "I-timeout-zero",
+     "path": "/api/v1/endpoints/local/containers/p1206552-a/stop",
+     "method": "POST",
+     "expect": "400/invalid_request/",
+     "rest": [
+      400,
+      "invalid_request",
+      ""
+     ]
+    },
+    {
+     "id": "I-timeout-huge",
+     "path": "/api/v1/endpoints/local/containers/p1206552-a/restart",
+     "method": "POST",
+     "expect": "400/invalid_request/",
+     "rest": [
+      400,
+      "invalid_request",
+      ""
+     ]
+    },
+    {
+     "id": "I-unknown-field",
+     "path": "/api/v1/endpoints/local/containers/p1206552-a/stop",
+     "method": "POST",
+     "expect": "400/invalid_request/",
+     "rest": [
+      400,
+      "invalid_request",
+      ""
+     ]
+    },
+    {
+     "id": "I-signal-field",
+     "path": "/api/v1/endpoints/local/containers/p1206552-a/stop",
+     "method": "POST",
+     "expect": "400/invalid_request/",
+     "rest": [
+      400,
+      "invalid_request",
+      ""
+     ]
+    },
+    {
+     "id": "I-encoded-slash",
+     "path": "/api/v1/endpoints/local/containers/a%2Fb/status",
+     "method": "GET",
+     "expect": "400/invalid_request/",
+     "rest": [
+      400,
+      "invalid_request",
+      ""
+     ]
+    },
+    {
+     "id": "N-exec",
+     "path": "/api/v1/endpoints/local/containers/p1206552-a/exec",
+     "method": "POST",
+     "expect": "404/not_found|/",
+     "rest": [
+      404,
+      "not_found",
+      ""
+     ]
+    },
+    {
+     "id": "N-kill",
+     "path": "/api/v1/endpoints/local/containers/p1206552-a/kill",
+     "method": "POST",
+     "expect": "404/not_found|/",
+     "rest": [
+      404,
+      "not_found",
+      ""
+     ]
+    },
+    {
+     "id": "N-pause",
+     "path": "/api/v1/endpoints/local/containers/p1206552-a/pause",
+     "method": "POST",
+     "expect": "404/not_found|/",
+     "rest": [
+      404,
+      "not_found",
+      ""
+     ]
+    },
+    {
+     "id": "N-remove",
+     "path": "/api/v1/endpoints/local/containers/p1206552-a",
+     "method": "DELETE",
+     "expect": "404/not_found|/",
+     "rest": [
+      404,
+      "not_found",
+      ""
+     ]
+    },
+    {
+     "id": "N-list",
+     "path": "/api/v1/endpoints/local/containers",
+     "method": "GET",
+     "expect": "404/not_found|/",
+     "rest": [
+      404,
+      "not_found",
+      ""
+     ]
+    },
+    {
+     "id": "N-list-slash",
+     "path": "/api/v1/endpoints/local/containers/",
+     "method": "GET",
+     "expect": "404/not_found|/",
+     "rest": [
+      404,
+      "not_found",
+      ""
+     ]
+    },
+    {
+     "id": "N-images",
+     "path": "/api/v1/endpoints/local/images",
+     "method": "GET",
+     "expect": "404/not_found|/",
+     "rest": [
+      404,
+      "not_found",
+      ""
+     ]
+    },
+    {
+     "id": "N-networks",
+     "path": "/api/v1/endpoints/local/networks",
+     "method": "GET",
+     "expect": "404/not_found|/",
+     "rest": [
+      404,
+      "not_found",
+      ""
+     ]
+    },
+    {
+     "id": "N-info",
+     "path": "/api/v1/endpoints/local/info",
+     "method": "GET",
+     "expect": "404/not_found|/",
+     "rest": [
+      404,
+      "not_found",
+      ""
+     ]
+    },
+    {
+     "id": "N-discovery",
+     "path": "/api/v1/endpoints",
+     "method": "GET",
+     "expect": "404/not_found|/",
+     "rest": [
+      404,
+      "not_found",
+      ""
+     ]
+    },
+    {
+     "id": "N-docker-path",
+     "path": "/containers/json",
+     "method": "GET",
+     "expect": "404/not_found|/",
+     "rest": [
+      404,
+      "",
+      ""
+     ]
+    },
+    {
+     "id": "N-docker-versioned",
+     "path": "/v1.44/containers/json",
+     "method": "GET",
+     "expect": "404/not_found|/",
+     "rest": [
+      404,
+      "",
+      ""
+     ]
+    },
+    {
+     "id": "N-docker-sock",
+     "path": "/var/run/docker.sock",
+     "method": "GET",
+     "expect": "404/not_found|/",
+     "rest": [
+      404,
+      "",
+      ""
+     ]
+    },
+    {
+     "id": "N-dotdot",
+     "path": "/api/v1/endpoints/local/containers/p1206552-a/status/../../json",
+     "method": "GET",
+     "expect": "404/not_found|/",
+     "rest": [
+      404,
+      "not_found",
+      ""
+     ]
+    },
+    {
+     "id": "N-case-variant",
+     "path": "/API/V1/ENDPOINTS/LOCAL/CONTAINERS/P1206552-A/status",
+     "method": "GET",
+     "expect": "404/not_found|/",
+     "rest": [
+      404,
+      "",
+      ""
+     ]
+    },
+    {
+     "id": "N-post-status",
+     "path": "/api/v1/endpoints/local/containers/p1206552-a/status",
+     "method": "POST",
+     "expect": "405/method_not_allowed/",
+     "rest": [
+      405,
+      "method_not_allowed",
+      ""
+     ]
+    },
+    {
+     "id": "N-get-stop",
+     "path": "/api/v1/endpoints/local/containers/p1206552-a/stop",
+     "method": "GET",
+     "expect": "405/method_not_allowed/",
+     "rest": [
+      405,
+      "method_not_allowed",
+      ""
+     ]
+    },
+    {
+     "id": "N-delete-start",
+     "path": "/api/v1/endpoints/local/containers/p1206552-a/start",
+     "method": "DELETE",
+     "expect": "405/method_not_allowed/",
+     "rest": [
+      405,
+      "method_not_allowed",
+      ""
+     ]
+    }
+   ],
+   "tools": [
+    "container_config",
+    "container_logs",
+    "container_restart",
+    "container_start",
+    "container_status",
+    "container_stop"
+   ],
+   "daemon_events_on_protected_or_ungranted": {
+    "B": [],
+    "self": [],
+    "peer": []
+   }
+  },
+  "usage": {},
+  "persistence": {},
+  "restore": {},
+  "migration": {},
+  "lifecycle": {},
+  "stage_seconds": {
+   "IMG": 1.1,
+   "DEPLOY": 6.3,
+   "IDLE-FRESH": "skipped",
+   "SETUP": 11.2,
+   "IDENTITIES": 2.2,
+   "MATRIX": 63.4,
+   "LIFECYCLE": 22.9,
+   "LATENCY": 49.0,
+   "IDLE-CONFIGURED": "skipped",
+   "LOAD": 43.2,
+   "PERSISTENCE": "skipped",
+   "RESTORE": "skipped",
+   "MIGRATION": "skipped",
+   "DEVFLOW": "skipped",
+   "DOCS": "skipped",
+   "LOGLEVEL": "skipped",
+   "LOGS": "skipped"
+  }
+ },
+ "pass": 48,
+ "not_pass": 1,
+ "results": [
+  {
+   "id": "ISO-00",
+   "name": "the Docker endpoint is the declared isolated fixture daemon (explicit endpoint, identity verified, not Unraid)",
+   "status": "PASS",
+   "detail": ""
+  },
+  {
+   "id": "REL-IMG-01",
+   "name": "the image under test is the exact source revision (revision label == head SHA) for linux/amd64",
+   "status": "PASS",
+   "detail": "6774f12cce6d48e36ca69b174171fe22c2488d46 linux/amd64"
+  },
+  {
+   "id": "REL-FOOT-IMG",
+   "name": "compressed image <= 60 MB (sum of real gzip OCI blobs)",
+   "status": "PASS",
+   "detail": "12.42 MB (11.84 MiB), budget 60 MB, 15 layers"
+  },
+  {
+   "id": "REL-FOOT-SAME",
+   "name": "the measured archive has exactly the uncompressed layers (diffIDs) of the image under test",
+   "status": "PASS",
+   "detail": ""
+  },
+  {
+   "id": "REL-DEP-01",
+   "name": "clean Compose deployment (unmodified docker-compose.yml + proxy file) starts, is healthy and READY on the real daemon",
+   "status": "PASS",
+   "detail": ""
+  },
+  {
+   "id": "REL-SETUP-setup-reveal",
+   "name": "the host helper reveals the setup token on a real controlling terminal",
+   "status": "PASS",
+   "detail": "exit 0"
+  },
+  {
+   "id": "REL-SETUP-setup-exchange",
+   "name": "the host-revealed token exchanges once for a setup-only session",
+   "status": "PASS",
+   "detail": "200"
+  },
+  {
+   "id": "REL-SETUP-setup-account",
+   "name": "administrator staged with two notification addresses",
+   "status": "PASS",
+   "detail": "200"
+  },
+  {
+   "id": "REL-SETUP-setup-proof",
+   "name": "address-control proof delivered over verified-TLS SMTP",
+   "status": "PASS",
+   "detail": "204"
+  },
+  {
+   "id": "REL-SETUP-setup-confirm",
+   "name": "address confirmed with the mailed proof",
+   "status": "PASS",
+   "detail": "204"
+  },
+  {
+   "id": "REL-SETUP-setup-totp",
+   "name": "TOTP enrolled only after proof with a live code",
+   "status": "PASS",
+   "detail": "200 204"
+  },
+  {
+   "id": "REL-SETUP-setup-complete",
+   "name": "setup completes and issues no session",
+   "status": "PASS",
+   "detail": "200"
+  },
+  {
+   "id": "REL-SETUP-login",
+   "name": "the new administrator signs in with password + TOTP; the session carries a server-bound AAL2 label",
+   "status": "PASS",
+   "detail": "200"
+  },
+  {
+   "id": "REL-ID-01",
+   "name": "an ordinary user and two groups are created by the administrator (no operation granted by that)",
+   "status": "PASS",
+   "detail": "{'owner': 'd3fd7143-aaac-457c-b922-b5d18b64b4b3'}{'g': 'e5dd10df-f7ae-4c6b-a40b-f103fe1bc27b', 'g2': 'b6a18f65-1c43-4675-ac5d-5a373f450a27'}"
+  },
+  {
+   "id": "REL-ID-02",
+   "name": "agents are created, each owned by exactly one user or group (owning grants nothing)",
+   "status": "PASS",
+   "detail": "14"
+  },
+  {
+   "id": "REL-ID-03",
+   "name": "an agent is added to a group",
+   "status": "PASS",
+   "detail": "204"
+  },
+  {
+   "id": "REL-ID-04",
+   "name": "explicit ALLOW/DENY rules are created (agent subjects, one group subject, a wildcard, an explicit DENY on B)",
+   "status": "PASS",
+   "detail": "[True, True, True, True, True, True, True, True, True, True, True, True, True, True]"
+  },
+  {
+   "id": "REL-ID-05",
+   "name": "credentials are issued once (mdt_ prefix)",
+   "status": "PASS",
+   "detail": ""
+  },
+  {
+   "id": "REL-ID-06",
+   "name": "the policy page's inventory lists A, B and C, and never Mandatary or its labelled peer",
+   "status": "PASS",
+   "detail": "['mandatary-mailpit-mailpit-1', 'p1206552-a', 'p1206552-b', 'p1206552-c', 'p1206552mstk-proxy-1', 'p1206552mstk-smtp-1']"
+  },
+  {
+   "id": "REL-MATRIX-REST",
+   "name": "REST: all 94 cases (16 allowed, 72 denied, plus 401/unknown endpoint/backend error) meet the expectation",
+   "status": "PASS",
+   "detail": "[]"
+  },
+  {
+   "id": "REL-MATRIX-MCP",
+   "name": "real MCP client (official go-sdk, Streamable HTTP over verified TLS): the same 94 cases meet the same expectation",
+   "status": "PASS",
+   "detail": "[]"
+  },
+  {
+   "id": "REL-MATRIX-PARITY",
+   "name": "REST and the real MCP client give the identical class (status, code, reason) for every case",
+   "status": "PASS",
+   "detail": "[]"
+  },
+  {
+   "id": "REL-MATRIX-POS",
+   "name": "grant a function on A: it succeeds through both API and real MCP (16 positive cases, each on both transports)",
+   "status": "PASS",
+   "detail": ""
+  },
+  {
+   "id": "REL-MATRIX-RAW",
+   "name": "REST: 29 invalid-input and unsupported-operation requests (exec, kill, remove, list, discovery, raw Docker paths, wrong methods, smuggled parameters) are refused and never succeed",
+   "status": "PASS",
+   "detail": "[]"
+  },
+  {
+   "id": "REL-MCP-CATALOG",
+   "name": "tools/list is exactly the six approved tools (no exec, discovery or raw Docker tool)",
+   "status": "PASS",
+   "detail": "['container_config', 'container_logs', 'container_restart', 'container_start', 'container_status', 'container_stop']"
+  },
+  {
+   "id": "REL-MCP-UNSUPPORTED",
+   "name": "MCP: 12 unsupported tool names (exec, kill, remove, list, raw Docker...) are protocol errors that reach nothing, even for a wildcard grant",
+   "status": "PASS",
+   "detail": "[]"
+  },
+  {
+   "id": "REL-MCP-NOAUTH",
+   "name": "MCP tools/list without or with an unknown credential is 401 (listing is not authorization)",
+   "status": "PASS",
+   "detail": "[{'id': 'L-none', 'connected': False, 'http_status': 401, 'http_code': 'unauthenticated', 'elapsed_ms': 0}, {'id': 'L-garbage', 'connected': False, 'http_status': 401, 'http_code': 'unauthenticated', "
+  },
+  {
+   "id": "REL-MATRIX-EFFECT",
+   "name": "daemon events: no start/stop/kill/die/restart on ungranted B, Mandatary itself or its labelled peer during the whole matrix",
+   "status": "PASS",
+   "detail": "{'B': [], 'self': [], 'peer': []}"
+  },
+  {
+   "id": "REL-MATRIX-STATE",
+   "name": "A is running again after the stop/start sequences, B was never touched, C (unstartable) was never started",
+   "status": "PASS",
+   "detail": ""
+  },
+  {
+   "id": "REL-LIFE-EXP-0",
+   "name": "a credential with a 6 s lifetime is issued",
+   "status": "PASS",
+   "detail": "201"
+  },
+  {
+   "id": "REL-LIFE-EXP-1",
+   "name": "a credential with a 6 s lifetime works before expiry (REST and MCP)",
+   "status": "PASS",
+   "detail": "((200, '', ''), (200, '', ''))"
+  },
+  {
+   "id": "REL-LIFE-EXP-2",
+   "name": "the same credential is refused with 401 on REST and MCP after expiry",
+   "status": "PASS",
+   "detail": "((401, 'unauthenticated', ''), (401, 'unauthenticated', ''))"
+  },
+  {
+   "id": "REL-LIFE-REV-1",
+   "name": "agent credential works before revocation",
+   "status": "PASS",
+   "detail": "((200, '', ''), (200, '', ''))"
+  },
+  {
+   "id": "REL-LIFE-REV-2",
+   "name": "revoking the credential returns 204",
+   "status": "PASS",
+   "detail": "204"
+  },
+  {
+   "id": "REL-LIFE-REV-3",
+   "name": "the revoked credential is refused with 401 immediately on both transports",
+   "status": "PASS",
+   "detail": "((401, 'unauthenticated', ''), (401, 'unauthenticated', ''))"
+  },
+  {
+   "id": "REL-LIFE-SESSION",
+   "name": "an MCP session opened with a valid credential does not keep authority after the credential is revoked (next call 401)",
+   "status": "PASS",
+   "detail": "(200, '', '') (401, 'unauthenticated', '')"
+  },
+  {
+   "id": "REL-LIFE-DIS",
+   "name": "a disabled agent's credential works before and is refused (401) after, on both transports",
+   "status": "PASS",
+   "detail": "((200, '', ''), (200, '', '')) ((401, 'unauthenticated', ''), (401, 'unauthenticated', '')) 204"
+  },
+  {
+   "id": "REL-LIFE-ROT-1",
+   "name": "rotation: during the overlap window both the old and the new credential authorize",
+   "status": "PASS",
+   "detail": "201 ((200, '', ''), (200, '', '')) ((200, '', ''), (200, '', ''))"
+  },
+  {
+   "id": "REL-LIFE-ROT-2",
+   "name": "rotation: after the overlap the old credential is 401 on both transports and the new one still works",
+   "status": "PASS",
+   "detail": "((401, 'unauthenticated', ''), (401, 'unauthenticated', ''), (200, '', ''), (200, '', ''))"
+  },
+  {
+   "id": "REL-LIFE-GROUP",
+   "name": "group rule: a member is allowed; after removal from the group the same credential is denied (403) on both transports",
+   "status": "PASS",
+   "detail": "((200, '', ''), (200, '', '')) ((403, 'forbidden', 'default_deny'), (403, 'forbidden', 'default_deny')) 204"
+  },
+  {
+   "id": "REL-LIFE-POL-1",
+   "name": "policy credential reads status and opens a follow stream",
+   "status": "PASS",
+   "detail": "((200, '', ''), (200, '', '')) 200 2"
+  },
+  {
+   "id": "REL-LIFE-POL-2",
+   "name": "disabling the policy rules ends the open follow stream within 5 s (authority-ended terminal frame)",
+   "status": "PASS",
+   "detail": "disable [204, 204] ended=True 0.2s last=b'{\"error\":{\"code\":\"forbidden\",\"status\":403,\"reason\":\"authorization_ended\",\"messag'"
+  },
+  {
+   "id": "REL-LIFE-POL-3",
+   "name": "after the policy change the same credential is denied (403) on both transports",
+   "status": "PASS",
+   "detail": "((403, 'forbidden', 'default_deny'), (403, 'forbidden', 'default_deny'))"
+  },
+  {
+   "id": "REL-LIFE-POL-4",
+   "name": "re-enabling the rules restores access (positive control); no operation was ever granted by the account itself",
+   "status": "PASS",
+   "detail": "[204, 204] ((200, '', ''), (200, '', ''))"
+  },
+  {
+   "id": "REL-LIFE-POL-5",
+   "name": "deleting the rules denies again (403) on both transports",
+   "status": "PASS",
+   "detail": "[204, 204] ((403, 'forbidden', 'default_deny'), (403, 'forbidden', 'default_deny'))"
+  },
+  {
+   "id": "REL-LAT",
+   "name": "added latency of an accounted outcome measured (150 sequential calls per class)",
+   "status": "PASS",
+   "detail": "p50 ms: 401 42.99, denied+accounted 96.94, allowed+accounted 181.74; p99 ms: 45.13 / 115.22 / 247.55"
+  },
+  {
+   "id": "REL-LOAD-RUN",
+   "name": "benchmark workload ran: 10 REST + 10 real-MCP polling clients and 5 active follow streams for 43 s with no failed call",
+   "status": "FAIL",
+   "detail": "rest ok 169 err 38 {'403/forbidden': 38}, mcp {'calls': 182, 'ok': 140, 'errors': 42, 'error_samples': ['tool error result'], 'by_error': {'forbidden/default_deny': 8, 'forbidden/safety_unverified': 34}}, streams {'load1': 3, 'load2': 2, 'opened': 5, 'failed': 0, 'frames': 84} "
+  },
+  {
+   "id": "REL-FOOT-LOAD",
+   "name": "RSS under the benchmark workload <= 150 MB (peak sampled 40.45 MB; kernel high-water mark VmHWM 41.15 MB reset at the start of the window)",
+   "status": "PASS",
+   "detail": "budget 150 MB; 43 RSS samples at 1 Hz; rss before 32.53 MB after 35.42 MB"
+  },
+  {
+   "id": "ISO-01",
+   "name": "the daemon is still the declared fixture daemon before cleanup",
+   "status": "PASS",
+   "detail": ""
+  }
+ ]
+}

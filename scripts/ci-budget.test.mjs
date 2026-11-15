@@ -95,6 +95,7 @@ test('the image job covers both CPUs natively and gates on a digest-pinned Trivy
 test('the image job runs the P1.20 release acceptance on the declared fixture daemon, on both CPUs', () => {
   const image = job('image');
   assert.match(image, /python3 tests\/release\/test_release\.py/);
+  assert.match(image, /python3 tests\/release\/report\.py --evidence docs\/release\/evidence --criteria tests\/release\/criteria\.json --out docs\/release\/phase1-release-acceptance\.md --check/);
   assert.match(image, /release\.py[^\n]*\\\n[^\n]*--docker-host "\$FIXTURE_DOCKER_HOST" --expect-daemon-id "\$FIXTURE_DAEMON_ID"/);
   assert.match(image, /--mcp-client "\$RUNNER_TEMP\/out\/mcpclient" --mig-tool "\$RUNNER_TEMP\/out\/migfixture"/);
   assert.match(image, /go build -trimpath -o "\$RUNNER_TEMP\/out\/mcpclient" \.\/tests\/release\/mcpclient/);

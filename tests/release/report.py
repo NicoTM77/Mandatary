@@ -104,13 +104,43 @@ def load_evidence(evdir):
     return manifest, results, digests, meta
 
 
+def mb(v):
+    return "%.2f MB (%d B)" % (v / 1e6, v) if isinstance(v, (int, float)) and not isinstance(v, bool) else "not measured"
+
+
+def measured_table(evdir, manifest):
+    """The measured values behind the budget criteria, read from the committed harness results (never typed). Missing values read 'not measured'."""
+    rows = []
+    for name, a in manifest["artifacts"].items():
+        path = os.path.join(evdir, a["file"])
+        if a["kind"] != "results" or not os.path.exists(path):
+            continue
+        with open(path) as fh:
+            doc = json.load(fh)
+        fp = (doc.get("evidence") or {}).get("footprint")
+        if not fp:
+            continue
+        env = (doc.get("evidence") or {}).get("environment", {})
+        idle = {r["label"]: r for r in fp.get("idle", [])}
+        ld = fp.get("load") or {}
+        img = (fp.get("image") or {}).get("compressed", {})
+
+        def steady(label):
+            r = idle.get(label)
+            return "%s steady; peak %s; under 50 MB from %s s" % (mb(r.get("VmRSS_steady_max")), mb(r.get("VmRSS_peak_in_window")), r.get("settled_under_budget_at_s")) if r else "not measured"
+        rows.append((name, "%s %s, %s CPUs, Docker %s" % (env.get("os_arch"), env.get("os"), env.get("cpus"), env.get("docker_server")), mb(img.get("bytes")), steady("fresh"), steady("configured"), steady("after-restart"),
+                     "peak %s; high-water mark %s; %s s; REST %s ok / %s non-200, MCP %s ok / %s errors" % (mb(ld.get("VmRSS_peak_sampled")), mb(ld.get("VmHWM_after")), ld.get("seconds"), sum((ld.get("rest") or {}).get(k, 0) for k in ("status", "logs")),
+                                                                                                         (ld.get("rest") or {}).get("errors"), (ld.get("mcp") or {}).get("ok"), (ld.get("mcp") or {}).get("errors"))))
+    return rows
+
+
 def verdict(rows):
     n = {k: sum(1 for r in rows if r["status"] == k) for k in ORDER}
     ok = bool(rows) and n["FAIL"] == 0 and n["UNVERIFIED"] == 0  # an empty report is never an acceptance
     return ok, n
 
 
-def render(manifest, rows, digests, meta, results):
+def render(manifest, rows, digests, meta, results, evdir):
     ok, n = verdict(rows)
     L = []
     w = L.append
@@ -140,7 +170,16 @@ def render(manifest, rows, digests, meta, results):
     for name, a in manifest["artifacts"].items():
         w("| `%s` | `%s` | `%s` | %s |" % (name, a["file"], digests.get(name, "MISSING"), a["source"]))
     w("")
-    w("## 3. Criteria")
+    w("## 3. Measured values behind the budgets")
+    w("")
+    w("Budgets (technical-decisions.md 10.2, MB = 10^6 bytes): image <= 60 MB compressed; idle <= 50 MB resident after startup; load <= 150 MB resident under 20 clients and 5 streams.")
+    w("")
+    w("| Environment (artifact) | Host | Compressed image | Idle after first start | Idle configured | Idle after restart | Load |")
+    w("| --- | --- | --- | --- | --- | --- | --- |")
+    for r in measured_table(evdir, manifest):
+        w("| `%s` | %s |" % (r[0], " | ".join(x.replace("|", "\\|") for x in r[1:])))
+    w("")
+    w("## 4. Criteria")
     w("")
     groups = []
     for r in rows:
@@ -156,7 +195,7 @@ def render(manifest, rows, digests, meta, results):
             w("| %s | %s | **%s** | %s | %s |" % (r["id"], r["text"].replace("|", "\\|"), r["status"], links, (r.get("limits") or "").replace("|", "\\|")))
         w("")
     if manifest.get("findings"):
-        w("## 4. Findings recorded by this run")
+        w("## 5. Findings recorded by this run")
         w("")
         w("These are observations made while producing the evidence. They are not criteria and are not hidden by the verdict above; each names where it is evidenced and what it needs.")
         w("")
@@ -187,7 +226,7 @@ def main():
     ap.add_argument("--check", action="store_true", help="fail when --out differs from what the evidence produces")
     a = ap.parse_args()
     manifest, rows, digests, meta, results = build(a.evidence, a.criteria)
-    text = render(manifest, rows, digests, meta, results)
+    text = render(manifest, rows, digests, meta, results, a.evidence)
     ok, n = verdict(rows)
     if a.check:
         have = None

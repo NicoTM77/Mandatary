@@ -1,0 +1,4256 @@
+{
+ "task": "t_836268ff",
+ "source_sha": "6ea36a20b26b207cf2fac1f1dee5b186cd627b25",
+ "image": "mandatary-ci:amd64",
+ "platform": "linux/amd64",
+ "prefix": "p120aec8",
+ "seconds": 1107,
+ "evidence": {
+  "environment": {
+   "docker_server": "28.0.4",
+   "api": "1.48",
+   "os_arch": "linux/amd64",
+   "kernel": "7.0.0-1014-aws",
+   "os": "Ubuntu 24.04.5 LTS",
+   "cpus": 4,
+   "memory_bytes": 16464302080,
+   "storage_driver": "overlay2",
+   "cgroup": "systemd v2",
+   "compose": "2.38.2",
+   "daemon_id": "8fcd00e2-c8ec-49fc-a584-a2113079d563",
+   "fsync_4k_work_filesystem": {
+    "n": 200,
+    "p50_ms": 0.034,
+    "p95_ms": 0.094,
+    "p99_ms": 0.149,
+    "mean_ms": 0.041
+   },
+   "host_cpus": 4,
+   "compose_project": "p120aec8mstk"
+  },
+  "image": {
+   "id": "sha256:9f31b68fe0198d22945862b89bbcecc1523c3cde05b4da11d1f3de18092d6676",
+   "repo_digests": [],
+   "architecture": "amd64",
+   "os": "linux",
+   "revision_label": "6ea36a20b26b207cf2fac1f1dee5b186cd627b25",
+   "rootfs_layers": [
+    "sha256:9486261b5a13f63ca6904b36721527ac8f19df53d300560138d69ae9b4c203de",
+    "sha256:621c35e751a51a9a9dc3e80aa0b7fe8be2a93402ea6ccd307d30852cd7776cda",
+    "sha256:b64fe4bb89ff075efc03878811052cbaf4f9dd891aed968e9ed6993fedf1f4a7",
+    "sha256:b5764396d8d3f88c6c91b8e97022f147ec721afcf85710d96775922e0df881af",
+    "sha256:275a30dd8ce958b21daa9ad962c6fbc09f98306ee2f486b65c9075dc257b1412",
+    "sha256:4d049f83d9cf21d1f5cc0e11deaf36df02790d0e60c1a3829538fb4b61685368",
+    "sha256:af5aa97ebe6ce1604747ec1e21af7136ded391bcabe4acef882e718a87c86bcc",
+    "sha256:6f1cdceb6a3146f0ccb986521156bef8a422cdbb0863396f7f751f575ba308f4",
+    "sha256:bd3cdfae1d3fdd83a2231d608969b38b82349777c2fff9a7c12d54f8ac5c9b38",
+    "sha256:4cde6b0bb6f50a5f255eef7b2a42162c661cf776b803225dcac9a659e396bb6b",
+    "sha256:ad51d0769d16ba578106a177987dfe3d2e02c1668c852b795b2f6b024068242a",
+    "sha256:f0e42608573850bddc6e1dcabb8a6ea34676a336964b3dbf006a4451f448be9f",
+    "sha256:0762a1f6557d1e88a761ab05aa7f65a10dc0e559913ea13befb873d907e1a396",
+    "sha256:639a0c7ebc03b48fb68be0bdacc255af0f9526665da8d3cbb8b1e0a210827821",
+    "sha256:9bae27f87c297ced14dff2a5d084cc28cd480e6481456fe25265e4e631b9a538"
+   ],
+   "docker_size_bytes": 25656397
+  },
+  "footprint": {
+   "oci_export_error": "ild: OCI exporter is not supported for the docker driver.\nSwitch to a different driver, or turn on the containerd image store, and try again.\nLearn more at https://docs.docker.com/go/build-exporters/\n",
+   "image": {
+    "compressed": {
+     "bytes": 12293013,
+     "MB": 12.29,
+     "MiB": 11.72
+    },
+    "budget": {
+     "bytes": 60000000,
+     "MB": 60.0,
+     "MiB": 57.22
+    },
+    "layers": [
+     {
+      "file": "blobs/sha256/9486261b5a13f63ca6904b36721527ac8f19df53d300560138d69ae9b4c203de",
+      "size": 124508
+     },
+     {
+      "file": "blobs/sha256/621c35e751a51a9a9dc3e80aa0b7fe8be2a93402ea6ccd307d30852cd7776cda",
+      "size": 12658
+     },
+     {
+      "file": "blobs/sha256/b64fe4bb89ff075efc03878811052cbaf4f9dd891aed968e9ed6993fedf1f4a7",
+      "size": 290142
+     },
+     {
+      "file": "blobs/sha256/b5764396d8d3f88c6c91b8e97022f147ec721afcf85710d96775922e0df881af",
+      "size": 257689
+     },
+     {
+      "file": "blobs/sha256/275a30dd8ce958b21daa9ad962c6fbc09f98306ee2f486b65c9075dc257b1412",
+      "size": 32076
+     },
+     {
+      "file": "blobs/sha256/4d049f83d9cf21d1f5cc0e11deaf36df02790d0e60c1a3829538fb4b61685368",
+      "size": 67
+     },
+     {
+      "file": "blobs/sha256/af5aa97ebe6ce1604747ec1e21af7136ded391bcabe4acef882e718a87c86bcc",
+      "size": 188
+     },
+     {
+      "file": "blobs/sha256/6f1cdceb6a3146f0ccb986521156bef8a422cdbb0863396f7f751f575ba308f4",
+      "size": 123
+     },
+     {
+      "file": "blobs/sha256/bd3cdfae1d3fdd83a2231d608969b38b82349777c2fff9a7c12d54f8ac5c9b38",
+      "size": 162
+     },
+     {
+      "file": "blobs/sha256/4cde6b0bb6f50a5f255eef7b2a42162c661cf776b803225dcac9a659e396bb6b",
+      "size": 80
+     },
+     {
+      "file": "blobs/sha256/ad51d0769d16ba578106a177987dfe3d2e02c1668c852b795b2f6b024068242a",
+      "size": 351
+     },
+     {
+      "file": "blobs/sha256/f0e42608573850bddc6e1dcabb8a6ea34676a336964b3dbf006a4451f448be9f",
+      "size": 312
+     },
+     {
+      "file": "blobs/sha256/0762a1f6557d1e88a761ab05aa7f65a10dc0e559913ea13befb873d907e1a396",
+      "size": 141971
+     },
+     {
+      "file": "blobs/sha256/639a0c7ebc03b48fb68be0bdacc255af0f9526665da8d3cbb8b1e0a210827821",
+      "size": 88
+     },
+     {
+      "file": "blobs/sha256/9bae27f87c297ced14dff2a5d084cc28cd480e6481456fe25265e4e631b9a538",
+      "size": 11422928
+     }
+    ],
+    "archive_sha256": "b114e94b9705cb8c1ddf3a1ad56d0e7be56dac7fc86e26c45dd2a30a088f5861",
+    "method": "ESTIMATE: this daemon's buildx driver cannot export OCI, so every layer of `docker save` of the image under test is gzip-compressed (level 6, the default of docker push) and summed with the config and manifest; a registry's own compressor can differ by a few percent"
+   },
+   "idle": [
+    {
+     "label": "fresh",
+     "pid_namespace": "host",
+     "window_s": 300,
+     "steady_window_s": 60,
+     "VmRSS_steady_max": 28225536,
+     "VmRSS_steady_median": 27590656,
+     "VmRSS_peak_in_window": 99115008,
+     "settled_under_budget_at_s": 140.0,
+     "VmHWM_process_lifetime": 99164160,
+     "RssAnon_last": 10559488,
+     "RssFile_last": 16982016,
+     "curve_s_rss_anon_file": [
+      [
+       0.0,
+       91930624,
+       75800576,
+       16130048
+      ],
+      [
+       5.0,
+       92049408,
+       75919360,
+       16130048
+      ],
+      [
+       10.0,
+       92250112,
+       76120064,
+       16130048
+      ],
+      [
+       15.0,
+       92418048,
+       76288000,
+       16130048
+      ],
+      [
+       20.0,
+       92643328,
+       76513280,
+       16130048
+      ],
+      [
+       25.0,
+       93765632,
+       76783616,
+       16982016
+      ],
+      [
+       30.0,
+       94076928,
+       77094912,
+       16982016
+      ],
+      [
+       35.0,
+       94330880,
+       77348864,
+       16982016
+      ],
+      [
+       40.0,
+       94576640,
+       77594624,
+       16982016
+      ],
+      [
+       45.0,
+       94879744,
+       77897728,
+       16982016
+      ],
+      [
+       50.0,
+       95096832,
+       78114816,
+       16982016
+      ],
+      [
+       55.0,
+       95375360,
+       78393344,
+       16982016
+      ],
+      [
+       60.0,
+       95887360,
+       78905344,
+       16982016
+      ],
+      [
+       65.0,
+       96161792,
+       79179776,
+       16982016
+      ],
+      [
+       70.0,
+       96452608,
+       79470592,
+       16982016
+      ],
+      [
+       75.0,
+       96714752,
+       79732736,
+       16982016
+      ],
+      [
+       80.0,
+       96980992,
+       79998976,
+       16982016
+      ],
+      [
+       85.0,
+       97230848,
+       80248832,
+       16982016
+      ],
+      [
+       90.0,
+       97513472,
+       80531456,
+       16982016
+      ],
+      [
+       95.0,
+       97787904,
+       80805888,
+       16982016
+      ],
+      [
+       100.0,
+       98033664,
+       81051648,
+       16982016
+      ],
+      [
+       105.0,
+       98340864,
+       81358848,
+       16982016
+      ],
+      [
+       110.0,
+       98639872,
+       81657856,
+       16982016
+      ],
+      [
+       115.0,
+       98844672,
+       81862656,
+       16982016
+      ],
+      [
+       120.0,
+       98947072,
+       81965056,
+       16982016
+      ],
+      [
+       125.0,
+       98971648,
+       81989632,
+       16982016
+      ],
+      [
+       130.0,
+       99115008,
+       82132992,
+       16982016
+      ],
+      [
+       135.0,
+       91459584,
+       74477568,
+       16982016
+      ],
+      [
+       140.0,
+       26501120,
+       9519104,
+       16982016
+      ],
+      [
+       145.0,
+       26501120,
+       9519104,
+       16982016
+      ],
+      [
+       150.0,
+       26714112,
+       9732096,
+       16982016
+      ],
+      [
+       155.0,
+       26505216,
+       9523200,
+       16982016
+      ],
+      [
+       160.0,
+       26705920,
+       9723904,
+       16982016
+      ],
+      [
+       165.0,
+       26898432,
+       9916416,
+       16982016
+      ],
+      [
+       170.0,
+       26947584,
+       9965568,
+       16982016
+      ],
+      [
+       175.0,
+       27049984,
+       10067968,
+       16982016
+      ],
+      [
+       180.0,
+       26955776,
+       9973760,
+       16982016
+      ],
+      [
+       185.0,
+       26963968,
+       9981952,
+       16982016
+      ],
+      [
+       190.0,
+       26984448,
+       10002432,
+       16982016
+      ],
+      [
+       195.0,
+       27058176,
+       10076160,
+       16982016
+      ],
+      [
+       200.0,
+       27140096,
+       10158080,
+       16982016
+      ],
+      [
+       205.0,
+       26918912,
+       9936896,
+       16982016
+      ],
+      [
+       210.0,
+       27000832,
+       10018816,
+       16982016
+      ],
+      [
+       215.0,
+       27004928,
+       10022912,
+       16982016
+      ],
+      [
+       220.0,
+       27017216,
+       10035200,
+       16982016
+      ],
+      [
+       225.0,
+       27054080,
+       10072064,
+       16982016
+      ],
+      [
+       230.0,
+       27119616,
+       10137600,
+       16982016
+      ],
+      [
+       235.0,
+       27140096,
+       10158080,
+       16982016
+      ],
+      [
+       240.0,
+       27217920,
+       10235904,
+       16982016
+      ],
+      [
+       245.0,
+       27222016,
+       10240000,
+       16982016
+      ],
+      [
+       250.0,
+       27230208,
+       10248192,
+       16982016
+      ],
+      [
+       255.0,
+       27234304,
+       10252288,
+       16982016
+      ],
+      [
+       260.0,
+       27250688,
+       10268672,
+       16982016
+      ],
+      [
+       265.0,
+       27590656,
+       10608640,
+       16982016
+      ],
+      [
+       270.0,
+       27693056,
+       10711040,
+       16982016
+      ],
+      [
+       275.0,
+       27770880,
+       10788864,
+       16982016
+      ],
+      [
+       280.0,
+       28000256,
+       11018240,
+       16982016
+      ],
+      [
+       285.0,
+       28110848,
+       11128832,
+       16982016
+      ],
+      [
+       290.0,
+       28225536,
+       11243520,
+       16982016
+      ],
+      [
+       295.0,
+       27541504,
+       10559488,
+       16982016
+      ]
+     ],
+     "cgroup": {
+      "memory.current": 12521472,
+      "memory.peak": 89141248,
+      "memory.max": "max"
+     }
+    },
+    {
+     "label": "configured",
+     "pid_namespace": "host",
+     "window_s": 120,
+     "steady_window_s": 60,
+     "VmRSS_steady_max": 32735232,
+     "VmRSS_steady_median": 32722944,
+     "VmRSS_peak_in_window": 32735232,
+     "settled_under_budget_at_s": 0.0,
+     "VmHWM_process_lifetime": 178888704,
+     "RssAnon_last": 14454784,
+     "RssFile_last": 18280448,
+     "curve_s_rss_anon_file": [
+      [
+       0.0,
+       32530432,
+       14249984,
+       18280448
+      ],
+      [
+       5.0,
+       32567296,
+       14286848,
+       18280448
+      ],
+      [
+       10.0,
+       32608256,
+       14327808,
+       18280448
+      ],
+      [
+       15.0,
+       32620544,
+       14340096,
+       18280448
+      ],
+      [
+       20.0,
+       32460800,
+       14180352,
+       18280448
+      ],
+      [
+       25.0,
+       32485376,
+       14204928,
+       18280448
+      ],
+      [
+       30.0,
+       32485376,
+       14204928,
+       18280448
+      ],
+      [
+       35.0,
+       32489472,
+       14209024,
+       18280448
+      ],
+      [
+       40.0,
+       32370688,
+       14090240,
+       18280448
+      ],
+      [
+       45.0,
+       32419840,
+       14139392,
+       18280448
+      ],
+      [
+       50.0,
+       32444416,
+       14163968,
+       18280448
+      ],
+      [
+       55.0,
+       32444416,
+       14163968,
+       18280448
+      ],
+      [
+       60.0,
+       32509952,
+       14229504,
+       18280448
+      ],
+      [
+       65.0,
+       32530432,
+       14249984,
+       18280448
+      ],
+      [
+       70.0,
+       32595968,
+       14315520,
+       18280448
+      ],
+      [
+       75.0,
+       32681984,
+       14401536,
+       18280448
+      ],
+      [
+       80.0,
+       32690176,
+       14409728,
+       18280448
+      ],
+      [
+       85.0,
+       32690176,
+       14409728,
+       18280448
+      ],
+      [
+       90.0,
+       32722944,
+       14442496,
+       18280448
+      ],
+      [
+       95.0,
+       32735232,
+       14454784,
+       18280448
+      ],
+      [
+       100.0,
+       32735232,
+       14454784,
+       18280448
+      ],
+      [
+       105.0,
+       32735232,
+       14454784,
+       18280448
+      ],
+      [
+       110.0,
+       32735232,
+       14454784,
+       18280448
+      ],
+      [
+       115.0,
+       32735232,
+       14454784,
+       18280448
+      ]
+     ],
+     "cgroup": {
+      "memory.current": 19877888,
+      "memory.peak": 170262528,
+      "memory.max": "max"
+     }
+    },
+    {
+     "label": "after-restart",
+     "pid_namespace": "host",
+     "window_s": 300,
+     "steady_window_s": 60,
+     "VmRSS_steady_max": 26546176,
+     "VmRSS_steady_median": 26390528,
+     "VmRSS_peak_in_window": 97284096,
+     "settled_under_budget_at_s": 160.0,
+     "VmHWM_process_lifetime": 97202176,
+     "RssAnon_last": 9568256,
+     "RssFile_last": 16977920,
+     "curve_s_rss_anon_file": [
+      [
+       0.0,
+       89362432,
+       73555968,
+       15806464
+      ],
+      [
+       5.0,
+       89632768,
+       73826304,
+       15806464
+      ],
+      [
+       10.0,
+       89841664,
+       74035200,
+       15806464
+      ],
+      [
+       15.0,
+       89919488,
+       74113024,
+       15806464
+      ],
+      [
+       20.0,
+       89993216,
+       74186752,
+       15806464
+      ],
+      [
+       25.0,
+       90304512,
+       74498048,
+       15806464
+      ],
+      [
+       30.0,
+       91783168,
+       74862592,
+       16920576
+      ],
+      [
+       35.0,
+       91951104,
+       75030528,
+       16920576
+      ],
+      [
+       40.0,
+       92209152,
+       75288576,
+       16920576
+      ],
+      [
+       45.0,
+       92430336,
+       75509760,
+       16920576
+      ],
+      [
+       50.0,
+       92745728,
+       75825152,
+       16920576
+      ],
+      [
+       55.0,
+       92999680,
+       76079104,
+       16920576
+      ],
+      [
+       60.0,
+       93282304,
+       76365824,
+       16916480
+      ],
+      [
+       65.0,
+       93761536,
+       76845056,
+       16916480
+      ],
+      [
+       70.0,
+       94019584,
+       77103104,
+       16916480
+      ],
+      [
+       75.0,
+       94265344,
+       77348864,
+       16916480
+      ],
+      [
+       80.0,
+       94568448,
+       77651968,
+       16916480
+      ],
+      [
+       85.0,
+       94830592,
+       77914112,
+       16916480
+      ],
+      [
+       90.0,
+       95236096,
+       78319616,
+       16916480
+      ],
+      [
+       95.0,
+       95477760,
+       78561280,
+       16916480
+      ],
+      [
+       100.0,
+       95744000,
+       78827520,
+       16916480
+      ],
+      [
+       105.0,
+       96006144,
+       79089664,
+       16916480
+      ],
+      [
+       110.0,
+       96260096,
+       79343616,
+       16916480
+      ],
+      [
+       115.0,
+       96505856,
+       79593472,
+       16912384
+      ],
+      [
+       120.0,
+       97107968,
+       80195584,
+       16912384
+      ],
+      [
+       125.0,
+       97161216,
+       80248832,
+       16912384
+      ],
+      [
+       130.0,
+       97173504,
+       80261120,
+       16912384
+      ],
+      [
+       135.0,
+       97181696,
+       80269312,
+       16912384
+      ],
+      [
+       140.0,
+       97202176,
+       80289792,
+       16912384
+      ],
+      [
+       145.0,
+       97239040,
+       80326656,
+       16912384
+      ],
+      [
+       150.0,
+       97284096,
+       80371712,
+       16912384
+      ],
+      [
+       155.0,
+       88629248,
+       71716864,
+       16912384
+      ],
+      [
+       160.0,
+       26636288,
+       9723904,
+       16912384
+      ],
+      [
+       165.0,
+       26636288,
+       9723904,
+       16912384
+      ],
+      [
+       170.0,
+       26644480,
+       9732096,
+       16912384
+      ],
+      [
+       175.0,
+       26648576,
+       9736192,
+       16912384
+      ],
+      [
+       180.0,
+       26660864,
+       9748480,
+       16912384
+      ],
+      [
+       185.0,
+       26664960,
+       9752576,
+       16912384
+      ],
+      [
+       190.0,
+       26533888,
+       9621504,
+       16912384
+      ],
+      [
+       195.0,
+       26533888,
+       9621504,
+       16912384
+      ],
+      [
+       200.0,
+       26533888,
+       9621504,
+       16912384
+      ],
+      [
+       205.0,
+       26533888,
+       9621504,
+       16912384
+      ],
+      [
+       210.0,
+       26599424,
+       9621504,
+       16977920
+      ],
+      [
+       215.0,
+       26599424,
+       9621504,
+       16977920
+      ],
+      [
+       220.0,
+       26472448,
+       9494528,
+       16977920
+      ],
+      [
+       225.0,
+       26472448,
+       9494528,
+       16977920
+      ],
+      [
+       230.0,
+       26472448,
+       9494528,
+       16977920
+      ],
+      [
+       235.0,
+       26472448,
+       9494528,
+       16977920
+      ],
+      [
+       240.0,
+       26484736,
+       9506816,
+       16977920
+      ],
+      [
+       245.0,
+       26374144,
+       9396224,
+       16977920
+      ],
+      [
+       250.0,
+       26374144,
+       9396224,
+       16977920
+      ],
+      [
+       255.0,
+       26374144,
+       9396224,
+       16977920
+      ],
+      [
+       260.0,
+       26374144,
+       9396224,
+       16977920
+      ],
+      [
+       265.0,
+       26374144,
+       9396224,
+       16977920
+      ],
+      [
+       270.0,
+       26374144,
+       9396224,
+       16977920
+      ],
+      [
+       275.0,
+       26390528,
+       9412608,
+       16977920
+      ],
+      [
+       280.0,
+       26537984,
+       9560064,
+       16977920
+      ],
+      [
+       285.0,
+       26542080,
+       9564160,
+       16977920
+      ],
+      [
+       290.0,
+       26542080,
+       9564160,
+       16977920
+      ],
+      [
+       295.0,
+       26546176,
+       9568256,
+       16977920
+      ]
+     ],
+     "cgroup": {
+      "memory.current": 11120640,
+      "memory.peak": 86003712,
+      "memory.max": "max"
+     }
+    }
+   ],
+   "latency": {
+    "unauth_401": {
+     "n": 150,
+     "p50_ms": 42.78,
+     "p95_ms": 43.292,
+     "p99_ms": 44.158,
+     "mean_ms": 42.686
+    },
+    "denied_accounted": {
+     "n": 150,
+     "p50_ms": 50.148,
+     "p95_ms": 52.157,
+     "p99_ms": 53.817,
+     "mean_ms": 50.297
+    },
+    "allowed_accounted": {
+     "n": 150,
+     "p50_ms": 60.785,
+     "p95_ms": 64.325,
+     "p99_ms": 66.721,
+     "mean_ms": 61.143
+    },
+    "usage_write_cost_estimate_p50_ms": 7.368,
+    "note": "denied_accounted - unauth_401 = authorization + one synchronous durable usage write, measured through the TLS proxy on the isolated host; not a microbenchmark of the write alone"
+   },
+   "load": {
+    "peak_reset_before_window": true,
+    "clients": {
+     "rest_pollers": 10,
+     "mcp_sessions": 10,
+     "follow_streams": 5
+    },
+    "seconds": 61.0,
+    "rest": {
+     "status": 1022,
+     "logs": 1021,
+     "errors": 0
+    },
+    "rest_error_classes": {},
+    "rest_latency": {
+     "n": 2043,
+     "p50_ms": 96.071,
+     "p95_ms": 139.864,
+     "p99_ms": 159.441,
+     "mean_ms": 95.656
+    },
+    "mcp": {
+     "workers": 10,
+     "seconds": 60.227123156,
+     "calls": 2259,
+     "ok": 2259,
+     "errors": 0,
+     "by_op": {
+      "container_logs": 1130,
+      "container_status": 1129
+     },
+     "p50_ms": 72.332,
+     "p95_ms": 125.503,
+     "p99_ms": 144.684
+    },
+    "mcp_error": null,
+    "streams": {
+     "load1": 3,
+     "load2": 2,
+     "opened": 5,
+     "failed": 0,
+     "frames": 315
+    },
+    "VmRSS_peak_sampled": 38703104,
+    "VmRSS_before": 32784384,
+    "VmRSS_after": 35987456,
+    "VmHWM_after": 39301120,
+    "cgroup": {
+     "memory.current": 23732224,
+     "memory.peak": 170262528,
+     "memory.max": "max"
+    },
+    "rss_samples": 61,
+    "service_log_safety_lines": [
+     "mandatary-1  | {\"time\":\"2026-11-15T15:48:01.146906445Z\",\"level\":\"INFO\",\"msg\":\"docker backend verified\"}"
+    ]
+   }
+  },
+  "matrix": {
+   "cases": 94,
+   "table": [
+    {
+     "id": "X-a-status-A",
+     "who": "a",
+     "op": "status",
+     "expect": "200//",
+     "rest": [
+      200,
+      "",
+      ""
+     ],
+     "mcp": [
+      200,
+      "",
+      ""
+     ]
+    },
+    {
+     "id": "X-a-config-A",
+     "who": "a",
+     "op": "config",
+     "expect": "200//",
+     "rest": [
+      200,
+      "",
+      ""
+     ],
+     "mcp": [
+      200,
+      "",
+      ""
+     ]
+    },
+    {
+     "id": "X-a-logs-A",
+     "who": "a",
+     "op": "logs",
+     "expect": "200//",
+     "rest": [
+      200,
+      "",
+      ""
+     ],
+     "mcp": [
+      200,
+      "",
+      ""
+     ]
+    },
+    {
+     "id": "X-a-restart-A",
+     "who": "a",
+     "op": "restart",
+     "expect": "200//",
+     "rest": [
+      200,
+      "",
+      ""
+     ],
+     "mcp": [
+      200,
+      "",
+      ""
+     ]
+    },
+    {
+     "id": "X-a-stop-A",
+     "who": "a",
+     "op": "stop",
+     "expect": "200//",
+     "rest": [
+      200,
+      "",
+      ""
+     ],
+     "mcp": [
+      200,
+      "",
+      ""
+     ]
+    },
+    {
+     "id": "X-a-start-A",
+     "who": "a",
+     "op": "start",
+     "expect": "200//",
+     "rest": [
+      200,
+      "",
+      ""
+     ],
+     "mcp": [
+      200,
+      "",
+      ""
+     ]
+    },
+    {
+     "id": "X-a-status-B",
+     "who": "a",
+     "op": "status",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-a-config-B",
+     "who": "a",
+     "op": "config",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-a-logs-B",
+     "who": "a",
+     "op": "logs",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-a-restart-B",
+     "who": "a",
+     "op": "restart",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-a-stop-B",
+     "who": "a",
+     "op": "stop",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-a-start-B",
+     "who": "a",
+     "op": "start",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-ro-status-A",
+     "who": "ro",
+     "op": "status",
+     "expect": "200//",
+     "rest": [
+      200,
+      "",
+      ""
+     ],
+     "mcp": [
+      200,
+      "",
+      ""
+     ]
+    },
+    {
+     "id": "X-ro-config-A",
+     "who": "ro",
+     "op": "config",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-ro-logs-A",
+     "who": "ro",
+     "op": "logs",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-ro-restart-A",
+     "who": "ro",
+     "op": "restart",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-ro-stop-A",
+     "who": "ro",
+     "op": "stop",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-ro-start-A",
+     "who": "ro",
+     "op": "start",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-ro-status-B",
+     "who": "ro",
+     "op": "status",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-ro-config-B",
+     "who": "ro",
+     "op": "config",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-ro-logs-B",
+     "who": "ro",
+     "op": "logs",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-ro-restart-B",
+     "who": "ro",
+     "op": "restart",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-ro-stop-B",
+     "who": "ro",
+     "op": "stop",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-ro-start-B",
+     "who": "ro",
+     "op": "start",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-none-status-A",
+     "who": "none",
+     "op": "status",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-none-config-A",
+     "who": "none",
+     "op": "config",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-none-logs-A",
+     "who": "none",
+     "op": "logs",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-none-restart-A",
+     "who": "none",
+     "op": "restart",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-none-stop-A",
+     "who": "none",
+     "op": "stop",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-none-start-A",
+     "who": "none",
+     "op": "start",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-none-status-B",
+     "who": "none",
+     "op": "status",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-none-config-B",
+     "who": "none",
+     "op": "config",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-none-logs-B",
+     "who": "none",
+     "op": "logs",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-none-restart-B",
+     "who": "none",
+     "op": "restart",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-none-stop-B",
+     "who": "none",
+     "op": "stop",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-none-start-B",
+     "who": "none",
+     "op": "start",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-dn-status-A",
+     "who": "dn",
+     "op": "status",
+     "expect": "200//",
+     "rest": [
+      200,
+      "",
+      ""
+     ],
+     "mcp": [
+      200,
+      "",
+      ""
+     ]
+    },
+    {
+     "id": "X-dn-config-A",
+     "who": "dn",
+     "op": "config",
+     "expect": "200//",
+     "rest": [
+      200,
+      "",
+      ""
+     ],
+     "mcp": [
+      200,
+      "",
+      ""
+     ]
+    },
+    {
+     "id": "X-dn-logs-A",
+     "who": "dn",
+     "op": "logs",
+     "expect": "200//",
+     "rest": [
+      200,
+      "",
+      ""
+     ],
+     "mcp": [
+      200,
+      "",
+      ""
+     ]
+    },
+    {
+     "id": "X-dn-restart-A",
+     "who": "dn",
+     "op": "restart",
+     "expect": "200//",
+     "rest": [
+      200,
+      "",
+      ""
+     ],
+     "mcp": [
+      200,
+      "",
+      ""
+     ]
+    },
+    {
+     "id": "X-dn-stop-A",
+     "who": "dn",
+     "op": "stop",
+     "expect": "200//",
+     "rest": [
+      200,
+      "",
+      ""
+     ],
+     "mcp": [
+      200,
+      "",
+      ""
+     ]
+    },
+    {
+     "id": "X-dn-start-A",
+     "who": "dn",
+     "op": "start",
+     "expect": "200//",
+     "rest": [
+      200,
+      "",
+      ""
+     ],
+     "mcp": [
+      200,
+      "",
+      ""
+     ]
+    },
+    {
+     "id": "X-dn-status-B",
+     "who": "dn",
+     "op": "status",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-dn-config-B",
+     "who": "dn",
+     "op": "config",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-dn-logs-B",
+     "who": "dn",
+     "op": "logs",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-dn-restart-B",
+     "who": "dn",
+     "op": "restart",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-dn-stop-B",
+     "who": "dn",
+     "op": "stop",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-dn-start-B",
+     "who": "dn",
+     "op": "start",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-grp-status-A",
+     "who": "grp",
+     "op": "status",
+     "expect": "200//",
+     "rest": [
+      200,
+      "",
+      ""
+     ],
+     "mcp": [
+      200,
+      "",
+      ""
+     ]
+    },
+    {
+     "id": "X-grp-config-A",
+     "who": "grp",
+     "op": "config",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-grp-logs-A",
+     "who": "grp",
+     "op": "logs",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-grp-restart-A",
+     "who": "grp",
+     "op": "restart",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-grp-stop-A",
+     "who": "grp",
+     "op": "stop",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-grp-start-A",
+     "who": "grp",
+     "op": "start",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-grp-status-B",
+     "who": "grp",
+     "op": "status",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-grp-config-B",
+     "who": "grp",
+     "op": "config",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-grp-logs-B",
+     "who": "grp",
+     "op": "logs",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-grp-restart-B",
+     "who": "grp",
+     "op": "restart",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-grp-stop-B",
+     "who": "grp",
+     "op": "stop",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "X-grp-start-B",
+     "who": "grp",
+     "op": "start",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "P-wild-status-B",
+     "who": "wild",
+     "op": "status",
+     "expect": "200//",
+     "rest": [
+      200,
+      "",
+      ""
+     ],
+     "mcp": [
+      200,
+      "",
+      ""
+     ]
+    },
+    {
+     "id": "P-wild-logs-B",
+     "who": "wild",
+     "op": "logs",
+     "expect": "200//",
+     "rest": [
+      200,
+      "",
+      ""
+     ],
+     "mcp": [
+      200,
+      "",
+      ""
+     ]
+    },
+    {
+     "id": "S-self-name-status",
+     "who": "wild",
+     "op": "status",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "S-self-name-config",
+     "who": "wild",
+     "op": "config",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "S-self-name-logs",
+     "who": "wild",
+     "op": "logs",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "S-self-name-stop",
+     "who": "wild",
+     "op": "stop",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "S-self-name-restart",
+     "who": "wild",
+     "op": "restart",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "S-self-name-start",
+     "who": "wild",
+     "op": "start",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "S-self-id-status",
+     "who": "wild",
+     "op": "status",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "S-self-id-config",
+     "who": "wild",
+     "op": "config",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "S-self-id-logs",
+     "who": "wild",
+     "op": "logs",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "S-self-id-stop",
+     "who": "wild",
+     "op": "stop",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "S-self-id-restart",
+     "who": "wild",
+     "op": "restart",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "S-self-id-start",
+     "who": "wild",
+     "op": "start",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "S-peer-name-status",
+     "who": "wild",
+     "op": "status",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "S-peer-name-config",
+     "who": "wild",
+     "op": "config",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "S-peer-name-logs",
+     "who": "wild",
+     "op": "logs",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "S-peer-name-stop",
+     "who": "wild",
+     "op": "stop",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "S-peer-name-restart",
+     "who": "wild",
+     "op": "restart",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "S-peer-name-start",
+     "who": "wild",
+     "op": "start",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "S-peer-id-status",
+     "who": "wild",
+     "op": "status",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "S-peer-id-config",
+     "who": "wild",
+     "op": "config",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "S-peer-id-logs",
+     "who": "wild",
+     "op": "logs",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "S-peer-id-stop",
+     "who": "wild",
+     "op": "stop",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "S-peer-id-restart",
+     "who": "wild",
+     "op": "restart",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "S-peer-id-start",
+     "who": "wild",
+     "op": "start",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "T-missing-status",
+     "who": "wild",
+     "op": "status",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "T-missing-stop",
+     "who": "wild",
+     "op": "stop",
+     "expect": "403/forbidden/default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "default_deny"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "default_deny"
+     ]
+    },
+    {
+     "id": "E-unknown-endpoint",
+     "who": "wild",
+     "op": "status",
+     "expect": "403/forbidden/safety_unverified|endpoint_inactive|default_deny",
+     "rest": [
+      403,
+      "forbidden",
+      "safety_unverified"
+     ],
+     "mcp": [
+      403,
+      "forbidden",
+      "safety_unverified"
+     ]
+    },
+    {
+     "id": "U-no-credential",
+     "who": "",
+     "op": "status",
+     "expect": "401/unauthenticated/",
+     "rest": [
+      401,
+      "unauthenticated",
+      ""
+     ],
+     "mcp": [
+      401,
+      "unauthenticated",
+      ""
+     ]
+    },
+    {
+     "id": "U-garbage-wellformed",
+     "who": "literal:mdt_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+     "op": "status",
+     "expect": "401/unauthenticated/",
+     "rest": [
+      401,
+      "unauthenticated",
+      ""
+     ],
+     "mcp": [
+      401,
+      "unauthenticated",
+      ""
+     ]
+    },
+    {
+     "id": "U-garbage-malformed",
+     "who": "literal:not-a-token",
+     "op": "stop",
+     "expect": "401/unauthenticated/",
+     "rest": [
+      401,
+      "unauthenticated",
+      ""
+     ],
+     "mcp": [
+      401,
+      "unauthenticated",
+      ""
+     ]
+    },
+    {
+     "id": "U-no-credential-stop",
+     "who": "",
+     "op": "stop",
+     "expect": "401/unauthenticated/",
+     "rest": [
+      401,
+      "unauthenticated",
+      ""
+     ],
+     "mcp": [
+      401,
+      "unauthenticated",
+      ""
+     ]
+    },
+    {
+     "id": "D-backend-error-start-C",
+     "who": "wild",
+     "op": "start",
+     "expect": "502/backend_failed/ or 400/invalid_request/",
+     "rest": [
+      400,
+      "invalid_request",
+      ""
+     ],
+     "mcp": [
+      400,
+      "invalid_request",
+      ""
+     ]
+    }
+   ],
+   "raw": [
+    {
+     "id": "I-tail-zero",
+     "path": "/api/v1/endpoints/local/containers/p120aec8-a/logs?tail=0",
+     "method": "GET",
+     "expect": "400/invalid_request/",
+     "rest": [
+      400,
+      "invalid_request",
+      ""
+     ]
+    },
+    {
+     "id": "I-tail-huge",
+     "path": "/api/v1/endpoints/local/containers/p120aec8-a/logs?tail=999999",
+     "method": "GET",
+     "expect": "400/invalid_request/",
+     "rest": [
+      400,
+      "invalid_request",
+      ""
+     ]
+    },
+    {
+     "id": "I-unknown-param-all",
+     "path": "/api/v1/endpoints/local/containers/p120aec8-a/status?all=true",
+     "method": "GET",
+     "expect": "400/invalid_request/",
+     "rest": [
+      400,
+      "invalid_request",
+      ""
+     ]
+    },
+    {
+     "id": "I-unknown-param-force",
+     "path": "/api/v1/endpoints/local/containers/p120aec8-a/status?force=1",
+     "method": "GET",
+     "expect": "400/invalid_request/",
+     "rest": [
+      400,
+      "invalid_request",
+      ""
+     ]
+    },
+    {
+     "id": "I-repeat-param",
+     "path": "/api/v1/endpoints/local/containers/p120aec8-a/logs?tail=1&tail=2",
+     "method": "GET",
+     "expect": "400/invalid_request/",
+     "rest": [
+      400,
+      "invalid_request",
+      ""
+     ]
+    },
+    {
+     "id": "I-follow-numeric",
+     "path": "/api/v1/endpoints/local/containers/p120aec8-a/logs?follow=1",
+     "method": "GET",
+     "expect": "400/invalid_request/",
+     "rest": [
+      400,
+      "invalid_request",
+      ""
+     ]
+    },
+    {
+     "id": "I-timeout-zero",
+     "path": "/api/v1/endpoints/local/containers/p120aec8-a/stop",
+     "method": "POST",
+     "expect": "400/invalid_request/",
+     "rest": [
+      400,
+      "invalid_request",
+      ""
+     ]
+    },
+    {
+     "id": "I-timeout-huge",
+     "path": "/api/v1/endpoints/local/containers/p120aec8-a/restart",
+     "method": "POST",
+     "expect": "400/invalid_request/",
+     "rest": [
+      400,
+      "invalid_request",
+      ""
+     ]
+    },
+    {
+     "id": "I-unknown-field",
+     "path": "/api/v1/endpoints/local/containers/p120aec8-a/stop",
+     "method": "POST",
+     "expect": "400/invalid_request/",
+     "rest": [
+      400,
+      "invalid_request",
+      ""
+     ]
+    },
+    {
+     "id": "I-signal-field",
+     "path": "/api/v1/endpoints/local/containers/p120aec8-a/stop",
+     "method": "POST",
+     "expect": "400/invalid_request/",
+     "rest": [
+      400,
+      "invalid_request",
+      ""
+     ]
+    },
+    {
+     "id": "I-encoded-slash",
+     "path": "/api/v1/endpoints/local/containers/a%2Fb/status",
+     "method": "GET",
+     "expect": "400/invalid_request/",
+     "rest": [
+      400,
+      "invalid_request",
+      ""
+     ]
+    },
+    {
+     "id": "N-exec",
+     "path": "/api/v1/endpoints/local/containers/p120aec8-a/exec",
+     "method": "POST",
+     "expect": "404/not_found|/",
+     "rest": [
+      404,
+      "not_found",
+      ""
+     ]
+    },
+    {
+     "id": "N-kill",
+     "path": "/api/v1/endpoints/local/containers/p120aec8-a/kill",
+     "method": "POST",
+     "expect": "404/not_found|/",
+     "rest": [
+      404,
+      "not_found",
+      ""
+     ]
+    },
+    {
+     "id": "N-pause",
+     "path": "/api/v1/endpoints/local/containers/p120aec8-a/pause",
+     "method": "POST",
+     "expect": "404/not_found|/",
+     "rest": [
+      404,
+      "not_found",
+      ""
+     ]
+    },
+    {
+     "id": "N-remove",
+     "path": "/api/v1/endpoints/local/containers/p120aec8-a",
+     "method": "DELETE",
+     "expect": "404/not_found|/",
+     "rest": [
+      404,
+      "not_found",
+      ""
+     ]
+    },
+    {
+     "id": "N-list",
+     "path": "/api/v1/endpoints/local/containers",
+     "method": "GET",
+     "expect": "404/not_found|/",
+     "rest": [
+      404,
+      "not_found",
+      ""
+     ]
+    },
+    {
+     "id": "N-list-slash",
+     "path": "/api/v1/endpoints/local/containers/",
+     "method": "GET",
+     "expect": "404/not_found|/",
+     "rest": [
+      404,
+      "not_found",
+      ""
+     ]
+    },
+    {
+     "id": "N-images",
+     "path": "/api/v1/endpoints/local/images",
+     "method": "GET",
+     "expect": "404/not_found|/",
+     "rest": [
+      404,
+      "not_found",
+      ""
+     ]
+    },
+    {
+     "id": "N-networks",
+     "path": "/api/v1/endpoints/local/networks",
+     "method": "GET",
+     "expect": "404/not_found|/",
+     "rest": [
+      404,
+      "not_found",
+      ""
+     ]
+    },
+    {
+     "id": "N-info",
+     "path": "/api/v1/endpoints/local/info",
+     "method": "GET",
+     "expect": "404/not_found|/",
+     "rest": [
+      404,
+      "not_found",
+      ""
+     ]
+    },
+    {
+     "id": "N-discovery",
+     "path": "/api/v1/endpoints",
+     "method": "GET",
+     "expect": "404/not_found|/",
+     "rest": [
+      404,
+      "not_found",
+      ""
+     ]
+    },
+    {
+     "id": "N-docker-path",
+     "path": "/containers/json",
+     "method": "GET",
+     "expect": "404/not_found|/",
+     "rest": [
+      404,
+      "",
+      ""
+     ]
+    },
+    {
+     "id": "N-docker-versioned",
+     "path": "/v1.44/containers/json",
+     "method": "GET",
+     "expect": "404/not_found|/",
+     "rest": [
+      404,
+      "",
+      ""
+     ]
+    },
+    {
+     "id": "N-docker-sock",
+     "path": "/var/run/docker.sock",
+     "method": "GET",
+     "expect": "404/not_found|/",
+     "rest": [
+      404,
+      "",
+      ""
+     ]
+    },
+    {
+     "id": "N-dotdot",
+     "path": "/api/v1/endpoints/local/containers/p120aec8-a/status/../../json",
+     "method": "GET",
+     "expect": "404/not_found|/",
+     "rest": [
+      404,
+      "not_found",
+      ""
+     ]
+    },
+    {
+     "id": "N-case-variant",
+     "path": "/API/V1/ENDPOINTS/LOCAL/CONTAINERS/P120AEC8-A/status",
+     "method": "GET",
+     "expect": "404/not_found|/",
+     "rest": [
+      404,
+      "",
+      ""
+     ]
+    },
+    {
+     "id": "N-post-status",
+     "path": "/api/v1/endpoints/local/containers/p120aec8-a/status",
+     "method": "POST",
+     "expect": "405/method_not_allowed/",
+     "rest": [
+      405,
+      "method_not_allowed",
+      ""
+     ]
+    },
+    {
+     "id": "N-get-stop",
+     "path": "/api/v1/endpoints/local/containers/p120aec8-a/stop",
+     "method": "GET",
+     "expect": "405/method_not_allowed/",
+     "rest": [
+      405,
+      "method_not_allowed",
+      ""
+     ]
+    },
+    {
+     "id": "N-delete-start",
+     "path": "/api/v1/endpoints/local/containers/p120aec8-a/start",
+     "method": "DELETE",
+     "expect": "405/method_not_allowed/",
+     "rest": [
+      405,
+      "method_not_allowed",
+      ""
+     ]
+    }
+   ],
+   "tools": [
+    "container_config",
+    "container_logs",
+    "container_restart",
+    "container_start",
+    "container_status",
+    "container_stop"
+   ],
+   "daemon_events_on_protected_or_ungranted": {
+    "B": [],
+    "self": [],
+    "peer": []
+   }
+  },
+  "usage": {
+   "AFTER-WORKLOAD": {
+    "expected_cells": 60,
+    "expected_events": 4763,
+    "daily_cells": 60,
+    "recent_events": 1000,
+    "graceful_exit": 0,
+    "diffs": [],
+    "hourly_diffs": []
+   },
+   "AFTER-CRASH": {
+    "expected_cells": 60,
+    "expected_events": 4773,
+    "daily_cells": 60,
+    "recent_events": 1000,
+    "graceful_exit": 0,
+    "diffs": [],
+    "hourly_diffs": []
+   }
+  },
+  "persistence": {
+   "rules_after_restart": 35,
+   "crash": {
+    "restart_count": 1,
+    "started_at_changed": true,
+    "seconds_to_ready": 0.6
+   }
+  },
+  "restore": {
+   "original_scope": {
+    "users": [
+     "rel-admin",
+     "rel-owner"
+    ],
+    "groups": [
+     "rel-g",
+     "rel-g2"
+    ],
+    "agents": [
+     "rel-a",
+     "rel-dis",
+     "rel-dn",
+     "rel-exp",
+     "rel-grp",
+     "rel-load1",
+     "rel-load2",
+     "rel-none",
+     "rel-pol",
+     "rel-rev",
+     "rel-ro",
+     "rel-rot",
+     "rel-sess",
+     "rel-wild"
+    ],
+    "rules": [
+     "agent:rel-a|ALLOW|container:inspect_config|p120aec8-a",
+     "agent:rel-a|ALLOW|container:inspect_status|p120aec8-a",
+     "agent:rel-a|ALLOW|container:logs|p120aec8-a",
+     "agent:rel-a|ALLOW|container:restart|p120aec8-a",
+     "agent:rel-a|ALLOW|container:start|p120aec8-a",
+     "agent:rel-a|ALLOW|container:stop|p120aec8-a",
+     "agent:rel-dis|ALLOW|container:inspect_status|p120aec8-a",
+     "agent:rel-dn|ALLOW|container:inspect_config|*",
+     "agent:rel-dn|ALLOW|container:inspect_status|*",
+     "agent:rel-dn|ALLOW|container:logs|*",
+     "agent:rel-dn|ALLOW|container:restart|*",
+     "agent:rel-dn|ALLOW|container:start|*",
+     "agent:rel-dn|ALLOW|container:stop|*",
+     "agent:rel-dn|DENY|container:inspect_config|p120aec8-b",
+     "agent:rel-dn|DENY|container:inspect_status|p120aec8-b",
+     "agent:rel-dn|DENY|container:logs|p120aec8-b",
+     "agent:rel-dn|DENY|container:restart|p120aec8-b",
+     "agent:rel-dn|DENY|container:start|p120aec8-b",
+     "agent:rel-dn|DENY|container:stop|p120aec8-b",
+     "agent:rel-exp|ALLOW|container:inspect_status|p120aec8-a",
+     "agent:rel-load1|ALLOW|container:inspect_status|p120aec8-a",
+     "agent:rel-load1|ALLOW|container:logs|p120aec8-a",
+     "agent:rel-load2|ALLOW|container:inspect_status|p120aec8-a",
+     "agent:rel-load2|ALLOW|container:logs|p120aec8-a",
+     "agent:rel-rev|ALLOW|container:inspect_status|p120aec8-a",
+     "agent:rel-rot|ALLOW|container:inspect_status|p120aec8-a",
+     "agent:rel-ro|ALLOW|container:inspect_status|p120aec8-a",
+     "agent:rel-sess|ALLOW|container:inspect_status|p120aec8-a",
+     "agent:rel-wild|ALLOW|container:inspect_config|*",
+     "agent:rel-wild|ALLOW|container:inspect_status|*",
+     "agent:rel-wild|ALLOW|container:logs|*",
+     "agent:rel-wild|ALLOW|container:restart|*",
+     "agent:rel-wild|ALLOW|container:start|*",
+     "agent:rel-wild|ALLOW|container:stop|*",
+     "group:rel-g2|ALLOW|container:inspect_status|p120aec8-a"
+    ]
+   },
+   "r1": {
+    "mode": "full",
+    "same_key": true,
+    "report": {
+     "backup_id": "9ad2910f-7755-4027-bac7-a8d88e919a8d",
+     "mode": "full",
+     "provenance": "authenticated",
+     "initiator": "admin",
+     "restore_generation": 2,
+     "state": "restore_quarantine",
+     "next_step": "host_recovery_required",
+     "imported": {
+      "address": 2,
+      "agent": 14,
+      "agent_membership": 1,
+      "endpoint": 1,
+      "group": 2,
+      "policy": 35,
+      "role": 1,
+      "user": 2
+     },
+     "retained_local": {
+      "address": 1,
+      "role": 1,
+      "user": 1
+     },
+     "inactive_credentials": {
+      "agent_credentials": 12,
+      "authenticators": 2
+     },
+     "credentials_stripped": false,
+     "excluded": [
+      "sessions",
+      "rate_limit_state",
+      "usage_statistics",
+      "setup_and_recovery_state",
+      "security_notices",
+      "control_generations_and_quarantine",
+      "master_key_and_installation_binding"
+     ]
+    },
+    "manifest_kinds_imported_local": {
+     "address": [
+      2,
+      1
+     ],
+     "agent": [
+      14,
+      0
+     ],
+     "agent_membership": [
+      1,
+      0
+     ],
+     "endpoint": [
+      1,
+      0
+     ],
+     "group": [
+      2,
+      0
+     ],
+     "policy": [
+      35,
+      0
+     ],
+     "role": [
+      1,
+      1
+     ],
+     "user": [
+      2,
+      1
+     ]
+    },
+    "inactive_credentials": {
+     "agent_credentials": 12,
+     "authenticators": 4
+    },
+    "not_approvable": [
+     "address:needs_reverification",
+     "role:single_administrator"
+    ],
+    "scope": {
+     "original": {
+      "users": 2,
+      "groups": 2,
+      "agents": 14,
+      "rules": 35
+     },
+     "effective_after_approval": {
+      "users": 4,
+      "groups": 2,
+      "agents": 14,
+      "rules": 34
+     },
+     "withheld_rules": [
+      "agent:rel-ro|ALLOW|container:inspect_status|p120aec8-a"
+     ],
+     "unexpected_rules": []
+    }
+   },
+   "r2": {
+    "mode": "clean",
+    "same_key": false,
+    "report": {
+     "backup_id": "10e35183-fefd-41e3-9ba6-158221e197e8",
+     "mode": "clean",
+     "provenance": "unauthenticated",
+     "initiator": "admin",
+     "restore_generation": 2,
+     "state": "restore_quarantine",
+     "next_step": "host_recovery_required",
+     "imported": {
+      "address": 2,
+      "agent": 14,
+      "agent_membership": 1,
+      "endpoint": 1,
+      "group": 2,
+      "policy": 35,
+      "role": 1,
+      "user": 2
+     },
+     "retained_local": {
+      "address": 1,
+      "role": 1,
+      "user": 1
+     },
+     "inactive_credentials": {},
+     "credentials_stripped": true,
+     "excluded": [
+      "sessions",
+      "rate_limit_state",
+      "usage_statistics",
+      "setup_and_recovery_state",
+      "security_notices",
+      "control_generations_and_quarantine",
+      "master_key_and_installation_binding"
+     ]
+    },
+    "manifest_kinds_imported_local": {
+     "address": [
+      2,
+      1
+     ],
+     "agent": [
+      14,
+      0
+     ],
+     "agent_membership": [
+      1,
+      0
+     ],
+     "endpoint": [
+      1,
+      0
+     ],
+     "group": [
+      2,
+      0
+     ],
+     "policy": [
+      35,
+      0
+     ],
+     "role": [
+      1,
+      1
+     ],
+     "user": [
+      2,
+      1
+     ]
+    },
+    "inactive_credentials": {
+     "agent_credentials": 0,
+     "authenticators": 2
+    },
+    "not_approvable": [
+     "address:needs_reverification",
+     "role:single_administrator"
+    ],
+    "scope": {
+     "original": {
+      "users": 2,
+      "groups": 2,
+      "agents": 14,
+      "rules": 35
+     },
+     "effective_after_approval": {
+      "users": 4,
+      "groups": 2,
+      "agents": 14,
+      "rules": 34
+     },
+     "withheld_rules": [
+      "agent:rel-ro|ALLOW|container:inspect_status|p120aec8-a"
+     ],
+     "unexpected_rules": []
+    }
+   }
+  },
+  "migration": {
+   "from": 13,
+   "to": 14,
+   "usage_cells": 60,
+   "diffs": [],
+   "integrity": "ok"
+  },
+  "lifecycle": {},
+  "stage_seconds": {
+   "IMG": 1.1,
+   "DEPLOY": 6.2,
+   "IDLE-FRESH": 300.0,
+   "SETUP": 23.7,
+   "IDENTITIES": 2.0,
+   "MATRIX": 50.7,
+   "LIFECYCLE": 19.9,
+   "LATENCY": 23.1,
+   "IDLE-CONFIGURED": 120.0,
+   "LOAD": 61.3,
+   "PERSISTENCE": 323.1,
+   "RESTORE": 124.8,
+   "MIGRATION": 7.2,
+   "DEVFLOW": 0.7,
+   "DOCS": 0.0,
+   "LOGLEVEL": 30.1,
+   "LOGS": 0.4
+  },
+  "logging": {
+   "debug": {
+    "WARN": 1,
+    "INFO": 2
+   },
+   "info": {
+    "WARN": 1,
+    "INFO": 2
+   },
+   "warn": {
+    "WARN": 1
+   },
+   "error": {}
+  }
+ },
+ "pass": 155,
+ "not_pass": 0,
+ "results": [
+  {
+   "id": "ISO-00",
+   "name": "the Docker endpoint is the declared isolated fixture daemon (explicit endpoint, identity verified, not Unraid)",
+   "status": "PASS",
+   "detail": ""
+  },
+  {
+   "id": "REL-IMG-01",
+   "name": "the image under test is the exact source revision (revision label == head SHA) for linux/amd64",
+   "status": "PASS",
+   "detail": "6ea36a20b26b207cf2fac1f1dee5b186cd627b25 linux/amd64"
+  },
+  {
+   "id": "REL-FOOT-IMG",
+   "name": "compressed image <= 60 MB (estimate from docker save, gzip level 6)",
+   "status": "PASS",
+   "detail": "12.29 MB (11.72 MiB), budget 60 MB, 15 layers"
+  },
+  {
+   "id": "REL-FOOT-SAME",
+   "name": "the measured archive has exactly the uncompressed layers (diffIDs) of the image under test",
+   "status": "PASS",
+   "detail": ""
+  },
+  {
+   "id": "REL-DEP-01",
+   "name": "clean Compose deployment (unmodified docker-compose.yml + proxy file) starts, is healthy and READY on the real daemon",
+   "status": "PASS",
+   "detail": ""
+  },
+  {
+   "id": "REL-FOOT-IDLE-fresh",
+   "name": "idle RSS <= 50 MB (fresh: steady state, last 60s of a 300s window from readiness)",
+   "status": "PASS",
+   "detail": "steady max 28.23 MB (median 27.59 MB, anon 10.56 MB, file 16.98 MB); peak in window 99.12 MB; settled under 50 MB at 140.0 s; process VmHWM 99.16 MB"
+  },
+  {
+   "id": "REL-FOOT-SETTLE-fresh",
+   "name": "after a start the resident set is back under 50 MB and stays there (settled at 140.0 s of a 300 s window; peak 99.12 MB)",
+   "status": "PASS",
+   "detail": "peak in window 99.12 MB; settled under budget at 140.0 s"
+  },
+  {
+   "id": "REL-SETUP-setup-reveal",
+   "name": "the host helper reveals the setup token on a real controlling terminal",
+   "status": "PASS",
+   "detail": "exit 0"
+  },
+  {
+   "id": "REL-SETUP-setup-exchange",
+   "name": "the host-revealed token exchanges once for a setup-only session",
+   "status": "PASS",
+   "detail": "200"
+  },
+  {
+   "id": "REL-SETUP-setup-account",
+   "name": "administrator staged with two notification addresses",
+   "status": "PASS",
+   "detail": "200"
+  },
+  {
+   "id": "REL-SETUP-setup-proof",
+   "name": "address-control proof delivered over verified-TLS SMTP",
+   "status": "PASS",
+   "detail": "204"
+  },
+  {
+   "id": "REL-SETUP-setup-confirm",
+   "name": "address confirmed with the mailed proof",
+   "status": "PASS",
+   "detail": "204"
+  },
+  {
+   "id": "REL-SETUP-setup-totp",
+   "name": "TOTP enrolled only after proof with a live code",
+   "status": "PASS",
+   "detail": "200 204"
+  },
+  {
+   "id": "REL-SETUP-setup-complete",
+   "name": "setup completes and issues no session",
+   "status": "PASS",
+   "detail": "200"
+  },
+  {
+   "id": "REL-SETUP-login",
+   "name": "the new administrator signs in with password + TOTP; the session carries a server-bound AAL2 label",
+   "status": "PASS",
+   "detail": "200"
+  },
+  {
+   "id": "REL-ID-01",
+   "name": "an ordinary user and two groups are created by the administrator (no operation granted by that)",
+   "status": "PASS",
+   "detail": "{'owner': '1ed38c43-8445-43c3-9895-2e82b3ca06bc'}{'g': '77d143ad-5a3a-4012-a2ee-42f42b725f4f', 'g2': 'a86fab1e-a573-49f7-bec0-74dea3573453'}"
+  },
+  {
+   "id": "REL-ID-02",
+   "name": "agents are created, each owned by exactly one user or group (owning grants nothing)",
+   "status": "PASS",
+   "detail": "14"
+  },
+  {
+   "id": "REL-ID-03",
+   "name": "an agent is added to a group",
+   "status": "PASS",
+   "detail": "204"
+  },
+  {
+   "id": "REL-ID-04",
+   "name": "explicit ALLOW/DENY rules are created (agent subjects, one group subject, a wildcard, an explicit DENY on B)",
+   "status": "PASS",
+   "detail": "[True, True, True, True, True, True, True, True, True, True, True, True, True, True]"
+  },
+  {
+   "id": "REL-ID-05",
+   "name": "credentials are issued once (mdt_ prefix)",
+   "status": "PASS",
+   "detail": ""
+  },
+  {
+   "id": "REL-ID-06",
+   "name": "the policy page's inventory lists A, B and C, and never Mandatary or its labelled peer",
+   "status": "PASS",
+   "detail": "['p120aec8-a', 'p120aec8-b', 'p120aec8-c', 'p120aec8mstk-proxy-1', 'p120aec8mstk-smtp-1']"
+  },
+  {
+   "id": "REL-MATRIX-REST",
+   "name": "REST: all 94 cases (16 allowed, 72 denied, plus 401/unknown endpoint/backend error) meet the expectation",
+   "status": "PASS",
+   "detail": "[]"
+  },
+  {
+   "id": "REL-MATRIX-MCP",
+   "name": "real MCP client (official go-sdk, Streamable HTTP over verified TLS): the same 94 cases meet the same expectation",
+   "status": "PASS",
+   "detail": "[]"
+  },
+  {
+   "id": "REL-MATRIX-PARITY",
+   "name": "REST and the real MCP client give the identical class (status, code, reason) for every case",
+   "status": "PASS",
+   "detail": "[]"
+  },
+  {
+   "id": "REL-MATRIX-POS",
+   "name": "grant a function on A: it succeeds through both API and real MCP (16 positive cases, each on both transports)",
+   "status": "PASS",
+   "detail": ""
+  },
+  {
+   "id": "REL-MATRIX-RAW",
+   "name": "REST: 29 invalid-input and unsupported-operation requests (exec, kill, remove, list, discovery, raw Docker paths, wrong methods, smuggled parameters) are refused and never succeed",
+   "status": "PASS",
+   "detail": "[]"
+  },
+  {
+   "id": "REL-MCP-CATALOG",
+   "name": "tools/list is exactly the six approved tools (no exec, discovery or raw Docker tool)",
+   "status": "PASS",
+   "detail": "['container_config', 'container_logs', 'container_restart', 'container_start', 'container_status', 'container_stop']"
+  },
+  {
+   "id": "REL-MCP-UNSUPPORTED",
+   "name": "MCP: 12 unsupported tool names (exec, kill, remove, list, raw Docker...) are protocol errors that reach nothing, even for a wildcard grant",
+   "status": "PASS",
+   "detail": "[]"
+  },
+  {
+   "id": "REL-MCP-NOAUTH",
+   "name": "MCP tools/list without or with an unknown credential is 401 (listing is not authorization)",
+   "status": "PASS",
+   "detail": "[{'id': 'L-none', 'connected': False, 'http_status': 401, 'http_code': 'unauthenticated', 'elapsed_ms': 0}, {'id': 'L-garbage', 'connected': False, 'http_status': 401, 'http_code': 'unauthenticated', "
+  },
+  {
+   "id": "REL-MATRIX-EFFECT",
+   "name": "daemon events: no start/stop/kill/die/restart on ungranted B, Mandatary itself or its labelled peer during the whole matrix",
+   "status": "PASS",
+   "detail": "{'B': [], 'self': [], 'peer': []}"
+  },
+  {
+   "id": "REL-MATRIX-STATE",
+   "name": "A is running again after the stop/start sequences, B was never touched, C (unstartable) was never started",
+   "status": "PASS",
+   "detail": ""
+  },
+  {
+   "id": "REL-LIFE-EXP-0",
+   "name": "a credential with a 6 s lifetime is issued",
+   "status": "PASS",
+   "detail": "201"
+  },
+  {
+   "id": "REL-LIFE-EXP-1",
+   "name": "a credential with a 6 s lifetime works before expiry (REST and MCP)",
+   "status": "PASS",
+   "detail": "((200, '', ''), (200, '', ''))"
+  },
+  {
+   "id": "REL-LIFE-EXP-2",
+   "name": "the same credential is refused with 401 on REST and MCP after expiry",
+   "status": "PASS",
+   "detail": "((401, 'unauthenticated', ''), (401, 'unauthenticated', ''))"
+  },
+  {
+   "id": "REL-LIFE-REV-1",
+   "name": "agent credential works before revocation",
+   "status": "PASS",
+   "detail": "((200, '', ''), (200, '', ''))"
+  },
+  {
+   "id": "REL-LIFE-REV-2",
+   "name": "revoking the credential returns 204",
+   "status": "PASS",
+   "detail": "204"
+  },
+  {
+   "id": "REL-LIFE-REV-3",
+   "name": "the revoked credential is refused with 401 immediately on both transports",
+   "status": "PASS",
+   "detail": "((401, 'unauthenticated', ''), (401, 'unauthenticated', ''))"
+  },
+  {
+   "id": "REL-LIFE-SESSION",
+   "name": "an MCP session opened with a valid credential does not keep authority after the credential is revoked (next call 401)",
+   "status": "PASS",
+   "detail": "(200, '', '') (401, 'unauthenticated', '')"
+  },
+  {
+   "id": "REL-LIFE-DIS",
+   "name": "a disabled agent's credential works before and is refused (401) after, on both transports",
+   "status": "PASS",
+   "detail": "((200, '', ''), (200, '', '')) ((401, 'unauthenticated', ''), (401, 'unauthenticated', '')) 204"
+  },
+  {
+   "id": "REL-LIFE-ROT-1",
+   "name": "rotation: during the overlap window both the old and the new credential authorize",
+   "status": "PASS",
+   "detail": "201 ((200, '', ''), (200, '', '')) ((200, '', ''), (200, '', ''))"
+  },
+  {
+   "id": "REL-LIFE-ROT-2",
+   "name": "rotation: after the overlap the old credential is 401 on both transports and the new one still works",
+   "status": "PASS",
+   "detail": "((401, 'unauthenticated', ''), (401, 'unauthenticated', ''), (200, '', ''), (200, '', ''))"
+  },
+  {
+   "id": "REL-LIFE-GROUP",
+   "name": "group rule: a member is allowed; after removal from the group the same credential is denied (403) on both transports",
+   "status": "PASS",
+   "detail": "((200, '', ''), (200, '', '')) ((403, 'forbidden', 'default_deny'), (403, 'forbidden', 'default_deny')) 204"
+  },
+  {
+   "id": "REL-LIFE-POL-1",
+   "name": "policy credential reads status and opens a follow stream",
+   "status": "PASS",
+   "detail": "((200, '', ''), (200, '', '')) 200 2"
+  },
+  {
+   "id": "REL-LIFE-POL-2",
+   "name": "disabling the policy rules ends the open follow stream within 5 s (authority-ended terminal frame)",
+   "status": "PASS",
+   "detail": "disable [204, 204] ended=True 0.1s last=b'{\"error\":{\"code\":\"forbidden\",\"status\":403,\"reason\":\"authorization_ended\",\"messag'"
+  },
+  {
+   "id": "REL-LIFE-POL-3",
+   "name": "after the policy change the same credential is denied (403) on both transports",
+   "status": "PASS",
+   "detail": "((403, 'forbidden', 'default_deny'), (403, 'forbidden', 'default_deny'))"
+  },
+  {
+   "id": "REL-LIFE-POL-4",
+   "name": "re-enabling the rules restores access (positive control); no operation was ever granted by the account itself",
+   "status": "PASS",
+   "detail": "[204, 204] ((200, '', ''), (200, '', ''))"
+  },
+  {
+   "id": "REL-LIFE-POL-5",
+   "name": "deleting the rules denies again (403) on both transports",
+   "status": "PASS",
+   "detail": "[204, 204] ((403, 'forbidden', 'default_deny'), (403, 'forbidden', 'default_deny'))"
+  },
+  {
+   "id": "REL-LAT",
+   "name": "added latency of an accounted outcome measured (150 sequential calls per class)",
+   "status": "PASS",
+   "detail": "p50 ms: 401 42.78, denied+accounted 50.15, allowed+accounted 60.78; p99 ms: 44.16 / 53.82 / 66.72"
+  },
+  {
+   "id": "REL-FOOT-IDLE-configured",
+   "name": "idle RSS <= 50 MB (configured: steady state, last 60s of a 120s window from readiness)",
+   "status": "PASS",
+   "detail": "steady max 32.74 MB (median 32.72 MB, anon 14.45 MB, file 18.28 MB); peak in window 32.74 MB; settled under 50 MB at 0.0 s; process VmHWM 178.89 MB"
+  },
+  {
+   "id": "REL-FOOT-SETTLE-configured",
+   "name": "after a start the resident set is back under 50 MB and stays there (settled at 0.0 s of a 120 s window; peak 32.74 MB)",
+   "status": "PASS",
+   "detail": "peak in window 32.74 MB; settled under budget at 0.0 s"
+  },
+  {
+   "id": "REL-LOAD-RUN",
+   "name": "benchmark workload ran for 61 s: 10 REST + 10 real-MCP polling clients and 5 follow streams, answered with 2043 REST and 2259 MCP successes (the footprint below is measured over exactly this window)",
+   "status": "PASS",
+   "detail": "rest ok 2043, mcp ok 2259, streams {'load1': 3, 'load2': 2, 'opened': 5, 'failed': 0, 'frames': 315} "
+  },
+  {
+   "id": "REL-LOAD-STABLE",
+   "name": "the service keeps authorizing legitimate calls under the workload: no non-200 REST answer and no MCP tool error in 61 s",
+   "status": "PASS",
+   "detail": "rest errors 0 {}; mcp {'calls': 2259, 'ok': 2259, 'errors': 0, 'by_error': None}; service log lines: mandatary-1  | {\"time\":\"2026-11-15T15:48:01.146906445Z\",\"level\":\"INFO\",\"msg\":\"docker backend verified\"}"
+  },
+  {
+   "id": "REL-FOOT-LOAD",
+   "name": "RSS under the benchmark workload <= 150 MB (peak sampled 38.70 MB; kernel high-water mark VmHWM 39.30 MB reset at the start of the window)",
+   "status": "PASS",
+   "detail": "budget 150 MB; 61 RSS samples at 1 Hz; rss before 32.78 MB after 35.99 MB"
+  },
+  {
+   "id": "REL-USAGE-AFTER-WORKLOAD",
+   "name": "exact usage totals per (agent, owner user, selector, operation) after AFTER-WORKLOAD: 4763 accounted outcomes in 60 tuples match the executed sequence",
+   "status": "PASS",
+   "detail": "graceful exit 0; "
+  },
+  {
+   "id": "REL-USAGE-RING-AFTER-WORKLOAD",
+   "name": "recent-event ring is bounded (<= 1000), holds no payload column, and the database passes integrity and foreign-key checks",
+   "status": "PASS",
+   "detail": "recent=1000 integrity=ok fk=0 cols=['agent_id', 'endpoint_id', 'id', 'occurred_at', 'operation', 'outcome', 'retain_until', 'selector_id', 'user_id']"
+  },
+  {
+   "id": "REL-FOOT-IDLE-after-restart",
+   "name": "idle RSS <= 50 MB (after-restart: steady state, last 60s of a 300s window from readiness)",
+   "status": "PASS",
+   "detail": "steady max 26.55 MB (median 26.39 MB, anon 9.57 MB, file 16.98 MB); peak in window 97.28 MB; settled under 50 MB at 160.0 s; process VmHWM 97.20 MB"
+  },
+  {
+   "id": "REL-FOOT-SETTLE-after-restart",
+   "name": "after a start the resident set is back under 50 MB and stays there (settled at 160.0 s of a 300 s window; peak 97.28 MB)",
+   "status": "PASS",
+   "detail": "peak in window 97.28 MB; settled under budget at 160.0 s"
+  },
+  {
+   "id": "REL-RESTART-1",
+   "name": "after stop/start the credential still authorizes A and still cannot touch B (policy and credential persisted)",
+   "status": "PASS",
+   "detail": "(200, '', '') (403, 'forbidden', 'default_deny')"
+  },
+  {
+   "id": "REL-RESTART-2",
+   "name": "the real MCP client sees the same after the restart",
+   "status": "PASS",
+   "detail": "(200, '', '')"
+  },
+  {
+   "id": "REL-RESTART-3",
+   "name": "the administrator signs in again (password + TOTP) and the policy listing is intact after the restart",
+   "status": "PASS",
+   "detail": "rules=35"
+  },
+  {
+   "id": "REL-RESTART-4",
+   "name": "setup stays closed after a restart (404)",
+   "status": "PASS",
+   "detail": "404"
+  },
+  {
+   "id": "REL-CRASH-1",
+   "name": "SIGKILL of the service process (from the host): Docker's restart policy restarts it (RestartCount >= 1, new StartedAt) and it is ready again after a fresh verification (1 s)",
+   "status": "PASS",
+   "detail": "{'restart_count': 1, 'started_at_changed': True}"
+  },
+  {
+   "id": "REL-CRASH-2",
+   "name": "after the crash the credential still authorizes A",
+   "status": "PASS",
+   "detail": "(200, '', '')"
+  },
+  {
+   "id": "REL-USAGE-AFTER-CRASH",
+   "name": "exact usage totals per (agent, owner user, selector, operation) after AFTER-CRASH: 4773 accounted outcomes in 60 tuples match the executed sequence",
+   "status": "PASS",
+   "detail": "graceful exit 0; "
+  },
+  {
+   "id": "REL-USAGE-RING-AFTER-CRASH",
+   "name": "recent-event ring is bounded (<= 1000), holds no payload column, and the database passes integrity and foreign-key checks",
+   "status": "PASS",
+   "detail": "recent=1000 integrity=ok fk=0 cols=['agent_id', 'endpoint_id', 'id', 'occurred_at', 'operation', 'outcome', 'retain_until', 'selector_id', 'user_id']"
+  },
+  {
+   "id": "REL-BACKUP-EXPORT-full",
+   "name": "export a full backup as the administrator (fresh AAL2); the archive carries no password, TOTP seed, bearer token or master key (24948 bytes)",
+   "status": "PASS",
+   "detail": "200 clean=True"
+  },
+  {
+   "id": "REL-R1-SETUP-setup-reveal",
+   "name": "the host helper reveals the setup token on a real controlling terminal",
+   "status": "PASS",
+   "detail": "exit 0"
+  },
+  {
+   "id": "REL-R1-SETUP-setup-exchange",
+   "name": "the host-revealed token exchanges once for a setup-only session",
+   "status": "PASS",
+   "detail": "200"
+  },
+  {
+   "id": "REL-R1-SETUP-setup-account",
+   "name": "administrator staged with two notification addresses",
+   "status": "PASS",
+   "detail": "200"
+  },
+  {
+   "id": "REL-R1-SETUP-setup-proof",
+   "name": "address-control proof delivered over verified-TLS SMTP",
+   "status": "PASS",
+   "detail": "204"
+  },
+  {
+   "id": "REL-R1-SETUP-setup-confirm",
+   "name": "address confirmed with the mailed proof",
+   "status": "PASS",
+   "detail": "204"
+  },
+  {
+   "id": "REL-R1-SETUP-setup-totp",
+   "name": "TOTP enrolled only after proof with a live code",
+   "status": "PASS",
+   "detail": "200 204"
+  },
+  {
+   "id": "REL-R1-SETUP-setup-complete",
+   "name": "setup completes and issues no session",
+   "status": "PASS",
+   "detail": "200"
+  },
+  {
+   "id": "REL-RESTORE-R1-ANON",
+   "name": "an anonymous restore request is refused (same key, full backup)",
+   "status": "PASS",
+   "detail": "401"
+  },
+  {
+   "id": "REL-RESTORE-R1-PHRASE",
+   "name": "a restore without the exact confirmation phrase is refused and changes nothing",
+   "status": "PASS",
+   "detail": "400"
+  },
+  {
+   "id": "REL-RESTORE-R1-TAMPER",
+   "name": "a tampered archive is refused (422) before any state change (same key, full backup)",
+   "status": "PASS",
+   "detail": "422 {'error': 'archive_integrity_failed'}"
+  },
+  {
+   "id": "REL-RESTORE-R1-NOQUAR",
+   "name": "after the refusals the installation is NOT in quarantine: still ready and the administrator's session is intact",
+   "status": "PASS",
+   "detail": "200"
+  },
+  {
+   "id": "REL-RESTORE-R1-DO",
+   "name": "restore succeeds (same key, full backup): installation enters RESTORE_QUARANTINE, session ended, nothing from the file is effective",
+   "status": "PASS",
+   "detail": "200 {'backup_id': '9ad2910f-7755-4027-bac7-a8d88e919a8d', 'mode': 'full', 'provenance': 'authenticated', 'initiator': 'admin', 'restore_generation': 2, 'state': 'restore_quarantine', 'next_step': 'host_re"
+  },
+  {
+   "id": "REL-RESTORE-R1-SIGNEDOUT",
+   "name": "the restoring administrator is signed out and cannot sign back in: password + TOTP never reach a session while quarantined",
+   "status": "PASS",
+   "detail": "401"
+  },
+  {
+   "id": "REL-RESTORE-R1-OLDTOKEN",
+   "name": "RESTORE-01: the credential that existed before the restore (carried inactive in a full archive, absent from a clean one) authorizes nothing while quarantined",
+   "status": "PASS",
+   "detail": "(403, 'forbidden', 'restore_quarantined')"
+  },
+  {
+   "id": "REL-R1-RECOVERY-recovery-issue",
+   "name": "recovery restore-admin accepted on the host",
+   "status": "PASS",
+   "detail": "exit 0: restore-administrator recovery generation 2 issued, absolute expiry 2026-11-15T16:34:00Z. No secret was printed; run the matching reveal command on this host terminal.\r\n"
+  },
+  {
+   "id": "REL-R1-RECOVERY-recovery-reveal",
+   "name": "the recovery token is revealed once on a real terminal",
+   "status": "PASS",
+   "detail": "exit 0"
+  },
+  {
+   "id": "REL-R1-RECOVERY-setup-exchange",
+   "name": "the host-revealed token exchanges once for a setup-only session",
+   "status": "PASS",
+   "detail": "200"
+  },
+  {
+   "id": "REL-R1-RECOVERY-setup-account",
+   "name": "administrator staged with two notification addresses",
+   "status": "PASS",
+   "detail": "200"
+  },
+  {
+   "id": "REL-R1-RECOVERY-setup-proof",
+   "name": "address-control proof delivered over verified-TLS SMTP",
+   "status": "PASS",
+   "detail": "204"
+  },
+  {
+   "id": "REL-R1-RECOVERY-setup-confirm",
+   "name": "address confirmed with the mailed proof",
+   "status": "PASS",
+   "detail": "204"
+  },
+  {
+   "id": "REL-R1-RECOVERY-setup-totp",
+   "name": "TOTP enrolled only after proof with a live code",
+   "status": "PASS",
+   "detail": "200 204"
+  },
+  {
+   "id": "REL-R1-RECOVERY-setup-complete",
+   "name": "setup completes and issues no session",
+   "status": "PASS",
+   "detail": "200"
+  },
+  {
+   "id": "REL-RESTORE-R1-MANIFEST",
+   "name": "recovery enrols ONE new administrator (quarantine ends in that step); the manifest lists every imported record as pending and credential rows are retained inactive for provenance only",
+   "status": "PASS",
+   "detail": "200 kinds={'address': [2, 1], 'agent': [14, 0], 'agent_membership': [1, 0], 'endpoint': [1, 0], 'group': [2, 0], 'policy': [35, 0], 'role': [1, 1], 'user': [2, 1]} cred={'agent_credentials': 12, 'authenticators': 4}"
+  },
+  {
+   "id": "REL-RESTORE-R1-INACTIVE",
+   "name": "RESTORE-09: before approval no imported rule is effective (the review shows what is imported next to what is in force)",
+   "status": "PASS",
+   "detail": "active rules before approval: 0"
+  },
+  {
+   "id": "REL-RESTORE-R1-APPROVE",
+   "name": "explicit approval of 54 named records in dependency order (1 rule(s) of rel-ro deliberately left pending)",
+   "status": "PASS",
+   "detail": "200 {'approved': [{'kind': 'endpoint', 'id': 'e2afd813-08ab-4cd8-801f-2a701bad105f', 'result': 'approved'}, {'kind': 'user', 'id': '1ed38c43-8445-43c3-9895-2e82b3ca06bc', 'result': 'approved'}, {'kind': '"
+  },
+  {
+   "id": "REL-RESTORE-R1-NOAPPROVE",
+   "name": "the administrator role, notification addresses and credentials have NO approval path (fixed reasons single_administrator / needs_reverification / unsupported)",
+   "status": "PASS",
+   "detail": "['address:needs_reverification', 'role:single_administrator']"
+  },
+  {
+   "id": "REL-RESTORE-R1-CRAFTED",
+   "name": "a crafted approval of a non-approvable record is refused by the server (409) whatever the client sends",
+   "status": "PASS",
+   "detail": "409"
+  },
+  {
+   "id": "REL-RESTORE-R1-REISSUE",
+   "name": "fresh credentials are issued for the restored agents (a backup never carries a usable token)",
+   "status": "PASS",
+   "detail": "[True, True, True, True]"
+  },
+  {
+   "id": "REL-RESTORE-R1-AUTHZ",
+   "name": "post-restore authorization on the fresh instance, REST and real MCP: approved grant on A works; B is denied; an agent whose rule was NOT approved is denied; explicit DENY still beats a wildcard ALLOW",
+   "status": "PASS",
+   "detail": "[]"
+  },
+  {
+   "id": "REL-RESTORE-R1-OLDTOKEN2",
+   "name": "the pre-restore credential is still refused after approval and reissue (a restored record never revives an old token)",
+   "status": "PASS",
+   "detail": "(401, 'unauthenticated', '')"
+  },
+  {
+   "id": "REL-RESTORE-R1-SCOPE",
+   "name": "documented scope comparison: every user, group and agent of the original is present; effective rules == imported rules minus the 1 deliberately unapproved; nothing extra is effective",
+   "status": "PASS",
+   "detail": "gone=['agent:rel-ro|ALLOW|container:inspect_status|p120aec8-a'] extra=[]"
+  },
+  {
+   "id": "REL-RESTORE-R1-USAGE",
+   "name": "RESTORE-10: usage statistics are outside the backup; the fresh instance holds exactly the 16 outcomes it served after the restore and none from the original",
+   "status": "PASS",
+   "detail": ""
+  },
+  {
+   "id": "REL-BACKUP-EXPORT-clean",
+   "name": "export a clean backup as the administrator (fresh AAL2); the archive carries no password, TOTP seed, bearer token or master key (18536 bytes)",
+   "status": "PASS",
+   "detail": "200 clean=True"
+  },
+  {
+   "id": "REL-R2-SETUP-setup-reveal",
+   "name": "the host helper reveals the setup token on a real controlling terminal",
+   "status": "PASS",
+   "detail": "exit 0"
+  },
+  {
+   "id": "REL-R2-SETUP-setup-exchange",
+   "name": "the host-revealed token exchanges once for a setup-only session",
+   "status": "PASS",
+   "detail": "200"
+  },
+  {
+   "id": "REL-R2-SETUP-setup-account",
+   "name": "administrator staged with two notification addresses",
+   "status": "PASS",
+   "detail": "200"
+  },
+  {
+   "id": "REL-R2-SETUP-setup-proof",
+   "name": "address-control proof delivered over verified-TLS SMTP",
+   "status": "PASS",
+   "detail": "204"
+  },
+  {
+   "id": "REL-R2-SETUP-setup-confirm",
+   "name": "address confirmed with the mailed proof",
+   "status": "PASS",
+   "detail": "204"
+  },
+  {
+   "id": "REL-R2-SETUP-setup-totp",
+   "name": "TOTP enrolled only after proof with a live code",
+   "status": "PASS",
+   "detail": "200 204"
+  },
+  {
+   "id": "REL-R2-SETUP-setup-complete",
+   "name": "setup completes and issues no session",
+   "status": "PASS",
+   "detail": "200"
+  },
+  {
+   "id": "REL-RESTORE-R2-ANON",
+   "name": "an anonymous restore request is refused (new key, clean backup)",
+   "status": "PASS",
+   "detail": "401"
+  },
+  {
+   "id": "REL-RESTORE-R2-PHRASE",
+   "name": "a restore without the exact confirmation phrase is refused and changes nothing",
+   "status": "PASS",
+   "detail": "400"
+  },
+  {
+   "id": "REL-RESTORE-R2-TAMPER",
+   "name": "a tampered archive is refused (422) before any state change (new key, clean backup)",
+   "status": "PASS",
+   "detail": "422 {'error': 'archive_integrity_failed'}"
+  },
+  {
+   "id": "REL-RESTORE-R2-NOQUAR",
+   "name": "after the refusals the installation is NOT in quarantine: still ready and the administrator's session is intact",
+   "status": "PASS",
+   "detail": "200"
+  },
+  {
+   "id": "REL-RESTORE-R2-PROVENANCE",
+   "name": "a clean archive from another installation key is refused (409 provenance_unverified) without the explicit acknowledgement",
+   "status": "PASS",
+   "detail": "409 {'error': 'provenance_unverified'}"
+  },
+  {
+   "id": "REL-RESTORE-R2-DO",
+   "name": "restore succeeds (new key, clean backup): installation enters RESTORE_QUARANTINE, session ended, nothing from the file is effective",
+   "status": "PASS",
+   "detail": "200 {'backup_id': '10e35183-fefd-41e3-9ba6-158221e197e8', 'mode': 'clean', 'provenance': 'unauthenticated', 'initiator': 'admin', 'restore_generation': 2, 'state': 'restore_quarantine', 'next_step': 'host"
+  },
+  {
+   "id": "REL-RESTORE-R2-SIGNEDOUT",
+   "name": "the restoring administrator is signed out and cannot sign back in: password + TOTP never reach a session while quarantined",
+   "status": "PASS",
+   "detail": "401"
+  },
+  {
+   "id": "REL-RESTORE-R2-OLDTOKEN",
+   "name": "RESTORE-01: the credential that existed before the restore (carried inactive in a full archive, absent from a clean one) authorizes nothing while quarantined",
+   "status": "PASS",
+   "detail": "(403, 'forbidden', 'restore_quarantined')"
+  },
+  {
+   "id": "REL-R2-RECOVERY-recovery-issue",
+   "name": "recovery restore-admin accepted on the host",
+   "status": "PASS",
+   "detail": "exit 0: restore-administrator recovery generation 2 issued, absolute expiry 2026-11-15T16:35:00Z. No secret was printed; run the matching reveal command on this host terminal.\r\n"
+  },
+  {
+   "id": "REL-R2-RECOVERY-recovery-reveal",
+   "name": "the recovery token is revealed once on a real terminal",
+   "status": "PASS",
+   "detail": "exit 0"
+  },
+  {
+   "id": "REL-R2-RECOVERY-setup-exchange",
+   "name": "the host-revealed token exchanges once for a setup-only session",
+   "status": "PASS",
+   "detail": "200"
+  },
+  {
+   "id": "REL-R2-RECOVERY-setup-account",
+   "name": "administrator staged with two notification addresses",
+   "status": "PASS",
+   "detail": "200"
+  },
+  {
+   "id": "REL-R2-RECOVERY-setup-proof",
+   "name": "address-control proof delivered over verified-TLS SMTP",
+   "status": "PASS",
+   "detail": "204"
+  },
+  {
+   "id": "REL-R2-RECOVERY-setup-confirm",
+   "name": "address confirmed with the mailed proof",
+   "status": "PASS",
+   "detail": "204"
+  },
+  {
+   "id": "REL-R2-RECOVERY-setup-totp",
+   "name": "TOTP enrolled only after proof with a live code",
+   "status": "PASS",
+   "detail": "200 204"
+  },
+  {
+   "id": "REL-R2-RECOVERY-setup-complete",
+   "name": "setup completes and issues no session",
+   "status": "PASS",
+   "detail": "200"
+  },
+  {
+   "id": "REL-RESTORE-R2-MANIFEST",
+   "name": "recovery enrols ONE new administrator (quarantine ends in that step); the manifest lists every imported record as pending and a clean archive carries no credential",
+   "status": "PASS",
+   "detail": "200 kinds={'address': [2, 1], 'agent': [14, 0], 'agent_membership': [1, 0], 'endpoint': [1, 0], 'group': [2, 0], 'policy': [35, 0], 'role': [1, 1], 'user': [2, 1]} cred={'agent_credentials': 0, 'authenticators': 2}"
+  },
+  {
+   "id": "REL-RESTORE-R2-INACTIVE",
+   "name": "RESTORE-09: before approval no imported rule is effective (the review shows what is imported next to what is in force)",
+   "status": "PASS",
+   "detail": "active rules before approval: 0"
+  },
+  {
+   "id": "REL-RESTORE-R2-APPROVE",
+   "name": "explicit approval of 54 named records in dependency order (1 rule(s) of rel-ro deliberately left pending)",
+   "status": "PASS",
+   "detail": "200 {'approved': [{'kind': 'endpoint', 'id': '8f4cc193-ca81-4784-85a0-ecb1ec20dac3', 'result': 'approved'}, {'kind': 'user', 'id': '1ed38c43-8445-43c3-9895-2e82b3ca06bc', 'result': 'approved'}, {'kind': '"
+  },
+  {
+   "id": "REL-RESTORE-R2-NOAPPROVE",
+   "name": "the administrator role, notification addresses and credentials have NO approval path (fixed reasons single_administrator / needs_reverification / unsupported)",
+   "status": "PASS",
+   "detail": "['address:needs_reverification', 'role:single_administrator']"
+  },
+  {
+   "id": "REL-RESTORE-R2-CRAFTED",
+   "name": "a crafted approval of a non-approvable record is refused by the server (409) whatever the client sends",
+   "status": "PASS",
+   "detail": "409"
+  },
+  {
+   "id": "REL-RESTORE-R2-REISSUE",
+   "name": "fresh credentials are issued for the restored agents (a backup never carries a usable token)",
+   "status": "PASS",
+   "detail": "[True, True, True, True]"
+  },
+  {
+   "id": "REL-RESTORE-R2-AUTHZ",
+   "name": "post-restore authorization on the fresh instance, REST and real MCP: approved grant on A works; B is denied; an agent whose rule was NOT approved is denied; explicit DENY still beats a wildcard ALLOW",
+   "status": "PASS",
+   "detail": "[]"
+  },
+  {
+   "id": "REL-RESTORE-R2-OLDTOKEN2",
+   "name": "the pre-restore credential is still refused after approval and reissue (a restored record never revives an old token)",
+   "status": "PASS",
+   "detail": "(401, 'unauthenticated', '')"
+  },
+  {
+   "id": "REL-RESTORE-R2-SCOPE",
+   "name": "documented scope comparison: every user, group and agent of the original is present; effective rules == imported rules minus the 1 deliberately unapproved; nothing extra is effective",
+   "status": "PASS",
+   "detail": "gone=['agent:rel-ro|ALLOW|container:inspect_status|p120aec8-a'] extra=[]"
+  },
+  {
+   "id": "REL-RESTORE-R2-USAGE",
+   "name": "RESTORE-10: usage statistics are outside the backup; the fresh instance holds exactly the 16 outcomes it served after the restore and none from the original",
+   "status": "PASS",
+   "detail": ""
+  },
+  {
+   "id": "REL-MIGRATE-REFUSE",
+   "name": "a downgrade that would lose usage rows (unmatched denials) is refused by the migration itself and the data is intact",
+   "status": "PASS",
+   "detail": "rc=1 schema now 13 (started at 14) migfixture: downgrade refused: partial migration error (type:sql,version:13): constraint failed: NOT"
+  },
+  {
+   "id": "REL-MIGRATE-PRIOR",
+   "name": "the store is at the immediately prior schema version 13 (the repository's own down-migration over a real populated store)",
+   "status": "PASS",
+   "detail": "13"
+  },
+  {
+   "id": "REL-MIGRATE-AUTHZ",
+   "name": "after the in-place upgrade: ready; the existing credential still authorizes A and not B on REST and real MCP; the administrator signs in",
+   "status": "PASS",
+   "detail": "(200, '', '') (403, 'forbidden', 'default_deny') (200, '', '')  ready=True login=True"
+  },
+  {
+   "id": "REL-MIGRATE-FORWARD",
+   "name": "the schema advanced 13 -> 14 on start; every usage total survived the migration exactly; integrity and foreign-key checks pass; the tables of the newer migration exist again",
+   "status": "PASS",
+   "detail": "schema=14 diffs=[] integrity=ok fk=0 tables=2"
+  },
+  {
+   "id": "REL-MIGRATE-NEWER",
+   "name": "a data directory from a NEWER schema than the binary is refused at startup (non-zero exit, no key in the output) and is not modified",
+   "status": "PASS",
+   "detail": "exit 1"
+  },
+  {
+   "id": "REL-DEV-01",
+   "name": "the host binary starts natively with the mock backend and no Docker access (DOCKER_HOST points nowhere), is ready on loopback (GET /api/v1/readyz 200) and its own `healthcheck` and `healthcheck --ready` exit 0",
+   "status": "PASS",
+   "detail": "readyz=200 healthcheck=0 healthcheck --ready=0"
+  },
+  {
+   "id": "REL-DEV-02",
+   "name": "the embedded SPA is served and an unauthenticated API call is refused (no open mock surface)",
+   "status": "PASS",
+   "detail": "index=200 api=401 unknown=404"
+  },
+  {
+   "id": "REL-DEV-03",
+   "name": "the mock backend announces itself (WARN) and the master key is not logged",
+   "status": "PASS",
+   "detail": ""
+  },
+  {
+   "id": "REL-DEV-04",
+   "name": "the mock backend beside a real Docker socket setting is refused at start-up (non-zero exit, no key in the output)",
+   "status": "PASS",
+   "detail": "exit=1"
+  },
+  {
+   "id": "REL-DOCS-LINKS",
+   "name": "every relative link in README.md, development.md and docs/*.md resolves to a file in the release (23 pages)",
+   "status": "PASS",
+   "detail": ""
+  },
+  {
+   "id": "REL-DOCS-DEPLOY",
+   "name": "docs/deployment.md names the Compose files and the example environment the release ships, and they exist",
+   "status": "PASS",
+   "detail": "[]"
+  },
+  {
+   "id": "REL-DOCS-LIMITS",
+   "name": "docs/deployment.md states what is not implemented, the evidence limits, the first-administrator flow and self-protection",
+   "status": "PASS",
+   "detail": "[]"
+  },
+  {
+   "id": "REL-DOCS-UNAVAILABLE",
+   "name": "docs/api-mcp.md states that exec, discovery and raw Docker operations are unsupported (later phases are unavailable, not stubs)",
+   "status": "PASS",
+   "detail": ""
+  },
+  {
+   "id": "REL-DOCS-README-LIMITS",
+   "name": "README.md points to the known limitations and open items",
+   "status": "PASS",
+   "detail": ""
+  },
+  {
+   "id": "REL-LOGLEVEL-KEY-debug",
+   "name": "the debug start logs no master key value",
+   "status": "PASS",
+   "detail": ""
+  },
+  {
+   "id": "REL-LOGLEVEL-KEY-info",
+   "name": "the info start logs no master key value",
+   "status": "PASS",
+   "detail": ""
+  },
+  {
+   "id": "REL-LOGLEVEL-KEY-warn",
+   "name": "the warn start logs no master key value",
+   "status": "PASS",
+   "detail": ""
+  },
+  {
+   "id": "REL-LOGLEVEL-KEY-error",
+   "name": "the error start logs no master key value",
+   "status": "PASS",
+   "detail": ""
+  },
+  {
+   "id": "REL-LOGLEVEL",
+   "name": "a start at each of debug/info/warn/error emits no JSON line below its level",
+   "status": "PASS",
+   "detail": "{'debug': {'WARN': 1, 'INFO': 2}, 'info': {'WARN': 1, 'INFO': 2}, 'warn': {'WARN': 1}, 'error': {}}"
+  },
+  {
+   "id": "REL-LOGLEVEL-POS",
+   "name": "positive control: the info start emits info lines and the warn/error starts do not (the filter really acts)",
+   "status": "PASS",
+   "detail": "{'debug': {'WARN': 1, 'INFO': 2}, 'info': {'WARN': 1, 'INFO': 2}, 'warn': {'WARN': 1}, 'error': {}}"
+  },
+  {
+   "id": "REL-LOGLEVEL-INVALID",
+   "name": "an invalid MANDATARY_LOG_LEVEL refuses to start (non-zero exit) and echoes no key",
+   "status": "PASS",
+   "detail": "1"
+  },
+  {
+   "id": "REL-LOGS",
+   "name": "no setup token, password, TOTP seed, master key, bearer token, address proof or session cookie appears in any log of 5 deployments (6113865 bytes scanned, 51 secrets checked)",
+   "status": "PASS",
+   "detail": ""
+  },
+  {
+   "id": "ISO-01",
+   "name": "the daemon is still the declared fixture daemon before cleanup",
+   "status": "PASS",
+   "detail": ""
+  }
+ ]
+}

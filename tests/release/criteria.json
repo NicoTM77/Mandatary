@@ -3,7 +3,7 @@
   "criteria": [
     {"id": "SH-1", "group": "Shared release criteria", "text": "A fresh installation from the repository's documented Compose file starts, passes health/readiness and completes the Phase 1 end-to-end scenarios (clean Compose deployment with containers A/B and a real MCP client).",
      "evidence": ["REL-DEP-01@vm-amd64", "REL-SETUP-setup-complete@vm-amd64", "REL-SETUP-login@vm-amd64", "REL-MATRIX-POS@vm-amd64", "REL-DEP-01@ci-amd64", "REL-DEP-01@ci-arm64"]},
-    {"id": "SH-2a", "group": "Shared release criteria", "text": "Image size budget: compressed production image <= 60 MB (10^6 bytes), measured from the OCI archive on each CPU.",
+    {"id": "SH-2a", "group": "Shared release criteria", "text": "Image size budget: compressed production image <= 60 MB (10^6 bytes), measured on each CPU: from the real gzip OCI export where the daemon can produce one (the VM), otherwise from a documented docker-save estimate (the hosted runners).",
      "evidence": ["REL-FOOT-IMG@vm-amd64", "REL-FOOT-IMG@ci-amd64", "REL-FOOT-IMG@ci-arm64"]},
     {"id": "SH-2b", "group": "Shared release criteria", "text": "Idle resource budget: resident set <= 50 MB with no request in flight (steady state of a 300 s curve from readiness, after first start, after configuration and after a restart); the start-up transient is reported and must settle under the budget.",
      "evidence": ["REL-FOOT-IDLE-fresh@vm-amd64", "REL-FOOT-SETTLE-fresh@vm-amd64", "REL-FOOT-IDLE-configured@vm-amd64", "REL-FOOT-IDLE-after-restart@vm-amd64", "REL-FOOT-SETTLE-after-restart@vm-amd64"],

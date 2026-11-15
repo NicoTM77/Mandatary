@@ -1,0 +1,3 @@
+BEFORE (logs/pre-snap.txt): C:9cf7a696b1ec |N:0d77899c7a99 1d4163a01edf c614c3683a3f d908fcb7ebfa |V:p120-trivy-cache 
+AFTER  (read after the run): C:9cf7a696b1ec |N:0d77899c7a99 1d4163a01edf c614c3683a3f d908fcb7ebfa |V:p120-trivy-cache 
+(9cf7a696b1ec is the VM's own pre-existing mailpit container; p120-trivy-cache is this card's scanner cache volume from the earlier Trivy phase. Nothing else exists.)

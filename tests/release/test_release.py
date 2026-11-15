@@ -467,6 +467,21 @@ class Report(unittest.TestCase):
         self.assertFalse(report.verdict([row("PASS"), row("FAIL")])[0])
         self.assertFalse(report.verdict([])[0])  # an empty report is never an acceptance
 
+    def test_measured_values_are_read_from_the_evidence_and_a_missing_value_says_so(self):
+        with tempfile.TemporaryDirectory() as d:
+            doc = {"results": [], "evidence": {"environment": {"os_arch": "linux/amd64", "os": "U", "cpus": 4, "docker_server": "29"},
+                                              "footprint": {"image": {"compressed": {"bytes": 12_400_000}}, "idle": [{"label": "fresh", "VmRSS_steady_max": 28_000_000, "VmRSS_peak_in_window": 100_000_000, "settled_under_budget_at_s": 140.0}],
+                                                            "load": {"VmRSS_peak_sampled": 41_000_000, "VmHWM_after": 42_000_000, "seconds": 43.0, "rest": {"status": 5, "logs": 6, "errors": 0}, "mcp": {"ok": 7, "errors": 0}}}}}
+            with open(os.path.join(d, "r.json"), "w") as fh:
+                json.dump(doc, fh)
+            rows = report.measured_table(d, {"artifacts": {"vm": {"file": "r.json", "kind": "results"}, "gone": {"file": "nope.json", "kind": "results"}}})
+        self.assertEqual(len(rows), 1)  # an artifact that does not exist contributes no row
+        self.assertIn("12.40 MB (12400000 B)", rows[0][2])
+        self.assertIn("28.00 MB", rows[0][3])
+        self.assertEqual(rows[0][4], "not measured")  # the configured idle measurement is absent: it is not filled in
+        self.assertEqual(report.mb(None), "not measured")
+        self.assertEqual(report.mb(True), "not measured")
+
     def test_a_stale_or_hand_edited_report_is_detected(self):
         with tempfile.TemporaryDirectory() as d:
             ev = os.path.join(d, "ev")

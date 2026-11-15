@@ -1,0 +1,14 @@
+{
+ "results": [
+  {
+   "detail": "Version: 0.76.2; 2 result target(s) scanned (/work/image.tar (debian 13.7), mandatary); HIGH/CRITICAL findings: 0",
+   "id": "SCAN-TRIVY-amd64",
+   "status": "PASS"
+  },
+  {
+   "detail": "CycloneDX 1.7, 63 components",
+   "id": "SCAN-SBOM-amd64",
+   "status": "PASS"
+  }
+ ]
+}

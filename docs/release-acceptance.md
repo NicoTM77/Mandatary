@@ -97,6 +97,20 @@ The harness refuses to start without `--expect-daemon-id` and refuses an ambient
 (`ISO-00`); it removes every resource it created, and `ISO-01` re-checks the daemon identity before cleanup. Every resource carries
 the unique `p120...` prefix of its run, never a name from another run.
 
+## Evidence layout and consistency
+
+`docs/release/evidence/` holds one directory per evidence source (`vm-amd64`, `ci-amd64`, `ci-arm64`, `scan-amd64`, `scan-arm64`,
+`gates`, `browsers`, `hosted-ci`) with the harness `release.json`, the raw logs and the collected `results.json`, a `diagnostics/`
+directory (runs that are not linked to a criterion but are cited by a finding), `manifest.json` (what each artifact is and how it was
+produced) and `SHA256SUMS`, which seals **every** file. `tests/release/report.py --check` (run by the Image job and by
+`tests/release/test_release.py`) fails when a file was changed, added or removed without re-sealing, or when the committed report is not
+what the sealed evidence produces. The criteria and the check ids they link are in `tests/release/criteria.json`
+(`tests/release/test_release.py` checks that every criterion has evidence and a known artifact).
+
+The VM run is produced from a `git archive` of the code commit; the evidence commit that follows adds this directory and the report
+only. `docs/release/evidence/manifest.json` records the code commit, the baseline, the image and binary digests and states that
+the product tree is unchanged from the merged baseline (`GATE-PRODUCT-TREE`).
+
 ## Known limits of this evidence
 
 * The footprint figures are for the stated host and workload; they are a gate on the budget, not a capacity claim.
