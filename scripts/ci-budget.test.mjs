@@ -69,7 +69,7 @@ test('the security job still requires every Baseline, negative-control and image
 // is never handed the Docker socket, and a HIGH/CRITICAL finding fails the job.
 test('the image job covers both CPUs natively and gates on a digest-pinned Trivy HIGH/CRITICAL scan', () => {
   const image = job('image');
-  assert.equal(minutes(image), 40);
+  assert.equal(minutes(image), 75);
   assert.match(image, /name: Image \(\$\{\{ matrix\.platform \}\}\)/);
   assert.match(image, /platform: linux\/amd64\n\s+runner: ubuntu-24\.04\n/);
   assert.match(image, /platform: linux\/arm64\n\s+runner: ubuntu-24\.04-arm\n/);
@@ -88,4 +88,18 @@ test('the image job covers both CPUs natively and gates on a digest-pinned Trivy
   assert.match(image, /acceptance\.py[^\n]*\\\n[^\n]*--docker-host "\$FIXTURE_DOCKER_HOST" --expect-daemon-id "\$FIXTURE_DAEMON_ID"/);
   assert.match(image, /python3 tests\/image\/test_isolation\.py/);
   assert.match(image, /NOT-THE-DECLARED-FIXTURE-DAEMON/);
+});
+
+// P1.20: the release acceptance runs in the same job on both CPUs against the same explicit fixture daemon, never an ambient one, and its
+// hermetic tests run first. The real MCP client and the migration tool are test tools built from the locked module.
+test('the image job runs the P1.20 release acceptance on the declared fixture daemon, on both CPUs', () => {
+  const image = job('image');
+  assert.match(image, /python3 tests\/release\/test_release\.py/);
+  assert.match(image, /release\.py[^\n]*\\\n[^\n]*--docker-host "\$FIXTURE_DOCKER_HOST" --expect-daemon-id "\$FIXTURE_DAEMON_ID"/);
+  assert.match(image, /--mcp-client "\$RUNNER_TEMP\/out\/mcpclient" --mig-tool "\$RUNNER_TEMP\/out\/migfixture"/);
+  assert.match(image, /go build -trimpath -o "\$RUNNER_TEMP\/out\/mcpclient" \.\/tests\/release\/mcpclient/);
+  assert.match(image, /--results "\$RUNNER_TEMP\/evidence\/release-\$\{\{ matrix\.arch \}\}\.json"/);
+  // The evidence is uploaded even when the run fails (the upload step is always()), and the scanner still follows the acceptance steps.
+  assert.ok(image.indexOf('Release acceptance (Compose A/B') < image.indexOf('- name: SBOM and Trivy'));
+  assert.match(image, /uses: actions\/upload-artifact[^\n]*\n\s+if: \$\{\{ always\(\) \}\}/);
 });

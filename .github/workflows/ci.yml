@@ -128,10 +128,16 @@ jobs:
   # the real daemon and the full Compose + TLS proxy + TLS SMTP fixture + setup flow. Trivy (pinned by digest, run as an
   # unprivileged container over an image tarball, never given the Docker socket) is the TD 2.3 image gate: any HIGH or
   # CRITICAL finding, or a scanner/DB failure, fails the job.
+  #
+  # P1.20 adds the release acceptance (tests/release/release.py) to the same job, on the same disposable daemon and both CPUs: a clean
+  # Compose deployment with containers A/B, the authorization matrix over REST and over the official go-sdk MCP client, credential and
+  # policy lifecycle, exact usage counts, restart and SIGKILL durability, restore into fresh instances, forward migration and the measured
+  # footprint (technical-decisions.md 10.2). 75, not 40: observed hosted durations of the two acceptance runs are added to the build,
+  # scan and a 5-minute first-start RSS curve (scripts/ci-budget.test.mjs pins this budget).
   image:
     name: Image (${{ matrix.platform }})
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 40
+    timeout-minutes: 75
     strategy:
       fail-fast: false
       matrix:
@@ -160,6 +166,20 @@ jobs:
           printf 'FIXTURE_DOCKER_HOST=unix:///var/run/docker.sock\nFIXTURE_DAEMON_ID=%s\n' "$id" >> "$GITHUB_ENV"
       - name: Isolation guard tests (hermetic, fake docker)
         run: python3 tests/image/test_isolation.py
+      - name: Release harness tests (hermetic - budgets, outcome classes, usage tally, OCI size, report consistency)
+        run: python3 tests/release/test_release.py
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version: '1.27.4'
+          cache: false
+      - name: Build the real MCP client and the migration fixture tool for this CPU (test tools, never shipped)
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/out"
+          export GOTOOLCHAIN=local GOFLAGS=-mod=readonly
+          CGO_ENABLED=0 go build -trimpath -o "$RUNNER_TEMP/out/mcpclient" ./tests/release/mcpclient
+          CGO_ENABLED=0 go build -trimpath -o "$RUNNER_TEMP/out/migfixture" ./tests/release/migfixture
+          sha256sum "$RUNNER_TEMP/out/mcpclient" "$RUNNER_TEMP/out/migfixture"
       - name: Build the image and the host-helper artifact
         run: |
           set -euo pipefail
@@ -190,6 +210,15 @@ jobs:
             --docker-host "$FIXTURE_DOCKER_HOST" --expect-daemon-id "$FIXTURE_DAEMON_ID" \
             --work "$work" --host-binary "$RUNNER_TEMP/out/mandatary" --sha "$(git rev-parse HEAD)" \
             --results "$RUNNER_TEMP/evidence/results-${{ matrix.arch }}.json"
+      - name: Release acceptance (Compose A/B, real MCP client, matrix, usage, restart/crash, restore, migration, footprint)
+        run: |
+          set -euo pipefail
+          work=$(mktemp -d "$HOME/mandatary-release.XXXXXXXX")
+          mkdir -p "$RUNNER_TEMP/evidence"
+          python3 tests/release/release.py --image mandatary-ci:${{ matrix.arch }} --platform ${{ matrix.platform }} --repo . \
+            --docker-host "$FIXTURE_DOCKER_HOST" --expect-daemon-id "$FIXTURE_DAEMON_ID" \
+            --work "$work" --host-binary "$RUNNER_TEMP/out/mandatary" --mcp-client "$RUNNER_TEMP/out/mcpclient" --mig-tool "$RUNNER_TEMP/out/migfixture" \
+            --sha "$(git rev-parse HEAD)" --results "$RUNNER_TEMP/evidence/release-${{ matrix.arch }}.json"
       - name: SBOM and Trivy HIGH/CRITICAL gate
         run: |
           set -euo pipefail
