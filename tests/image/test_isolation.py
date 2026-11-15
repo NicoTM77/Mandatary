@@ -42,6 +42,15 @@ sys.exit(0)
 GOOD = {"ID": "FIXTURE-DAEMON-ID-0001", "Name": "mandatary-test-vm", "OperatingSystem": "Ubuntu 26.04.1 LTS", "KernelVersion": "7.0.0-generic", "ServerVersion": "29.9.3"}
 
 
+def mkdir_under_umask(path, mask):
+    """Create a directory with the default mode under an explicit umask (no chmod with a permissive literal)."""
+    old = os.umask(mask)
+    try:
+        os.mkdir(path)
+    finally:
+        os.umask(old)
+
+
 class Fixture:
     def __init__(self, tc, infos):
         # Under $HOME, not /tmp: the harness (like the product) refuses a --work path beneath a world-writable directory.
@@ -141,13 +150,14 @@ class GuardTests(unittest.TestCase):
 
     def test_unsafe_ancestors_are_reported_and_safe_ones_are_not(self):
         safe = os.path.join(self.fx.tmp, "safe")
-        os.makedirs(safe, mode=0o700)
+        mkdir_under_umask(safe, 0o077)  # owner-only
         self.assertEqual(isolation.unsafe_ancestors(os.path.join(safe, "work")), [])
-        os.chmod(safe, 0o770)
-        self.assertEqual([d for d, _ in isolation.unsafe_ancestors(os.path.join(safe, "work"))], [safe])
-        os.chmod(safe, 0o707)
-        self.assertEqual([d for d, _ in isolation.unsafe_ancestors(os.path.join(safe, "work"))], [safe])
-        os.chmod(safe, 0o700)
+        grp = os.path.join(self.fx.tmp, "grp")
+        mkdir_under_umask(grp, 0o002)  # group-writable, as `mkdir` makes under the VM's default umask
+        self.assertEqual([d for d, _ in isolation.unsafe_ancestors(os.path.join(grp, "work"))], [grp])
+        wld = os.path.join(self.fx.tmp, "wld")
+        mkdir_under_umask(wld, 0o000)  # group- and world-writable
+        self.assertEqual([d for d, _ in isolation.unsafe_ancestors(os.path.join(wld, "work"))], [wld])
         link = os.path.join(self.fx.tmp, "link")
         os.symlink(safe, link)
         self.assertEqual([d for d, _ in isolation.unsafe_ancestors(os.path.join(link, "work"))], [link])
@@ -212,8 +222,7 @@ class HarnessTests(unittest.TestCase):
     def test_a_group_writable_parent_of_the_work_directory_is_named_before_anything_is_created(self):
         fx = Fixture(self, [GOOD])
         parent = os.path.join(fx.tmp, "shared")
-        os.makedirs(parent)
-        os.chmod(parent, 0o775)  # what `mkdir -p` makes under umask 0002
+        mkdir_under_umask(parent, 0o002)  # what `mkdir` makes under the VM's default umask: mode 0775
         results = os.path.join(fx.tmp, "results.json")
         work = os.path.join(parent, "work")
         p = subprocess.run([sys.executable, os.path.join(HERE, "acceptance.py"), "--image", "mandatary:test", "--platform", "linux/amd64",
