@@ -1,0 +1,286 @@
+=== RUN   TestAdminUIBrowser
+=== RUN   TestAdminUIBrowser/chromium/setup-login/light
+2026/11/15 15:22:41 http: TLS handshake error from 127.0.0.1:54888: remote error: tls: unknown certificate
+2026/11/15 15:22:41 http: TLS handshake error from 127.0.0.1:54912: remote error: tls: unknown certificate
+    admin_ui_browser_test.go:257: {"scenario":"setup-login","scheme":"light","engine":"chromium","browser":"156.0.8078.4","requests":43,"blockedEgress":0,"secretsInConsole":0}
+=== RUN   TestAdminUIBrowser/chromium/setup-replay-expiry/light
+2026/11/15 15:22:44 http: TLS handshake error from 127.0.0.1:45828: remote error: tls: unknown certificate
+2026/11/15 15:22:44 http: TLS handshake error from 127.0.0.1:45856: remote error: tls: unknown certificate
+2026/11/15 15:22:45 http: TLS handshake error from 127.0.0.1:45860: remote error: tls: unknown certificate
+2026/11/15 15:22:45 http: TLS handshake error from 127.0.0.1:45878: remote error: tls: unknown certificate
+    admin_ui_browser_test.go:257: {"scenario":"setup-replay-expiry","scheme":"light","engine":"chromium","browser":"156.0.8078.4","requests":25,"blockedEgress":0,"secretsInConsole":0}
+=== RUN   TestAdminUIBrowser/chromium/login-flows/light
+2026/11/15 15:22:46 http: TLS handshake error from 127.0.0.1:46954: remote error: tls: unknown certificate
+2026/11/15 15:22:46 http: TLS handshake error from 127.0.0.1:46986: remote error: tls: unknown certificate
+2026/11/15 15:22:47 http: TLS handshake error from 127.0.0.1:47002: remote error: tls: unknown certificate
+2026/11/15 15:22:47 http: TLS handshake error from 127.0.0.1:47014: remote error: tls: unknown certificate
+2026/11/15 15:22:47 http: TLS handshake error from 127.0.0.1:47028: remote error: tls: unknown certificate
+2026/11/15 15:22:48 http: TLS handshake error from 127.0.0.1:47046: remote error: tls: unknown certificate
+2026/11/15 15:22:48 http: TLS handshake error from 127.0.0.1:47058: remote error: tls: unknown certificate
+2026/11/15 15:22:48 http: TLS handshake error from 127.0.0.1:47064: remote error: tls: unknown certificate
+2026/11/15 15:22:48 http: TLS handshake error from 127.0.0.1:47076: remote error: tls: unknown certificate
+2026/11/15 15:22:48 http: TLS handshake error from 127.0.0.1:47084: remote error: tls: unknown certificate
+2026/11/15 15:22:48 http: TLS handshake error from 127.0.0.1:47090: remote error: tls: unknown certificate
+2026/11/15 15:22:49 http: TLS handshake error from 127.0.0.1:47098: remote error: tls: unknown certificate
+    admin_ui_browser_test.go:257: {"scenario":"login-flows","scheme":"light","engine":"chromium","browser":"156.0.8078.4","requests":51,"blockedEgress":0,"secretsInConsole":0}
+=== RUN   TestAdminUIBrowser/chromium/setup-login/dark
+2026/11/15 15:22:50 http: TLS handshake error from 127.0.0.1:55514: remote error: tls: unknown certificate
+2026/11/15 15:22:50 http: TLS handshake error from 127.0.0.1:55536: remote error: tls: unknown certificate
+2026/11/15 15:22:51 http: TLS handshake error from 127.0.0.1:55546: remote error: tls: unknown certificate
+2026/11/15 15:22:51 http: TLS handshake error from 127.0.0.1:55548: remote error: tls: unknown certificate
+2026/11/15 15:22:51 http: TLS handshake error from 127.0.0.1:55552: remote error: tls: unknown certificate
+    admin_ui_browser_test.go:257: {"scenario":"setup-login","scheme":"dark","engine":"chromium","browser":"156.0.8078.4","requests":43,"blockedEgress":0,"secretsInConsole":0}
+=== RUN   TestAdminUIBrowser/chromium/setup-replay-expiry/dark
+2026/11/15 15:22:53 http: TLS handshake error from 127.0.0.1:44304: remote error: tls: unknown certificate
+2026/11/15 15:22:53 http: TLS handshake error from 127.0.0.1:44326: remote error: tls: unknown certificate
+2026/11/15 15:22:53 http: TLS handshake error from 127.0.0.1:44332: remote error: tls: unknown certificate
+2026/11/15 15:22:53 http: TLS handshake error from 127.0.0.1:44340: remote error: tls: unknown certificate
+2026/11/15 15:22:53 http: TLS handshake error from 127.0.0.1:44350: remote error: tls: unknown certificate
+    admin_ui_browser_test.go:257: {"scenario":"setup-replay-expiry","scheme":"dark","engine":"chromium","browser":"156.0.8078.4","requests":25,"blockedEgress":0,"secretsInConsole":0}
+=== RUN   TestAdminUIBrowser/chromium/login-flows/dark
+2026/11/15 15:22:55 http: TLS handshake error from 127.0.0.1:60806: remote error: tls: unknown certificate
+2026/11/15 15:22:55 http: TLS handshake error from 127.0.0.1:60826: remote error: tls: unknown certificate
+2026/11/15 15:22:56 http: TLS handshake error from 127.0.0.1:60828: remote error: tls: unknown certificate
+2026/11/15 15:22:56 http: TLS handshake error from 127.0.0.1:60848: remote error: tls: unknown certificate
+2026/11/15 15:22:56 http: TLS handshake error from 127.0.0.1:60858: remote error: tls: unknown certificate
+2026/11/15 15:22:56 http: TLS handshake error from 127.0.0.1:60862: remote error: tls: unknown certificate
+2026/11/15 15:22:56 http: TLS handshake error from 127.0.0.1:60872: remote error: tls: unknown certificate
+2026/11/15 15:22:56 http: TLS handshake error from 127.0.0.1:60874: remote error: tls: unknown certificate
+2026/11/15 15:22:57 http: TLS handshake error from 127.0.0.1:60888: remote error: tls: unknown certificate
+    admin_ui_browser_test.go:257: {"scenario":"login-flows","scheme":"dark","engine":"chromium","browser":"156.0.8078.4","requests":51,"blockedEgress":0,"secretsInConsole":0}
+--- PASS: TestAdminUIBrowser (16.89s)
+    --- PASS: TestAdminUIBrowser/chromium/setup-login/light (3.22s)
+    --- PASS: TestAdminUIBrowser/chromium/setup-replay-expiry/light (2.01s)
+    --- PASS: TestAdminUIBrowser/chromium/login-flows/light (3.47s)
+    --- PASS: TestAdminUIBrowser/chromium/setup-login/dark (2.82s)
+    --- PASS: TestAdminUIBrowser/chromium/setup-replay-expiry/dark (1.94s)
+    --- PASS: TestAdminUIBrowser/chromium/login-flows/dark (3.44s)
+=== RUN   TestRecoveryUIBrowser
+=== RUN   TestRecoveryUIBrowser/chromium/export-flows/light
+2026/11/15 15:22:58 http: TLS handshake error from 127.0.0.1:54436: remote error: tls: unknown certificate
+2026/11/15 15:22:58 http: TLS handshake error from 127.0.0.1:54462: remote error: tls: unknown certificate
+2026/11/15 15:22:58 http: TLS handshake error from 127.0.0.1:54472: remote error: tls: unknown certificate
+    recovery_ui_browser_test.go:282: {"scenario":"export-flows","scheme":"light","engine":"chromium","browser":"156.0.8078.4","requests":19,"blockedEgress":0,"secretsInConsole":0,"phoneChecks":false}
+=== RUN   TestRecoveryUIBrowser/chromium/restore-flows/light
+2026/11/15 15:23:01 http: TLS handshake error from 127.0.0.1:55556: remote error: tls: unknown certificate
+2026/11/15 15:23:01 http: TLS handshake error from 127.0.0.1:55576: remote error: tls: unknown certificate
+2026/11/15 15:23:02 http: TLS handshake error from 127.0.0.1:55582: remote error: tls: unknown certificate
+2026/11/15 15:23:06 http: TLS handshake error from 127.0.0.1:55598: remote error: tls: unknown certificate
+2026/11/15 15:23:06 http: TLS handshake error from 127.0.0.1:55614: remote error: tls: unknown certificate
+2026/11/15 15:23:07 http: TLS handshake error from 127.0.0.1:55622: remote error: tls: unknown certificate
+    recovery_ui_browser_test.go:282: {"scenario":"restore-flows","scheme":"light","engine":"chromium","browser":"156.0.8078.4","requests":65,"blockedEgress":0,"secretsInConsole":0,"phoneChecks":false}
+=== RUN   TestRecoveryUIBrowser/chromium/restore-failure/light
+2026/11/15 15:23:09 http: TLS handshake error from 127.0.0.1:40458: remote error: tls: unknown certificate
+2026/11/15 15:23:09 http: TLS handshake error from 127.0.0.1:40482: remote error: tls: unknown certificate
+2026/11/15 15:23:10 http: TLS handshake error from 127.0.0.1:40492: remote error: tls: unknown certificate
+2026/11/15 15:23:10 http: TLS handshake error from 127.0.0.1:40496: remote error: tls: unknown certificate
+2026/11/15 15:23:11 http: TLS handshake error from 127.0.0.1:40510: remote error: tls: unknown certificate
+2026/11/15 15:23:11 http: TLS handshake error from 127.0.0.1:40512: remote error: tls: unknown certificate
+    recovery_ui_browser_test.go:282: {"scenario":"restore-failure","scheme":"light","engine":"chromium","browser":"156.0.8078.4","requests":33,"blockedEgress":0,"secretsInConsole":0,"phoneChecks":false}
+=== RUN   TestRecoveryUIBrowser/chromium/parallel-restore/light
+2026/11/15 15:23:12 http: TLS handshake error from 127.0.0.1:42684: remote error: tls: unknown certificate
+2026/11/15 15:23:12 http: TLS handshake error from 127.0.0.1:42694: remote error: tls: unknown certificate
+2026/11/15 15:23:13 http: TLS handshake error from 127.0.0.1:42696: remote error: tls: unknown certificate
+2026/11/15 15:23:13 http: TLS handshake error from 127.0.0.1:42698: remote error: tls: unknown certificate
+2026/11/15 15:23:13 http: TLS handshake error from 127.0.0.1:42700: remote error: tls: unknown certificate
+    recovery_ui_browser_test.go:282: {"scenario":"parallel-restore","scheme":"light","engine":"chromium","browser":"156.0.8078.4","requests":27,"blockedEgress":0,"secretsInConsole":0,"phoneChecks":false}
+=== RUN   TestRecoveryUIBrowser/chromium/denial/light
+2026/11/15 15:23:14 http: TLS handshake error from 127.0.0.1:40418: remote error: tls: unknown certificate
+2026/11/15 15:23:14 http: TLS handshake error from 127.0.0.1:40434: remote error: tls: unknown certificate
+2026/11/15 15:23:14 http: TLS handshake error from 127.0.0.1:40446: remote error: tls: unknown certificate
+2026/11/15 15:23:16 http: TLS handshake error from 127.0.0.1:40452: remote error: tls: unknown certificate
+    recovery_ui_browser_test.go:282: {"scenario":"denial","scheme":"light","engine":"chromium","browser":"156.0.8078.4","requests":19,"blockedEgress":0,"secretsInConsole":0,"phoneChecks":false}
+=== RUN   TestRecoveryUIBrowser/chromium/export-flows/dark
+2026/11/15 15:23:18 http: TLS handshake error from 127.0.0.1:46636: remote error: tls: unknown certificate
+2026/11/15 15:23:18 http: TLS handshake error from 127.0.0.1:46664: remote error: tls: unknown certificate
+2026/11/15 15:23:18 http: TLS handshake error from 127.0.0.1:46674: remote error: tls: unknown certificate
+    recovery_ui_browser_test.go:282: {"scenario":"export-flows","scheme":"dark","engine":"chromium","browser":"156.0.8078.4","requests":19,"blockedEgress":0,"secretsInConsole":0,"phoneChecks":false}
+=== RUN   TestRecoveryUIBrowser/chromium/restore-flows/dark
+2026/11/15 15:23:21 http: TLS handshake error from 127.0.0.1:36506: remote error: tls: unknown certificate
+2026/11/15 15:23:21 http: TLS handshake error from 127.0.0.1:36534: remote error: tls: unknown certificate
+2026/11/15 15:23:21 http: TLS handshake error from 127.0.0.1:36548: remote error: tls: unknown certificate
+2026/11/15 15:23:25 http: TLS handshake error from 127.0.0.1:36556: remote error: tls: unknown certificate
+2026/11/15 15:23:25 http: TLS handshake error from 127.0.0.1:36562: remote error: tls: unknown certificate
+2026/11/15 15:23:26 http: TLS handshake error from 127.0.0.1:36566: remote error: tls: unknown certificate
+2026/11/15 15:23:27 http: TLS handshake error from 127.0.0.1:36574: remote error: tls: unknown certificate
+    recovery_ui_browser_test.go:282: {"scenario":"restore-flows","scheme":"dark","engine":"chromium","browser":"156.0.8078.4","requests":65,"blockedEgress":0,"secretsInConsole":0,"phoneChecks":false}
+=== RUN   TestRecoveryUIBrowser/chromium/restore-failure/dark
+2026/11/15 15:23:28 http: TLS handshake error from 127.0.0.1:37750: remote error: tls: unknown certificate
+2026/11/15 15:23:28 http: TLS handshake error from 127.0.0.1:37764: remote error: tls: unknown certificate
+2026/11/15 15:23:29 http: TLS handshake error from 127.0.0.1:37774: remote error: tls: unknown certificate
+2026/11/15 15:23:29 http: TLS handshake error from 127.0.0.1:56496: remote error: tls: unknown certificate
+2026/11/15 15:23:29 http: TLS handshake error from 127.0.0.1:56502: remote error: tls: unknown certificate
+2026/11/15 15:23:30 http: TLS handshake error from 127.0.0.1:56514: remote error: tls: unknown certificate
+2026/11/15 15:23:30 http: TLS handshake error from 127.0.0.1:56530: remote error: tls: unknown certificate
+    recovery_ui_browser_test.go:282: {"scenario":"restore-failure","scheme":"dark","engine":"chromium","browser":"156.0.8078.4","requests":33,"blockedEgress":0,"secretsInConsole":0,"phoneChecks":false}
+=== RUN   TestRecoveryUIBrowser/chromium/parallel-restore/dark
+2026/11/15 15:23:31 http: TLS handshake error from 127.0.0.1:33942: remote error: tls: unknown certificate
+2026/11/15 15:23:31 http: TLS handshake error from 127.0.0.1:33960: remote error: tls: unknown certificate
+2026/11/15 15:23:31 http: TLS handshake error from 127.0.0.1:33966: remote error: tls: unknown certificate
+2026/11/15 15:23:31 http: TLS handshake error from 127.0.0.1:33970: remote error: tls: unknown certificate
+2026/11/15 15:23:32 http: TLS handshake error from 127.0.0.1:33986: remote error: tls: unknown certificate
+2026/11/15 15:23:32 http: TLS handshake error from 127.0.0.1:33994: remote error: tls: unknown certificate
+2026/11/15 15:23:32 http: TLS handshake error from 127.0.0.1:33998: remote error: tls: unknown certificate
+    recovery_ui_browser_test.go:282: {"scenario":"parallel-restore","scheme":"dark","engine":"chromium","browser":"156.0.8078.4","requests":27,"blockedEgress":0,"secretsInConsole":0,"phoneChecks":false}
+=== RUN   TestRecoveryUIBrowser/chromium/denial/dark
+2026/11/15 15:23:33 http: TLS handshake error from 127.0.0.1:51842: remote error: tls: unknown certificate
+2026/11/15 15:23:33 http: TLS handshake error from 127.0.0.1:51866: remote error: tls: unknown certificate
+2026/11/15 15:23:35 http: TLS handshake error from 127.0.0.1:51876: remote error: tls: unknown certificate
+2026/11/15 15:23:36 http: TLS handshake error from 127.0.0.1:51892: remote error: tls: unknown certificate
+    recovery_ui_browser_test.go:282: {"scenario":"denial","scheme":"dark","engine":"chromium","browser":"156.0.8078.4","requests":19,"blockedEgress":0,"secretsInConsole":0,"phoneChecks":false}
+--- PASS: TestRecoveryUIBrowser (38.81s)
+    --- PASS: TestRecoveryUIBrowser/chromium/export-flows/light (3.11s)
+    --- PASS: TestRecoveryUIBrowser/chromium/restore-flows/light (8.06s)
+    --- PASS: TestRecoveryUIBrowser/chromium/restore-failure/light (2.71s)
+    --- PASS: TestRecoveryUIBrowser/chromium/parallel-restore/light (2.08s)
+    --- PASS: TestRecoveryUIBrowser/chromium/denial/light (3.71s)
+    --- PASS: TestRecoveryUIBrowser/chromium/export-flows/dark (3.04s)
+    --- PASS: TestRecoveryUIBrowser/chromium/restore-flows/dark (7.61s)
+    --- PASS: TestRecoveryUIBrowser/chromium/restore-failure/dark (2.65s)
+    --- PASS: TestRecoveryUIBrowser/chromium/parallel-restore/dark (2.06s)
+    --- PASS: TestRecoveryUIBrowser/chromium/denial/dark (3.78s)
+=== RUN   TestRecoveryUIBrowserPhone
+=== RUN   TestRecoveryUIBrowserPhone/chromium/restore-flows-phone/light
+2026/11/15 15:23:37 http: TLS handshake error from 127.0.0.1:34114: remote error: tls: unknown certificate
+2026/11/15 15:23:37 http: TLS handshake error from 127.0.0.1:34130: remote error: tls: unknown certificate
+2026/11/15 15:23:37 http: TLS handshake error from 127.0.0.1:34144: remote error: tls: unknown certificate
+    recovery_ui_browser_test.go:313: {"scenario":"restore-flows","scheme":"light","engine":"chromium","browser":"156.0.8078.4","requests":65,"blockedEgress":0,"secretsInConsole":0,"phoneChecks":true}
+=== RUN   TestRecoveryUIBrowserPhone/chromium/restore-flows-phone/dark
+2026/11/15 15:23:45 http: TLS handshake error from 127.0.0.1:45598: remote error: tls: unknown certificate
+2026/11/15 15:23:45 http: TLS handshake error from 127.0.0.1:45618: remote error: tls: unknown certificate
+2026/11/15 15:23:45 http: TLS handshake error from 127.0.0.1:45622: remote error: tls: unknown certificate
+2026/11/15 15:23:46 http: TLS handshake error from 127.0.0.1:45630: remote error: tls: unknown certificate
+2026/11/15 15:23:46 http: TLS handshake error from 127.0.0.1:45638: remote error: tls: unknown certificate
+2026/11/15 15:23:50 http: TLS handshake error from 127.0.0.1:57306: remote error: tls: unknown certificate
+2026/11/15 15:23:50 http: TLS handshake error from 127.0.0.1:57322: remote error: tls: unknown certificate
+2026/11/15 15:23:50 http: TLS handshake error from 127.0.0.1:57334: remote error: tls: unknown certificate
+2026/11/15 15:23:51 http: TLS handshake error from 127.0.0.1:57350: remote error: tls: unknown certificate
+2026/11/15 15:23:52 http: TLS handshake error from 127.0.0.1:57356: remote error: tls: unknown certificate
+    recovery_ui_browser_test.go:313: {"scenario":"restore-flows","scheme":"dark","engine":"chromium","browser":"156.0.8078.4","requests":65,"blockedEgress":0,"secretsInConsole":0,"phoneChecks":true}
+--- PASS: TestRecoveryUIBrowserPhone (16.40s)
+    --- PASS: TestRecoveryUIBrowserPhone/chromium/restore-flows-phone/light (8.17s)
+    --- PASS: TestRecoveryUIBrowserPhone/chromium/restore-flows-phone/dark (8.23s)
+=== RUN   TestSecurityUIBrowser
+=== RUN   TestSecurityUIBrowser/chromium/a11y-selfcheck/light
+    security_ui_browser_test.go:247: {"scenario":"a11y-selfcheck","scheme":"light","engine":"chromium","browser":"156.0.8078.4","requests":0,"blockedEgress":0,"secretsInConsole":0,"webkitSelectNotes":0}
+=== RUN   TestSecurityUIBrowser/chromium/security-flows/light
+2026/11/15 15:23:54 http: TLS handshake error from 127.0.0.1:34056: remote error: tls: unknown certificate
+2026/11/15 15:23:55 http: TLS handshake error from 127.0.0.1:34076: remote error: tls: unknown certificate
+2026/11/15 15:23:55 http: TLS handshake error from 127.0.0.1:34088: remote error: tls: unknown certificate
+2026/11/15 15:23:56 http: TLS handshake error from 127.0.0.1:34118: remote error: tls: unknown certificate
+2026/11/15 15:23:57 http: TLS handshake error from 127.0.0.1:34124: remote error: tls: unknown certificate
+2026/11/15 15:23:57 http: TLS handshake error from 127.0.0.1:34140: remote error: tls: unknown certificate
+    security_ui_browser_test.go:247: {"scenario":"security-flows","scheme":"light","engine":"chromium","browser":"156.0.8078.4","requests":87,"blockedEgress":0,"secretsInConsole":0,"webkitSelectNotes":0}
+=== RUN   TestSecurityUIBrowser/chromium/recovery-flow/light
+2026/11/15 15:24:00 http: TLS handshake error from 127.0.0.1:60338: remote error: tls: unknown certificate
+2026/11/15 15:24:00 http: TLS handshake error from 127.0.0.1:60350: remote error: tls: unknown certificate
+2026/11/15 15:24:00 http: TLS handshake error from 127.0.0.1:60356: remote error: tls: unknown certificate
+2026/11/15 15:24:01 http: TLS handshake error from 127.0.0.1:60364: remote error: tls: unknown certificate
+2026/11/15 15:24:01 http: TLS handshake error from 127.0.0.1:60380: remote error: tls: unknown certificate
+2026/11/15 15:24:01 http: TLS handshake error from 127.0.0.1:60396: remote error: tls: unknown certificate
+2026/11/15 15:24:01 http: TLS handshake error from 127.0.0.1:60402: remote error: tls: unknown certificate
+2026/11/15 15:24:02 http: TLS handshake error from 127.0.0.1:60414: remote error: tls: unknown certificate
+2026/11/15 15:24:02 http: TLS handshake error from 127.0.0.1:60428: remote error: tls: unknown certificate
+2026/11/15 15:24:02 http: TLS handshake error from 127.0.0.1:60430: remote error: tls: unknown certificate
+    security_ui_browser_test.go:247: {"scenario":"recovery-flow","scheme":"light","engine":"chromium","browser":"156.0.8078.4","requests":71,"blockedEgress":0,"secretsInConsole":0,"webkitSelectNotes":0}
+=== RUN   TestSecurityUIBrowser/chromium/recovery-reveal-phone/light
+2026/11/15 15:24:04 http: TLS handshake error from 127.0.0.1:37308: remote error: tls: unknown certificate
+2026/11/15 15:24:04 http: TLS handshake error from 127.0.0.1:37330: remote error: tls: unknown certificate
+2026/11/15 15:24:05 http: TLS handshake error from 127.0.0.1:37336: remote error: tls: unknown certificate
+2026/11/15 15:24:05 http: TLS handshake error from 127.0.0.1:37350: remote error: tls: unknown certificate
+2026/11/15 15:24:05 http: TLS handshake error from 127.0.0.1:37358: remote error: tls: unknown certificate
+    security_ui_browser_test.go:247: {"scenario":"recovery-reveal-phone","scheme":"light","engine":"chromium","browser":"156.0.8078.4","requests":25,"blockedEgress":0,"secretsInConsole":0,"webkitSelectNotes":0}
+=== RUN   TestSecurityUIBrowser/chromium/key-flows/light
+2026/11/15 15:24:07 http: TLS handshake error from 127.0.0.1:46474: remote error: tls: unknown certificate
+2026/11/15 15:24:07 http: TLS handshake error from 127.0.0.1:46496: remote error: tls: unknown certificate
+2026/11/15 15:24:07 http: TLS handshake error from 127.0.0.1:46508: remote error: tls: unknown certificate
+2026/11/15 15:24:08 http: TLS handshake error from 127.0.0.1:46522: remote error: tls: unknown certificate
+2026/11/15 15:24:08 http: TLS handshake error from 127.0.0.1:46536: remote error: tls: unknown certificate
+2026/11/15 15:24:08 http: TLS handshake error from 127.0.0.1:46542: remote error: tls: unknown certificate
+2026/11/15 15:24:08 http: TLS handshake error from 127.0.0.1:46550: remote error: tls: unknown certificate
+2026/11/15 15:24:08 http: TLS handshake error from 127.0.0.1:46560: remote error: tls: unknown certificate
+2026/11/15 15:24:09 http: TLS handshake error from 127.0.0.1:46564: remote error: tls: unknown certificate
+2026/11/15 15:24:09 http: TLS handshake error from 127.0.0.1:55802: remote error: tls: unknown certificate
+    security_ui_browser_test.go:247: {"scenario":"key-flows","scheme":"light","engine":"chromium","browser":"156.0.8078.4","requests":65,"blockedEgress":0,"secretsInConsole":0,"webkitSelectNotes":0}
+=== RUN   TestSecurityUIBrowser/chromium/denial-matrix/light
+2026/11/15 15:24:11 http: TLS handshake error from 127.0.0.1:38114: remote error: tls: unknown certificate
+2026/11/15 15:24:11 http: TLS handshake error from 127.0.0.1:38136: remote error: tls: unknown certificate
+2026/11/15 15:24:11 http: TLS handshake error from 127.0.0.1:38138: remote error: tls: unknown certificate
+2026/11/15 15:24:11 http: TLS handshake error from 127.0.0.1:38154: remote error: tls: unknown certificate
+2026/11/15 15:24:12 http: TLS handshake error from 127.0.0.1:38158: remote error: tls: unknown certificate
+2026/11/15 15:24:12 http: TLS handshake error from 127.0.0.1:38164: remote error: tls: unknown certificate
+2026/11/15 15:24:12 http: TLS handshake error from 127.0.0.1:38166: remote error: tls: unknown certificate
+2026/11/15 15:24:12 http: TLS handshake error from 127.0.0.1:38182: remote error: tls: unknown certificate
+2026/11/15 15:24:12 http: TLS handshake error from 127.0.0.1:38190: remote error: tls: unknown certificate
+    security_ui_browser_test.go:247: {"scenario":"denial-matrix","scheme":"light","engine":"chromium","browser":"156.0.8078.4","requests":37,"blockedEgress":0,"secretsInConsole":0,"webkitSelectNotes":0}
+=== RUN   TestSecurityUIBrowser/chromium/policy-flows/light
+2026/11/15 15:24:13 http: TLS handshake error from 127.0.0.1:34764: remote error: tls: unknown certificate
+2026/11/15 15:24:13 http: TLS handshake error from 127.0.0.1:34770: remote error: tls: unknown certificate
+2026/11/15 15:24:14 http: TLS handshake error from 127.0.0.1:34780: remote error: tls: unknown certificate
+    security_ui_browser_test.go:247: {"scenario":"policy-flows","scheme":"light","engine":"chromium","browser":"156.0.8078.4","requests":58,"blockedEgress":0,"secretsInConsole":0,"webkitSelectNotes":0}
+=== RUN   TestSecurityUIBrowser/chromium/a11y-selfcheck/dark
+    security_ui_browser_test.go:247: {"scenario":"a11y-selfcheck","scheme":"dark","engine":"chromium","browser":"156.0.8078.4","requests":0,"blockedEgress":0,"secretsInConsole":0,"webkitSelectNotes":0}
+=== RUN   TestSecurityUIBrowser/chromium/security-flows/dark
+2026/11/15 15:24:19 http: TLS handshake error from 127.0.0.1:56318: remote error: tls: unknown certificate
+2026/11/15 15:24:19 http: TLS handshake error from 127.0.0.1:56334: remote error: tls: unknown certificate
+2026/11/15 15:24:20 http: TLS handshake error from 127.0.0.1:56350: remote error: tls: unknown certificate
+    security_ui_browser_test.go:247: {"scenario":"security-flows","scheme":"dark","engine":"chromium","browser":"156.0.8078.4","requests":87,"blockedEgress":0,"secretsInConsole":0,"webkitSelectNotes":0}
+=== RUN   TestSecurityUIBrowser/chromium/recovery-flow/dark
+2026/11/15 15:24:26 http: TLS handshake error from 127.0.0.1:35844: remote error: tls: unknown certificate
+2026/11/15 15:24:26 http: TLS handshake error from 127.0.0.1:35860: remote error: tls: unknown certificate
+2026/11/15 15:24:27 http: TLS handshake error from 127.0.0.1:35864: remote error: tls: unknown certificate
+2026/11/15 15:24:30 http: TLS handshake error from 127.0.0.1:54314: remote error: tls: unknown certificate
+2026/11/15 15:24:30 http: TLS handshake error from 127.0.0.1:54322: remote error: tls: unknown certificate
+2026/11/15 15:24:31 http: TLS handshake error from 127.0.0.1:54326: remote error: tls: unknown certificate
+2026/11/15 15:24:31 http: TLS handshake error from 127.0.0.1:54332: remote error: tls: unknown certificate
+    security_ui_browser_test.go:247: {"scenario":"recovery-flow","scheme":"dark","engine":"chromium","browser":"156.0.8078.4","requests":71,"blockedEgress":0,"secretsInConsole":0,"webkitSelectNotes":0}
+=== RUN   TestSecurityUIBrowser/chromium/recovery-reveal-phone/dark
+2026/11/15 15:24:33 http: TLS handshake error from 127.0.0.1:54330: remote error: tls: unknown certificate
+2026/11/15 15:24:33 http: TLS handshake error from 127.0.0.1:54352: remote error: tls: unknown certificate
+    security_ui_browser_test.go:247: {"scenario":"recovery-reveal-phone","scheme":"dark","engine":"chromium","browser":"156.0.8078.4","requests":25,"blockedEgress":0,"secretsInConsole":0,"webkitSelectNotes":0}
+=== RUN   TestSecurityUIBrowser/chromium/key-flows/dark
+2026/11/15 15:24:36 http: TLS handshake error from 127.0.0.1:44690: remote error: tls: unknown certificate
+2026/11/15 15:24:36 http: TLS handshake error from 127.0.0.1:44710: remote error: tls: unknown certificate
+2026/11/15 15:24:37 http: TLS handshake error from 127.0.0.1:44716: remote error: tls: unknown certificate
+2026/11/15 15:24:37 http: TLS handshake error from 127.0.0.1:44724: remote error: tls: unknown certificate
+2026/11/15 15:24:37 http: TLS handshake error from 127.0.0.1:44738: remote error: tls: unknown certificate
+2026/11/15 15:24:37 http: TLS handshake error from 127.0.0.1:44750: remote error: tls: unknown certificate
+2026/11/15 15:24:38 http: TLS handshake error from 127.0.0.1:44760: remote error: tls: unknown certificate
+2026/11/15 15:24:38 http: TLS handshake error from 127.0.0.1:44774: remote error: tls: unknown certificate
+2026/11/15 15:24:39 http: TLS handshake error from 127.0.0.1:44784: remote error: tls: unknown certificate
+    security_ui_browser_test.go:247: {"scenario":"key-flows","scheme":"dark","engine":"chromium","browser":"156.0.8078.4","requests":65,"blockedEgress":0,"secretsInConsole":0,"webkitSelectNotes":0}
+=== RUN   TestSecurityUIBrowser/chromium/denial-matrix/dark
+2026/11/15 15:24:40 http: TLS handshake error from 127.0.0.1:56818: remote error: tls: unknown certificate
+2026/11/15 15:24:40 http: TLS handshake error from 127.0.0.1:56832: remote error: tls: unknown certificate
+2026/11/15 15:24:42 http: TLS handshake error from 127.0.0.1:56852: remote error: tls: unknown certificate
+2026/11/15 15:24:42 http: TLS handshake error from 127.0.0.1:56856: remote error: tls: unknown certificate
+    security_ui_browser_test.go:247: {"scenario":"denial-matrix","scheme":"dark","engine":"chromium","browser":"156.0.8078.4","requests":37,"blockedEgress":0,"secretsInConsole":0,"webkitSelectNotes":0}
+=== RUN   TestSecurityUIBrowser/chromium/policy-flows/dark
+2026/11/15 15:24:43 http: TLS handshake error from 127.0.0.1:38926: remote error: tls: unknown certificate
+2026/11/15 15:24:43 http: TLS handshake error from 127.0.0.1:38946: remote error: tls: unknown certificate
+2026/11/15 15:24:44 http: TLS handshake error from 127.0.0.1:38956: remote error: tls: unknown certificate
+2026/11/15 15:24:44 http: TLS handshake error from 127.0.0.1:38958: remote error: tls: unknown certificate
+2026/11/15 15:24:45 http: TLS handshake error from 127.0.0.1:38970: remote error: tls: unknown certificate
+2026/11/15 15:24:46 http: TLS handshake error from 127.0.0.1:38990: remote error: tls: unknown certificate
+    security_ui_browser_test.go:247: {"scenario":"policy-flows","scheme":"dark","engine":"chromium","browser":"156.0.8078.4","requests":58,"blockedEgress":0,"secretsInConsole":0,"webkitSelectNotes":0}
+--- PASS: TestSecurityUIBrowser (54.09s)
+    --- PASS: TestSecurityUIBrowser/chromium/a11y-selfcheck/light (1.27s)
+    --- PASS: TestSecurityUIBrowser/chromium/security-flows/light (5.45s)
+    --- PASS: TestSecurityUIBrowser/chromium/recovery-flow/light (4.35s)
+    --- PASS: TestSecurityUIBrowser/chromium/recovery-reveal-phone/light (2.82s)
+    --- PASS: TestSecurityUIBrowser/chromium/key-flows/light (3.31s)
+    --- PASS: TestSecurityUIBrowser/chromium/denial-matrix/light (2.85s)
+    --- PASS: TestSecurityUIBrowser/chromium/policy-flows/light (4.25s)
+    --- PASS: TestSecurityUIBrowser/chromium/a11y-selfcheck/dark (1.38s)
+    --- PASS: TestSecurityUIBrowser/chromium/security-flows/dark (7.30s)
+    --- PASS: TestSecurityUIBrowser/chromium/recovery-flow/dark (6.19s)
+    --- PASS: TestSecurityUIBrowser/chromium/recovery-reveal-phone/dark (3.64s)
+    --- PASS: TestSecurityUIBrowser/chromium/key-flows/dark (4.07s)
+    --- PASS: TestSecurityUIBrowser/chromium/denial-matrix/dark (3.19s)
+    --- PASS: TestSecurityUIBrowser/chromium/policy-flows/dark (4.03s)
+=== RUN   TestWebAuthnBrowserVirtualAuthenticator
+2026/11/15 15:24:47 http: TLS handshake error from 127.0.0.1:43078: remote error: tls: unknown certificate
+    webauthn_browser_test.go:86: {"browser":"156.0.8078.4","resident":true,"nonresident":true,"signedUV":true,"replayRejected":true,"signedUVDowngradeRejected":true,"localRequestsOnly":true}
+--- PASS: TestWebAuthnBrowserVirtualAuthenticator (1.32s)
+PASS
+ok  	github.com/NicoTM77/Mandatary/internal/auth	127.554s

@@ -1,0 +1,49 @@
+test_a_missing_or_zero_or_boolean_measurement_is_never_a_pass (__main__.Budgets.test_a_missing_or_zero_or_boolean_measurement_is_never_a_pass) ... ok
+test_a_real_measurement_within_the_budget_passes (__main__.Budgets.test_a_real_measurement_within_the_budget_passes) ... ok
+test_budgets_are_the_approved_numbers_in_the_strict_unit (__main__.Budgets.test_budgets_are_the_approved_numbers_in_the_strict_unit) ... ok
+test_one_byte_over_the_budget_fails (__main__.Budgets.test_one_byte_over_the_budget_fails) ... ok
+test_a_stop_is_always_followed_by_a_start_for_the_same_agent_and_target (__main__.Cases.test_a_stop_is_always_followed_by_a_start_for_the_same_agent_and_target) ... ok
+test_case_ids_are_unique (__main__.Cases.test_case_ids_are_unique) ... ok
+test_every_default_denial_has_no_selector_and_only_the_explicit_deny_names_one (__main__.Cases.test_every_default_denial_has_no_selector_and_only_the_explicit_deny_names_one) ... ok
+test_every_success_is_accounted_as_allowed_with_a_selector (__main__.Cases.test_every_success_is_accounted_as_allowed_with_a_selector) ... ok
+test_nothing_unauthenticated_or_protected_is_accounted (__main__.Cases.test_nothing_unauthenticated_or_protected_is_accounted) ... ok
+test_tally_and_measurement_comparison (__main__.Cases.test_tally_and_measurement_comparison) ... ok
+test_the_cross_product_is_complete (__main__.Cases.test_the_cross_product_is_complete) ... ok
+test_the_expected_totals_are_pinned (__main__.Cases.test_the_expected_totals_are_pinned) ... ok
+test_a_browser_run_needs_both_colour_schemes_the_named_engine_and_no_skip (__main__.Collect.test_a_browser_run_needs_both_colour_schemes_the_named_engine_and_no_skip) ... ok
+test_a_gate_that_exited_zero_without_its_evidence_is_a_failure (__main__.Collect.test_a_gate_that_exited_zero_without_its_evidence_is_a_failure) ... ok
+test_a_nonzero_exit_or_a_vulnerability_or_a_failed_test_fails (__main__.Collect.test_a_nonzero_exit_or_a_vulnerability_or_a_failed_test_fails) ... ok
+test_gates_pass_only_with_exit_zero_and_the_evidence_the_gate_exists_to_produce (__main__.Collect.test_gates_pass_only_with_exit_zero_and_the_evidence_the_gate_exists_to_produce) ... ok
+test_hosted_jobs_count_only_when_completed_successfully (__main__.Collect.test_hosted_jobs_count_only_when_completed_successfully) ... ok
+test_scan_results (__main__.Collect.test_scan_results) ... ok
+test_the_product_tree_comparison_passes_only_when_nothing_differs (__main__.Collect.test_the_product_tree_comparison_passes_only_when_nothing_differs) ... ok
+test_every_criterion_has_a_unique_id_a_group_and_linked_evidence (__main__.Criteria.test_every_criterion_has_a_unique_id_a_group_and_linked_evidence) ... ok
+test_every_evidence_reference_names_a_known_artifact (__main__.Criteria.test_every_evidence_reference_names_a_known_artifact) ... ok
+test_the_named_release_criteria_are_all_present (__main__.Criteria.test_the_named_release_criteria_are_all_present) ... ok
+test_a_broken_link_a_missing_shipped_file_or_a_missing_statement_fails_its_own_check (__main__.Docs.test_a_broken_link_a_missing_shipped_file_or_a_missing_statement_fails_its_own_check) ... ok
+test_a_consistent_tree_passes_every_documentation_check (__main__.Docs.test_a_consistent_tree_passes_every_documentation_check) ... ok
+test_a_complete_description_names_every_fact (__main__.EnvironmentFacts.test_a_complete_description_names_every_fact) ... ok
+test_a_missing_fact_is_named_and_unreadable_output_is_an_error_not_an_empty_record (__main__.EnvironmentFacts.test_a_missing_fact_is_named_and_unreadable_output_is_an_error_not_an_empty_record) ... ok
+test_the_release_harness_refuses_an_ambient_or_remote_endpoint (__main__.Harness.test_the_release_harness_refuses_an_ambient_or_remote_endpoint) ... ok
+test_the_release_harness_refuses_to_run_without_a_declared_daemon_identity (__main__.Harness.test_the_release_harness_refuses_to_run_without_a_declared_daemon_identity) ... ok
+test_an_attestation_manifest_is_not_counted_as_part_of_the_runtime_image (__main__.Oci.test_an_attestation_manifest_is_not_counted_as_part_of_the_runtime_image) ... ok
+test_the_size_is_manifest_config_and_every_layer (__main__.Oci.test_the_size_is_manifest_config_and_every_layer) ... ok
+test_a_daemon_refusal_is_either_class_but_never_a_success_or_a_denial (__main__.Outcomes.test_a_daemon_refusal_is_either_class_but_never_a_success_or_a_denial) ... ok
+test_a_result_that_never_connected_is_not_a_success (__main__.Outcomes.test_a_result_that_never_connected_is_not_a_success) ... ok
+test_an_expectation_rejects_the_wrong_class (__main__.Outcomes.test_an_expectation_rejects_the_wrong_class) ... ok
+test_mcp_classification_matches_rest_for_the_same_failure (__main__.Outcomes.test_mcp_classification_matches_rest_for_the_same_failure) ... ok
+test_rest_classification (__main__.Outcomes.test_rest_classification) ... ok
+test_a_garbled_line_is_ignored_not_guessed (__main__.Proc.test_a_garbled_line_is_ignored_not_guessed) ... ok
+test_parse_status_reads_kib_as_bytes (__main__.Proc.test_parse_status_reads_kib_as_bytes) ... ok
+test_percentiles_are_nearest_rank_and_empty_is_zero (__main__.Proc.test_percentiles_are_nearest_rank_and_empty_is_zero) ... ok
+test_a_criterion_without_a_result_or_digest_is_never_a_pass (__main__.Report.test_a_criterion_without_a_result_or_digest_is_never_a_pass) ... ok
+test_a_stale_or_hand_edited_report_is_detected (__main__.Report.test_a_stale_or_hand_edited_report_is_detected) ... ok
+test_one_failing_link_fails_the_criterion_even_when_others_pass (__main__.Report.test_one_failing_link_fails_the_criterion_even_when_others_pass) ... ok
+test_the_verdict_is_accepted_only_when_every_criterion_passes (__main__.Report.test_the_verdict_is_accepted_only_when_every_criterion_passes) ... ok
+test_an_unrecognised_archive_is_an_error_not_a_size (__main__.SaveSize.test_an_unrecognised_archive_is_an_error_not_a_size) ... ok
+test_the_size_is_every_layer_compressed_plus_config_and_manifest (__main__.SaveSize.test_the_size_is_every_layer_compressed_plus_config_and_manifest) ... ok
+
+----------------------------------------------------------------------
+Ran 44 tests in 0.667s
+
+OK

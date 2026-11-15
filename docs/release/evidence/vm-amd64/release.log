@@ -1,0 +1,156 @@
+PASS ISO-00 the Docker endpoint is the declared isolated fixture daemon (explicit endpoint, identity verified, not Unraid)
+PASS REL-IMG-01 the image under test is the exact source revision (revision label == head SHA) for linux/amd64
+PASS REL-FOOT-IMG compressed image <= 60 MB (sum of real gzip OCI blobs)
+PASS REL-FOOT-SAME the measured archive has exactly the uncompressed layers (diffIDs) of the image under test
+PASS REL-DEP-01 clean Compose deployment (unmodified docker-compose.yml + proxy file) starts, is healthy and READY on the real daemon
+PASS REL-FOOT-IDLE-fresh idle RSS <= 50 MB (fresh: steady state, last 60s of a 300s window from readiness)
+PASS REL-FOOT-SETTLE-fresh after a start the resident set is back under 50 MB and stays there (settled at 145.0 s of a 300 s window; peak 100.55 MB)
+PASS REL-SETUP-setup-reveal the host helper reveals the setup token on a real controlling terminal
+PASS REL-SETUP-setup-exchange the host-revealed token exchanges once for a setup-only session
+PASS REL-SETUP-setup-account administrator staged with two notification addresses
+PASS REL-SETUP-setup-proof address-control proof delivered over verified-TLS SMTP
+PASS REL-SETUP-setup-confirm address confirmed with the mailed proof
+PASS REL-SETUP-setup-totp TOTP enrolled only after proof with a live code
+PASS REL-SETUP-setup-complete setup completes and issues no session
+PASS REL-SETUP-login the new administrator signs in with password + TOTP; the session carries a server-bound AAL2 label
+PASS REL-ID-01 an ordinary user and two groups are created by the administrator (no operation granted by that)
+PASS REL-ID-02 agents are created, each owned by exactly one user or group (owning grants nothing)
+PASS REL-ID-03 an agent is added to a group
+PASS REL-ID-04 explicit ALLOW/DENY rules are created (agent subjects, one group subject, a wildcard, an explicit DENY on B)
+PASS REL-ID-05 credentials are issued once (mdt_ prefix)
+PASS REL-ID-06 the policy page's inventory lists A, B and C, and never Mandatary or its labelled peer
+PASS REL-MATRIX-REST REST: all 94 cases (16 allowed, 72 denied, plus 401/unknown endpoint/backend error) meet the expectation
+PASS REL-MATRIX-MCP real MCP client (official go-sdk, Streamable HTTP over verified TLS): the same 94 cases meet the same expectation
+PASS REL-MATRIX-PARITY REST and the real MCP client give the identical class (status, code, reason) for every case
+PASS REL-MATRIX-POS grant a function on A: it succeeds through both API and real MCP (16 positive cases, each on both transports)
+PASS REL-MATRIX-RAW REST: 29 invalid-input and unsupported-operation requests (exec, kill, remove, list, discovery, raw Docker paths, wrong methods, smuggled parameters) are refused and never succeed
+PASS REL-MCP-CATALOG tools/list is exactly the six approved tools (no exec, discovery or raw Docker tool)
+PASS REL-MCP-UNSUPPORTED MCP: 12 unsupported tool names (exec, kill, remove, list, raw Docker...) are protocol errors that reach nothing, even for a wildcard grant
+PASS REL-MCP-NOAUTH MCP tools/list without or with an unknown credential is 401 (listing is not authorization)
+PASS REL-MATRIX-EFFECT daemon events: no start/stop/kill/die/restart on ungranted B, Mandatary itself or its labelled peer during the whole matrix
+PASS REL-MATRIX-STATE A is running again after the stop/start sequences, B was never touched, C (unstartable) was never started
+PASS REL-LIFE-EXP-0 a credential with a 6 s lifetime is issued
+PASS REL-LIFE-EXP-1 a credential with a 6 s lifetime works before expiry (REST and MCP)
+PASS REL-LIFE-EXP-2 the same credential is refused with 401 on REST and MCP after expiry
+PASS REL-LIFE-REV-1 agent credential works before revocation
+PASS REL-LIFE-REV-2 revoking the credential returns 204
+PASS REL-LIFE-REV-3 the revoked credential is refused with 401 immediately on both transports
+PASS REL-LIFE-SESSION an MCP session opened with a valid credential does not keep authority after the credential is revoked (next call 401)
+PASS REL-LIFE-DIS a disabled agent's credential works before and is refused (401) after, on both transports
+PASS REL-LIFE-ROT-1 rotation: during the overlap window both the old and the new credential authorize
+PASS REL-LIFE-ROT-2 rotation: after the overlap the old credential is 401 on both transports and the new one still works
+PASS REL-LIFE-GROUP group rule: a member is allowed; after removal from the group the same credential is denied (403) on both transports
+PASS REL-LIFE-POL-1 policy credential reads status and opens a follow stream
+PASS REL-LIFE-POL-2 disabling the policy rules ends the open follow stream within 5 s (authority-ended terminal frame)
+PASS REL-LIFE-POL-3 after the policy change the same credential is denied (403) on both transports
+PASS REL-LIFE-POL-4 re-enabling the rules restores access (positive control); no operation was ever granted by the account itself
+PASS REL-LIFE-POL-5 deleting the rules denies again (403) on both transports
+PASS REL-LAT added latency of an accounted outcome measured (150 sequential calls per class)
+PASS REL-FOOT-IDLE-configured idle RSS <= 50 MB (configured: steady state, last 60s of a 120s window from readiness)
+PASS REL-FOOT-SETTLE-configured after a start the resident set is back under 50 MB and stays there (settled at 0.0 s of a 120 s window; peak 33.43 MB)
+PASS REL-LOAD-RUN benchmark workload ran for 43 s: 10 REST + 10 real-MCP polling clients and 5 follow streams, answered with 151 REST and 118 MCP successes (the footprint below is measured over exactly this window)
+PASS REL-LOAD-STABLE the service keeps authorizing legitimate calls under the workload: no non-200 REST answer and no MCP tool error in 43 s
+PASS REL-FOOT-LOAD RSS under the benchmark workload <= 150 MB (peak sampled 40.97 MB; kernel high-water mark VmHWM 42.46 MB reset at the start of the window)
+PASS REL-USAGE-AFTER-WORKLOAD exact usage totals per (agent, owner user, selector, operation) after AFTER-WORKLOAD: 730 accounted outcomes in 60 tuples match the executed sequence
+PASS REL-USAGE-RING-AFTER-WORKLOAD recent-event ring is bounded (<= 1000), holds no payload column, and the database passes integrity and foreign-key checks
+PASS REL-FOOT-IDLE-after-restart idle RSS <= 50 MB (after-restart: steady state, last 60s of a 300s window from readiness)
+PASS REL-FOOT-SETTLE-after-restart after a start the resident set is back under 50 MB and stays there (settled at 155.0 s of a 300 s window; peak 98.81 MB)
+PASS REL-RESTART-1 after stop/start the credential still authorizes A and still cannot touch B (policy and credential persisted)
+PASS REL-RESTART-2 the real MCP client sees the same after the restart
+PASS REL-RESTART-3 the administrator signs in again (password + TOTP) and the policy listing is intact after the restart
+PASS REL-RESTART-4 setup stays closed after a restart (404)
+PASS REL-CRASH-1 SIGKILL of the service process (from the host): Docker's restart policy restarts it (RestartCount >= 1, new StartedAt) and it is ready again after a fresh verification (1 s)
+PASS REL-CRASH-2 after the crash the credential still authorizes A
+PASS REL-USAGE-AFTER-CRASH exact usage totals per (agent, owner user, selector, operation) after AFTER-CRASH: 740 accounted outcomes in 60 tuples match the executed sequence
+PASS REL-USAGE-RING-AFTER-CRASH recent-event ring is bounded (<= 1000), holds no payload column, and the database passes integrity and foreign-key checks
+PASS REL-BACKUP-EXPORT-full export a full backup as the administrator (fresh AAL2); the archive carries no password, TOTP seed, bearer token or master key (24948 bytes)
+PASS REL-R1-SETUP-setup-reveal the host helper reveals the setup token on a real controlling terminal
+PASS REL-R1-SETUP-setup-exchange the host-revealed token exchanges once for a setup-only session
+PASS REL-R1-SETUP-setup-account administrator staged with two notification addresses
+PASS REL-R1-SETUP-setup-proof address-control proof delivered over verified-TLS SMTP
+PASS REL-R1-SETUP-setup-confirm address confirmed with the mailed proof
+PASS REL-R1-SETUP-setup-totp TOTP enrolled only after proof with a live code
+PASS REL-R1-SETUP-setup-complete setup completes and issues no session
+PASS REL-RESTORE-R1-ANON an anonymous restore request is refused (same key, full backup)
+PASS REL-RESTORE-R1-PHRASE a restore without the exact confirmation phrase is refused and changes nothing
+PASS REL-RESTORE-R1-TAMPER a tampered archive is refused (422) before any state change (same key, full backup)
+PASS REL-RESTORE-R1-NOQUAR after the refusals the installation is NOT in quarantine: still ready and the administrator's session is intact
+PASS REL-RESTORE-R1-DO restore succeeds (same key, full backup): installation enters RESTORE_QUARANTINE, session ended, nothing from the file is effective
+PASS REL-RESTORE-R1-SIGNEDOUT the restoring administrator is signed out and cannot sign back in: password + TOTP never reach a session while quarantined
+PASS REL-RESTORE-R1-OLDTOKEN RESTORE-01: the credential that existed before the restore (carried inactive in a full archive, absent from a clean one) authorizes nothing while quarantined
+PASS REL-R1-RECOVERY-recovery-issue recovery restore-admin accepted on the host
+PASS REL-R1-RECOVERY-recovery-reveal the recovery token is revealed once on a real terminal
+PASS REL-R1-RECOVERY-setup-exchange the host-revealed token exchanges once for a setup-only session
+PASS REL-R1-RECOVERY-setup-account administrator staged with two notification addresses
+PASS REL-R1-RECOVERY-setup-proof address-control proof delivered over verified-TLS SMTP
+PASS REL-R1-RECOVERY-setup-confirm address confirmed with the mailed proof
+PASS REL-R1-RECOVERY-setup-totp TOTP enrolled only after proof with a live code
+PASS REL-R1-RECOVERY-setup-complete setup completes and issues no session
+PASS REL-RESTORE-R1-MANIFEST recovery enrols ONE new administrator (quarantine ends in that step); the manifest lists every imported record as pending and credential rows are retained inactive for provenance only
+PASS REL-RESTORE-R1-INACTIVE RESTORE-09: before approval no imported rule is effective (the review shows what is imported next to what is in force)
+PASS REL-RESTORE-R1-APPROVE explicit approval of 54 named records in dependency order (1 rule(s) of rel-ro deliberately left pending)
+PASS REL-RESTORE-R1-NOAPPROVE the administrator role, notification addresses and credentials have NO approval path (fixed reasons single_administrator / needs_reverification / unsupported)
+PASS REL-RESTORE-R1-CRAFTED a crafted approval of a non-approvable record is refused by the server (409) whatever the client sends
+PASS REL-RESTORE-R1-REISSUE fresh credentials are issued for the restored agents (a backup never carries a usable token)
+PASS REL-RESTORE-R1-AUTHZ post-restore authorization on the fresh instance, REST and real MCP: approved grant on A works; B is denied; an agent whose rule was NOT approved is denied; explicit DENY still beats a wildcard ALLOW
+PASS REL-RESTORE-R1-OLDTOKEN2 the pre-restore credential is still refused after approval and reissue (a restored record never revives an old token)
+PASS REL-RESTORE-R1-SCOPE documented scope comparison: every user, group and agent of the original is present; effective rules == imported rules minus the 1 deliberately unapproved; nothing extra is effective
+PASS REL-RESTORE-R1-USAGE RESTORE-10: usage statistics are outside the backup; the fresh instance holds exactly the 16 outcomes it served after the restore and none from the original
+PASS REL-BACKUP-EXPORT-clean export a clean backup as the administrator (fresh AAL2); the archive carries no password, TOTP seed, bearer token or master key (18536 bytes)
+PASS REL-R2-SETUP-setup-reveal the host helper reveals the setup token on a real controlling terminal
+PASS REL-R2-SETUP-setup-exchange the host-revealed token exchanges once for a setup-only session
+PASS REL-R2-SETUP-setup-account administrator staged with two notification addresses
+PASS REL-R2-SETUP-setup-proof address-control proof delivered over verified-TLS SMTP
+PASS REL-R2-SETUP-setup-confirm address confirmed with the mailed proof
+PASS REL-R2-SETUP-setup-totp TOTP enrolled only after proof with a live code
+PASS REL-R2-SETUP-setup-complete setup completes and issues no session
+PASS REL-RESTORE-R2-ANON an anonymous restore request is refused (new key, clean backup)
+PASS REL-RESTORE-R2-PHRASE a restore without the exact confirmation phrase is refused and changes nothing
+PASS REL-RESTORE-R2-TAMPER a tampered archive is refused (422) before any state change (new key, clean backup)
+PASS REL-RESTORE-R2-NOQUAR after the refusals the installation is NOT in quarantine: still ready and the administrator's session is intact
+PASS REL-RESTORE-R2-PROVENANCE a clean archive from another installation key is refused (409 provenance_unverified) without the explicit acknowledgement
+PASS REL-RESTORE-R2-DO restore succeeds (new key, clean backup): installation enters RESTORE_QUARANTINE, session ended, nothing from the file is effective
+PASS REL-RESTORE-R2-SIGNEDOUT the restoring administrator is signed out and cannot sign back in: password + TOTP never reach a session while quarantined
+PASS REL-RESTORE-R2-OLDTOKEN RESTORE-01: the credential that existed before the restore (carried inactive in a full archive, absent from a clean one) authorizes nothing while quarantined
+PASS REL-R2-RECOVERY-recovery-issue recovery restore-admin accepted on the host
+PASS REL-R2-RECOVERY-recovery-reveal the recovery token is revealed once on a real terminal
+PASS REL-R2-RECOVERY-setup-exchange the host-revealed token exchanges once for a setup-only session
+PASS REL-R2-RECOVERY-setup-account administrator staged with two notification addresses
+PASS REL-R2-RECOVERY-setup-proof address-control proof delivered over verified-TLS SMTP
+PASS REL-R2-RECOVERY-setup-confirm address confirmed with the mailed proof
+PASS REL-R2-RECOVERY-setup-totp TOTP enrolled only after proof with a live code
+PASS REL-R2-RECOVERY-setup-complete setup completes and issues no session
+PASS REL-RESTORE-R2-MANIFEST recovery enrols ONE new administrator (quarantine ends in that step); the manifest lists every imported record as pending and a clean archive carries no credential
+PASS REL-RESTORE-R2-INACTIVE RESTORE-09: before approval no imported rule is effective (the review shows what is imported next to what is in force)
+PASS REL-RESTORE-R2-APPROVE explicit approval of 54 named records in dependency order (1 rule(s) of rel-ro deliberately left pending)
+PASS REL-RESTORE-R2-NOAPPROVE the administrator role, notification addresses and credentials have NO approval path (fixed reasons single_administrator / needs_reverification / unsupported)
+PASS REL-RESTORE-R2-CRAFTED a crafted approval of a non-approvable record is refused by the server (409) whatever the client sends
+PASS REL-RESTORE-R2-REISSUE fresh credentials are issued for the restored agents (a backup never carries a usable token)
+PASS REL-RESTORE-R2-AUTHZ post-restore authorization on the fresh instance, REST and real MCP: approved grant on A works; B is denied; an agent whose rule was NOT approved is denied; explicit DENY still beats a wildcard ALLOW
+PASS REL-RESTORE-R2-OLDTOKEN2 the pre-restore credential is still refused after approval and reissue (a restored record never revives an old token)
+PASS REL-RESTORE-R2-SCOPE documented scope comparison: every user, group and agent of the original is present; effective rules == imported rules minus the 1 deliberately unapproved; nothing extra is effective
+PASS REL-RESTORE-R2-USAGE RESTORE-10: usage statistics are outside the backup; the fresh instance holds exactly the 16 outcomes it served after the restore and none from the original
+PASS REL-MIGRATE-REFUSE a downgrade that would lose usage rows (unmatched denials) is refused by the migration itself and the data is intact
+PASS REL-MIGRATE-PRIOR the store is at the immediately prior schema version 13 (the repository's own down-migration over a real populated store)
+PASS REL-MIGRATE-AUTHZ after the in-place upgrade: ready; the existing credential still authorizes A and not B on REST and real MCP; the administrator signs in
+PASS REL-MIGRATE-FORWARD the schema advanced 13 -> 14 on start; every usage total survived the migration exactly; integrity and foreign-key checks pass; the tables of the newer migration exist again
+PASS REL-MIGRATE-NEWER a data directory from a NEWER schema than the binary is refused at startup (non-zero exit, no key in the output) and is not modified
+PASS REL-DEV-01 the host binary starts natively with the mock backend and no Docker access (DOCKER_HOST points nowhere), is ready on loopback (GET /api/v1/readyz 200) and its own `healthcheck` and `healthcheck --ready` exit 0
+PASS REL-DEV-02 the embedded SPA is served and an unauthenticated API call is refused (no open mock surface)
+PASS REL-DEV-03 the mock backend announces itself (WARN) and the master key is not logged
+PASS REL-DEV-04 the mock backend beside a real Docker socket setting is refused at start-up (non-zero exit, no key in the output)
+PASS REL-DOCS-LINKS every relative link in README.md, development.md and docs/*.md resolves to a file in the release (23 pages)
+PASS REL-DOCS-DEPLOY docs/deployment.md names the Compose files and the example environment the release ships, and they exist
+PASS REL-DOCS-LIMITS docs/deployment.md states what is not implemented, the evidence limits, the first-administrator flow and self-protection
+PASS REL-DOCS-UNAVAILABLE docs/api-mcp.md states that exec, discovery and raw Docker operations are unsupported (later phases are unavailable, not stubs)
+PASS REL-DOCS-README-LIMITS README.md points to the known limitations and open items
+PASS REL-LOGLEVEL-KEY-debug the debug start logs no master key value
+PASS REL-LOGLEVEL-KEY-info the info start logs no master key value
+PASS REL-LOGLEVEL-KEY-warn the warn start logs no master key value
+PASS REL-LOGLEVEL-KEY-error the error start logs no master key value
+PASS REL-LOGLEVEL a start at each of debug/info/warn/error emits no JSON line below its level
+PASS REL-LOGLEVEL-POS positive control: the info start emits info lines and the warn/error starts do not (the filter really acts)
+PASS REL-LOGLEVEL-INVALID an invalid MANDATARY_LOG_LEVEL refuses to start (non-zero exit) and echoes no key
+PASS REL-LOGS no setup token, password, TOTP seed, master key, bearer token, address proof or session cookie appears in any log of 5 deployments (1598927 bytes scanned, 51 secrets checked)
+PASS ISO-01 the daemon is still the declared fixture daemon before cleanup
+SUMMARY pass=155 not_pass=0

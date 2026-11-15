@@ -1,0 +1,120 @@
+=== RUN   TestAdminUIBrowser
+=== RUN   TestAdminUIBrowser/webkit/setup-login/light
+    admin_ui_browser_test.go:257: Skipping host requirements validation logic because `PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS` env variable is set.
+        {"scenario":"setup-login","scheme":"light","engine":"webkit","browser":"27.2","requests":43,"blockedEgress":0,"secretsInConsole":0}
+=== RUN   TestAdminUIBrowser/webkit/setup-replay-expiry/light
+    admin_ui_browser_test.go:257: Skipping host requirements validation logic because `PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS` env variable is set.
+        {"scenario":"setup-replay-expiry","scheme":"light","engine":"webkit","browser":"27.2","requests":25,"blockedEgress":0,"secretsInConsole":0}
+=== RUN   TestAdminUIBrowser/webkit/login-flows/light
+    admin_ui_browser_test.go:257: Skipping host requirements validation logic because `PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS` env variable is set.
+        {"scenario":"login-flows","scheme":"light","engine":"webkit","browser":"27.2","requests":51,"blockedEgress":0,"secretsInConsole":0}
+=== RUN   TestAdminUIBrowser/webkit/setup-login/dark
+    admin_ui_browser_test.go:257: Skipping host requirements validation logic because `PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS` env variable is set.
+        {"scenario":"setup-login","scheme":"dark","engine":"webkit","browser":"27.2","requests":43,"blockedEgress":0,"secretsInConsole":0}
+=== RUN   TestAdminUIBrowser/webkit/setup-replay-expiry/dark
+    admin_ui_browser_test.go:257: Skipping host requirements validation logic because `PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS` env variable is set.
+        {"scenario":"setup-replay-expiry","scheme":"dark","engine":"webkit","browser":"27.2","requests":25,"blockedEgress":0,"secretsInConsole":0}
+=== RUN   TestAdminUIBrowser/webkit/login-flows/dark
+    admin_ui_browser_test.go:257: Skipping host requirements validation logic because `PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS` env variable is set.
+        {"scenario":"login-flows","scheme":"dark","engine":"webkit","browser":"27.2","requests":51,"blockedEgress":0,"secretsInConsole":0}
+--- PASS: TestAdminUIBrowser (25.52s)
+    --- PASS: TestAdminUIBrowser/webkit/setup-login/light (4.27s)
+    --- PASS: TestAdminUIBrowser/webkit/setup-replay-expiry/light (3.46s)
+    --- PASS: TestAdminUIBrowser/webkit/login-flows/light (4.92s)
+    --- PASS: TestAdminUIBrowser/webkit/setup-login/dark (4.19s)
+    --- PASS: TestAdminUIBrowser/webkit/setup-replay-expiry/dark (3.52s)
+    --- PASS: TestAdminUIBrowser/webkit/login-flows/dark (5.14s)
+=== RUN   TestRecoveryUIBrowser
+=== RUN   TestRecoveryUIBrowser/webkit/export-flows/light
+    recovery_ui_browser_test.go:282: Skipping host requirements validation logic because `PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS` env variable is set.
+        {"scenario":"export-flows","scheme":"light","engine":"webkit","browser":"27.2","requests":19,"blockedEgress":0,"secretsInConsole":0,"phoneChecks":false}
+=== RUN   TestRecoveryUIBrowser/webkit/restore-flows/light
+    recovery_ui_browser_test.go:282: Skipping host requirements validation logic because `PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS` env variable is set.
+        {"scenario":"restore-flows","scheme":"light","engine":"webkit","browser":"27.2","requests":65,"blockedEgress":0,"secretsInConsole":0,"phoneChecks":false}
+=== RUN   TestRecoveryUIBrowser/webkit/restore-failure/light
+    recovery_ui_browser_test.go:282: Skipping host requirements validation logic because `PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS` env variable is set.
+        {"scenario":"restore-failure","scheme":"light","engine":"webkit","browser":"27.2","requests":33,"blockedEgress":0,"secretsInConsole":0,"phoneChecks":false}
+=== RUN   TestRecoveryUIBrowser/webkit/parallel-restore/light
+    recovery_ui_browser_test.go:282: Skipping host requirements validation logic because `PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS` env variable is set.
+        {"scenario":"parallel-restore","scheme":"light","engine":"webkit","browser":"27.2","requests":27,"blockedEgress":0,"secretsInConsole":0,"phoneChecks":false}
+=== RUN   TestRecoveryUIBrowser/webkit/denial/light
+    recovery_ui_browser_test.go:282: Skipping host requirements validation logic because `PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS` env variable is set.
+        {"scenario":"denial","scheme":"light","engine":"webkit","browser":"27.2","requests":19,"blockedEgress":0,"secretsInConsole":0,"phoneChecks":false}
+=== RUN   TestRecoveryUIBrowser/webkit/export-flows/dark
+    recovery_ui_browser_test.go:282: Skipping host requirements validation logic because `PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS` env variable is set.
+        {"scenario":"export-flows","scheme":"dark","engine":"webkit","browser":"27.2","requests":19,"blockedEgress":0,"secretsInConsole":0,"phoneChecks":false}
+=== RUN   TestRecoveryUIBrowser/webkit/restore-flows/dark
+    recovery_ui_browser_test.go:282: Skipping host requirements validation logic because `PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS` env variable is set.
+        {"scenario":"restore-flows","scheme":"dark","engine":"webkit","browser":"27.2","requests":65,"blockedEgress":0,"secretsInConsole":0,"phoneChecks":false}
+=== RUN   TestRecoveryUIBrowser/webkit/restore-failure/dark
+    recovery_ui_browser_test.go:282: Skipping host requirements validation logic because `PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS` env variable is set.
+        {"scenario":"restore-failure","scheme":"dark","engine":"webkit","browser":"27.2","requests":33,"blockedEgress":0,"secretsInConsole":0,"phoneChecks":false}
+=== RUN   TestRecoveryUIBrowser/webkit/parallel-restore/dark
+    recovery_ui_browser_test.go:282: Skipping host requirements validation logic because `PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS` env variable is set.
+        {"scenario":"parallel-restore","scheme":"dark","engine":"webkit","browser":"27.2","requests":27,"blockedEgress":0,"secretsInConsole":0,"phoneChecks":false}
+=== RUN   TestRecoveryUIBrowser/webkit/denial/dark
+    recovery_ui_browser_test.go:282: Skipping host requirements validation logic because `PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS` env variable is set.
+        {"scenario":"denial","scheme":"dark","engine":"webkit","browser":"27.2","requests":19,"blockedEgress":0,"secretsInConsole":0,"phoneChecks":false}
+--- PASS: TestRecoveryUIBrowser (57.78s)
+    --- PASS: TestRecoveryUIBrowser/webkit/export-flows/light (4.32s)
+    --- PASS: TestRecoveryUIBrowser/webkit/restore-flows/light (12.37s)
+    --- PASS: TestRecoveryUIBrowser/webkit/restore-failure/light (4.21s)
+    --- PASS: TestRecoveryUIBrowser/webkit/parallel-restore/light (3.85s)
+    --- PASS: TestRecoveryUIBrowser/webkit/denial/light (4.75s)
+    --- PASS: TestRecoveryUIBrowser/webkit/export-flows/dark (4.44s)
+    --- PASS: TestRecoveryUIBrowser/webkit/restore-flows/dark (11.38s)
+    --- PASS: TestRecoveryUIBrowser/webkit/restore-failure/dark (4.01s)
+    --- PASS: TestRecoveryUIBrowser/webkit/parallel-restore/dark (3.78s)
+    --- PASS: TestRecoveryUIBrowser/webkit/denial/dark (4.68s)
+=== RUN   TestSecurityUIBrowser
+=== RUN   TestSecurityUIBrowser/webkit/a11y-selfcheck/light
+    security_ui_browser_test.go:247: Skipping host requirements validation logic because `PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS` env variable is set.
+        {"scenario":"a11y-selfcheck","scheme":"light","engine":"webkit","browser":"27.2","requests":0,"blockedEgress":0,"secretsInConsole":0,"webkitSelectNotes":0}
+=== RUN   TestSecurityUIBrowser/webkit/security-flows/light
+    security_ui_browser_test.go:247: Skipping host requirements validation logic because `PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS` env variable is set.
+        {"scenario":"security-flows","scheme":"light","engine":"webkit","browser":"27.2","requests":87,"blockedEgress":0,"secretsInConsole":0,"webkitSelectNotes":0}
+=== RUN   TestSecurityUIBrowser/webkit/recovery-flow/light
+    security_ui_browser_test.go:247: Skipping host requirements validation logic because `PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS` env variable is set.
+        {"scenario":"recovery-flow","scheme":"light","engine":"webkit","browser":"27.2","requests":71,"blockedEgress":0,"secretsInConsole":0,"webkitSelectNotes":0}
+=== RUN   TestSecurityUIBrowser/webkit/recovery-reveal-phone/light
+    security_ui_browser_test.go:247: Skipping host requirements validation logic because `PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS` env variable is set.
+        {"scenario":"recovery-reveal-phone","scheme":"light","engine":"webkit","browser":"27.2","requests":25,"blockedEgress":0,"secretsInConsole":0,"webkitSelectNotes":0}
+=== RUN   TestSecurityUIBrowser/webkit/denial-matrix/light
+    security_ui_browser_test.go:247: Skipping host requirements validation logic because `PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS` env variable is set.
+        {"scenario":"denial-matrix","scheme":"light","engine":"webkit","browser":"27.2","requests":37,"blockedEgress":0,"secretsInConsole":0,"webkitSelectNotes":0}
+=== RUN   TestSecurityUIBrowser/webkit/policy-flows/light
+    security_ui_browser_test.go:247: Skipping host requirements validation logic because `PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS` env variable is set.
+        {"scenario":"policy-flows","scheme":"light","engine":"webkit","browser":"27.2","requests":58,"blockedEgress":0,"secretsInConsole":0,"webkitSelectNotes":6}
+=== RUN   TestSecurityUIBrowser/webkit/a11y-selfcheck/dark
+    security_ui_browser_test.go:247: Skipping host requirements validation logic because `PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS` env variable is set.
+        {"scenario":"a11y-selfcheck","scheme":"dark","engine":"webkit","browser":"27.2","requests":0,"blockedEgress":0,"secretsInConsole":0,"webkitSelectNotes":0}
+=== RUN   TestSecurityUIBrowser/webkit/security-flows/dark
+    security_ui_browser_test.go:247: Skipping host requirements validation logic because `PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS` env variable is set.
+        {"scenario":"security-flows","scheme":"dark","engine":"webkit","browser":"27.2","requests":87,"blockedEgress":0,"secretsInConsole":0,"webkitSelectNotes":0}
+=== RUN   TestSecurityUIBrowser/webkit/recovery-flow/dark
+    security_ui_browser_test.go:247: Skipping host requirements validation logic because `PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS` env variable is set.
+        {"scenario":"recovery-flow","scheme":"dark","engine":"webkit","browser":"27.2","requests":71,"blockedEgress":0,"secretsInConsole":0,"webkitSelectNotes":0}
+=== RUN   TestSecurityUIBrowser/webkit/recovery-reveal-phone/dark
+    security_ui_browser_test.go:247: Skipping host requirements validation logic because `PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS` env variable is set.
+        {"scenario":"recovery-reveal-phone","scheme":"dark","engine":"webkit","browser":"27.2","requests":25,"blockedEgress":0,"secretsInConsole":0,"webkitSelectNotes":0}
+=== RUN   TestSecurityUIBrowser/webkit/denial-matrix/dark
+    security_ui_browser_test.go:247: Skipping host requirements validation logic because `PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS` env variable is set.
+        {"scenario":"denial-matrix","scheme":"dark","engine":"webkit","browser":"27.2","requests":37,"blockedEgress":0,"secretsInConsole":0,"webkitSelectNotes":0}
+=== RUN   TestSecurityUIBrowser/webkit/policy-flows/dark
+    security_ui_browser_test.go:247: Skipping host requirements validation logic because `PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS` env variable is set.
+        {"scenario":"policy-flows","scheme":"dark","engine":"webkit","browser":"27.2","requests":58,"blockedEgress":0,"secretsInConsole":0,"webkitSelectNotes":6}
+--- PASS: TestSecurityUIBrowser (65.20s)
+    --- PASS: TestSecurityUIBrowser/webkit/a11y-selfcheck/light (1.86s)
+    --- PASS: TestSecurityUIBrowser/webkit/security-flows/light (9.21s)
+    --- PASS: TestSecurityUIBrowser/webkit/recovery-flow/light (6.24s)
+    --- PASS: TestSecurityUIBrowser/webkit/recovery-reveal-phone/light (3.48s)
+    --- PASS: TestSecurityUIBrowser/webkit/denial-matrix/light (3.62s)
+    --- PASS: TestSecurityUIBrowser/webkit/policy-flows/light (6.84s)
+    --- PASS: TestSecurityUIBrowser/webkit/a11y-selfcheck/dark (1.71s)
+    --- PASS: TestSecurityUIBrowser/webkit/security-flows/dark (9.96s)
+    --- PASS: TestSecurityUIBrowser/webkit/recovery-flow/dark (6.89s)
+    --- PASS: TestSecurityUIBrowser/webkit/recovery-reveal-phone/dark (3.92s)
+    --- PASS: TestSecurityUIBrowser/webkit/denial-matrix/dark (4.13s)
+    --- PASS: TestSecurityUIBrowser/webkit/policy-flows/dark (7.34s)
+PASS
+ok  	github.com/NicoTM77/Mandatary/internal/auth	148.533s

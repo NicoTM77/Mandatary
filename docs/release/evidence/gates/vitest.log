@@ -1,0 +1,17 @@
+
+> mandatary-web@0.0.0 test
+> vitest run
+
+
+ RUN  v5.1.0 /workspaces/Mandatary/.worktrees/t_836268ff/web
+
+
+ Test Files  35 passed (35)
+      Tests  753 passed (753)
+   Start at  17:11:44
+   Duration  123.93s (environment 61%, tests 26%, import 12%, transform 1%)
+
+Environment  jsdom was created 35 times · 70.38s total, 61% of tracked time
+             create it once per worker with pool: 'vmThreads' (keeps per-file isolation) or isolate: false (shares it across files)
+             learn more: https://vitest.dev/guide/improving-performance#test-environments
+
