@@ -54,7 +54,8 @@ test('official checksums exist for every patched archive and none for vulnerable
 test('CI pins only patched Go versions and has no vulnerable label', () => {
   const ci = read('.github/workflows/ci.yml');
   assert.match(ci, new RegExp(`go: \\['${PRIMARY.replaceAll('.', '\\.')}', '${COMPAT.replaceAll('.', '\\.')}'\\]`));
-  assert.equal([...ci.matchAll(new RegExp(`go-version: '${PRIMARY.replaceAll('.', '\\.')}'`, 'g'))].length, 2);
+  // 3: the Storage and Security jobs and, since P1.20, the Image job, which builds the real MCP client and the migration fixture tool with the same pinned toolchain.
+  assert.equal([...ci.matchAll(new RegExp(`go-version: '${PRIMARY.replaceAll('.', '\\.')}'`, 'g'))].length, 3);
   for (const version of VULNERABLE) assert.ok(!ci.includes(version), `CI still references ${version}`);
 });
 

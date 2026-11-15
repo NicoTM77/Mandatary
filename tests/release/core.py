@@ -462,7 +462,7 @@ def devflow(c: Ctx):
     base, key = e.prepare_state("devflow", uid, gid)
     port = stack.free_port()
     env = {"PATH": "/usr/bin:/bin", "MANDATARY_DATA_DIR": base + "/data", "MANDATARY_MASTER_KEY_FILE": base + "/keys/master.key", "MANDATARY_ADMIN_LISTEN_ADDR": "127.0.0.1:%d" % port,
-           "MANDATARY_PUBLIC_ORIGIN": "http://127.0.0.1:%d" % port, "MANDATARY_DEV_MOCK_DOCKER": "true", "MANDATARY_LOG_FORMAT": "text", "MANDATARY_LOG_LEVEL": "info",
+           "MANDATARY_PUBLIC_ORIGIN": "https://127.0.0.1:%d" % port, "MANDATARY_DEV_MOCK_DOCKER": "true", "MANDATARY_LOG_FORMAT": "text", "MANDATARY_LOG_LEVEL": "info",
            "DOCKER_HOST": "unix:///nonexistent/no-docker-in-the-local-workflow.sock"}
     out = os.path.join(base, "out.log")
     with open(out, "w") as fh:
@@ -478,10 +478,13 @@ def devflow(c: Ctx):
         except OSError as ex:
             return 0, str(ex)
     try:
-        ok = e.wait(lambda: get("/readyz")[0] == 200, 30)
-        h, r, idx, api, nf = get("/healthz")[0], get("/readyz")[0], get("/"), get("/api/v1/endpoints/local/containers/x/status"), get("/no-such-route")[0]
+        ok = e.wait(lambda: get("/api/v1/readyz")[0] == 200, 30)
+        r, idx, api, nf = get("/api/v1/readyz")[0], get("/"), get("/api/v1/endpoints/local/containers/x/status"), get("/no-such-route")[0]
+        live = subprocess.run([c.a.host_binary, "healthcheck"], env=env, capture_output=True, text=True, timeout=30, cwd=base).returncode
+        ready = subprocess.run([c.a.host_binary, "healthcheck", "--ready"], env=env, capture_output=True, text=True, timeout=30, cwd=base).returncode
         log = open(out).read()
-        c.check("REL-DEV-01", "the host binary starts natively with the mock backend and no Docker access (DOCKER_HOST points nowhere), is ready on loopback and serves /healthz and /readyz", ok and h == 200 and r == 200, "healthz=%s readyz=%s" % (h, r))
+        c.check("REL-DEV-01", "the host binary starts natively with the mock backend and no Docker access (DOCKER_HOST points nowhere), is ready on loopback (GET /api/v1/readyz 200) and its own `healthcheck` and `healthcheck --ready` exit 0",
+                ok and r == 200 and live == 0 and ready == 0, "readyz=%s healthcheck=%s healthcheck --ready=%s" % (r, live, ready))
         c.check("REL-DEV-02", "the embedded SPA is served and an unauthenticated API call is refused (no open mock surface)", idx[0] == 200 and "<div id=" in idx[1] and api[0] == 401 and nf == 404, "index=%s api=%s unknown=%s" % (idx[0], api[0], nf))
         c.check("REL-DEV-03", "the mock backend announces itself (WARN) and the master key is not logged", "mock docker backend active" in log and key not in log)
     finally:
