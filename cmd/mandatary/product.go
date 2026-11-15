@@ -86,10 +86,7 @@ func composeProduct(ctx context.Context, logger *slog.Logger, c config.Config, r
 		backend = mock
 		logger.Warn(logging.DockerMockActive)
 	} else {
-		evidence := opts.evidence
-		if evidence == nil {
-			evidence = docker.DefaultProcessEvidenceReader
-		}
+		evidence := mandatoryEvidence(opts.evidence)
 		adapter, err := docker.NewSDKAdapter(docker.SDKOptions{
 			EndpointID: local,
 			Transport:  unixTransport(c.DockerSocket),
@@ -163,6 +160,23 @@ func composeProduct(ctx context.Context, logger *slog.Logger, c config.Config, r
 		})
 	}
 	return p, true
+}
+
+// mandatoryEvidence makes the process's own runtime evidence mandatory for a real socket (SELF-13, S1.4).
+// With a real daemon there is no native exception: the process must be provably inside a container (its
+// cgroup names the container, or it is the root of a private cgroup namespace). Anything else, including a
+// native host process, a masked or absent /proc/self/cgroup and an unreadable one, leaves the safety proof
+// unverified even when the deployment binding names a labelled member of the inventory: a borrowed
+// binding must never let a host process pose as that container.
+func mandatoryEvidence(read docker.ProcessEvidenceReader) docker.ProcessEvidenceReader {
+	if read == nil {
+		read = docker.DefaultProcessEvidenceReader
+	}
+	return func(ctx context.Context) (docker.ProcessEvidence, error) {
+		ev, err := read(ctx)
+		ev.Mandatory = true
+		return ev, err
+	}
 }
 
 // verifier performs the fresh VerifySelf the contract requires at process start and after every loss of

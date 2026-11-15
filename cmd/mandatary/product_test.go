@@ -423,3 +423,67 @@ func TestInvalidMockAndSocketTogetherRefusesStartup(t *testing.T) {
 	}
 	_ = fmt.Sprint(out)
 }
+
+// cgroupEvidence feeds real /proc/self/cgroup text through the product's own parser, so the shapes below
+// are the ones the kernel produces rather than hand-built ProcessEvidence values.
+func cgroupEvidence(text string) docker.ProcessEvidenceReader {
+	return func(context.Context) (docker.ProcessEvidence, error) {
+		if text == "" {
+			return docker.ProcessEvidence{}, nil // the file is absent (a non-Linux or masked /proc)
+		}
+		id, private, err := docker.ParseCgroupContainerID(text)
+		if err != nil {
+			return docker.ProcessEvidence{}, err
+		}
+		return docker.ProcessEvidence{ContainerID: string(id), PrivateCgroupNS: private}, nil
+	}
+}
+
+// SELF-13 / S1.4: there is no native real-socket exception. With a real socket, a process that is not
+// provably inside a container (no container ID in its cgroup and not the root of a private cgroup
+// namespace) must never verify, even when the deployment binding names a labelled member of the daemon's
+// inventory: a borrowed binding would otherwise let a host process act as that container.
+func TestSELFNativeEvidenceWithARealSocketNeverVerifies(t *testing.T) {
+	binding := map[string]string{"MANDATARY_SELF_INSTANCE_UUID": instanceUUID}
+	for _, tc := range []struct {
+		name, cgroup string
+	}{
+		{"native cgroup v2 (user slice)", "0::/user.slice/user-1000.slice/session-3.scope\n"},
+		{"native cgroup v1 (several hierarchies)", "12:cpu,cpuacct:/user.slice\n11:memory:/user.slice\n1:name=systemd:/user.slice/user-1000.slice\n"},
+		{"native cgroup v2 under systemd service", "0::/system.slice/ssh.service\n"},
+		{"no /proc/self/cgroup at all", ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			d := newFakeDaemon(t, fakeContainer{selfFullID, selfLabels(instanceUUID)})
+			env := map[string]string{"MANDATARY_DOCKER_SOCKET": "unix://" + d.path}
+			for k, v := range binding {
+				env[k] = v
+			}
+			c := composeFor(t, env, productOptions{evidence: cgroupEvidence(tc.cgroup)})
+			time.Sleep(120 * time.Millisecond) // several retries: it must never become ready by retrying
+			if code, ready := c.ready(); code != http.StatusServiceUnavailable || ready {
+				t.Fatalf("native evidence must keep readiness false: %d %v", code, ready)
+			}
+			if d.operational.Load() != 0 {
+				t.Fatalf("%d operational daemon calls while unverified", d.operational.Load())
+			}
+		})
+	}
+}
+
+// The two accepted shapes stay accepted (positive controls for the test above).
+func TestSELFContainerEvidenceWithARealSocketStillVerifies(t *testing.T) {
+	for _, tc := range []struct {
+		name, cgroup string
+	}{
+		{"private cgroup namespace root", "0::/\n"},
+		{"cgroup v2 path naming the container", "0::/system.slice/docker-" + selfFullID + ".scope\n"},
+		{"cgroup v1 path naming the container", "12:cpu:/docker/" + selfFullID + "\n11:memory:/docker/" + selfFullID + "\n"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			d := newFakeDaemon(t, fakeContainer{selfFullID, selfLabels(instanceUUID)})
+			c := composeFor(t, map[string]string{"MANDATARY_DOCKER_SOCKET": "unix://" + d.path, "MANDATARY_SELF_INSTANCE_UUID": instanceUUID}, productOptions{evidence: cgroupEvidence(tc.cgroup)})
+			c.waitReady(t, true)
+		})
+	}
+}

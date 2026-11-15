@@ -2,11 +2,17 @@
 """Image acceptance harness (P1.19). Standard library only; drives the `docker` CLI.
 
 Runs against an ISOLATED, disposable Docker host (the approved test VM, or a hosted CI runner) and never
-against a production daemon. Every resource it creates carries a unique run prefix and is removed at the
-end; it never prunes and never touches resources it did not create. It needs: docker (+compose), python3,
-openssl, and the host-helper binary (the `host-binary` Dockerfile target for the same platform).
+against a production daemon. The daemon is never ambient: --docker-host (an explicit unix:///absolute/path
+socket) and --expect-daemon-id and/or --expect-daemon-name (the declared identity of that fixture daemon)
+are mandatory. The identity is verified (tests/image/isolation.py) before the first file, container or
+network is created and again before cleanup; a mismatch, an unreachable daemon or an Unraid host aborts
+with ISO-00/ISO-01 and removes nothing. DOCKER_HOST and DOCKER_CONTEXT are never consulted: every docker
+call names the endpoint with --host. Every resource it creates carries a unique run prefix and is removed at
+the end; it never prunes and never touches resources it did not create. It needs: docker (+compose),
+python3, openssl, and the host-helper binary (the `host-binary` Dockerfile target for the same platform).
 
     python3 tests/image/acceptance.py --image mandatary:local --platform linux/amd64 \
+        --docker-host unix:///var/run/docker.sock --expect-daemon-id <ID from `docker info`> \
         --repo . --work /srv/mandatary/tests/<task>/work --host-binary ./out/mandatary \
         --sha <40-hex> --scenarios IMG,HARD,SELF,PRIV,STACK --results results.json
 
@@ -41,6 +47,9 @@ import sys
 import tarfile
 import time
 import uuid
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # also under `python3 -I`, which drops the script directory
+import isolation  # noqa: E402
 
 BUSYBOX = "docker.io/library/busybox:1.37.0@sha256:a7dbc319b1438115a207e11930dc4bb3e643dcb3ec0bdd694bb36cd8fad289ec"
 SELF_LABEL = "io.mandatary.self"
@@ -77,8 +86,11 @@ class Env:
         self.networks = []
         self.stacks = []
         self.secrets = []  # values scrubbed from any text we ever print or store
+        self.ep = a.docker_host
+        self.sock = isolation.socket_path(self.ep)
         os.makedirs(self.work, mode=0o700, exist_ok=True)
-        self.docker_gid = str(os.stat("/var/run/docker.sock").st_gid)
+        os.chmod(self.work, 0o700)  # makedirs applies its mode to the leaf only and through the umask
+        self.docker_gid = str(os.stat(self.sock).st_gid)
         self.arch = {"linux/amd64": "amd64", "linux/arm64": "arm64"}[a.platform]
 
     # ---- plumbing -------------------------------------------------------------------------------------
@@ -89,7 +101,7 @@ class Env:
         return text
 
     def docker(self, *args, check=True, inp=None, timeout=240):
-        p = subprocess.run(["docker", *args], capture_output=True, text=True, input=inp, timeout=timeout)
+        p = subprocess.run(["docker", "--host", self.ep, *args], capture_output=True, text=True, input=inp, timeout=timeout)
         if check and p.returncode != 0:
             raise Fail("docker " + " ".join(args[:3]) + " failed: " + self.scrub((p.stderr or p.stdout)[-400:]))
         return p
@@ -126,8 +138,12 @@ class Env:
     def prepare_state(self, tag, uid, gid):
         """Fresh data dir + master key for one deployment, owned by uid:gid (key 0400, data 0700)."""
         base = os.path.join(self.work, tag)
+        os.makedirs(base, mode=0o700)
+        os.chmod(base, 0o700)  # independent of the caller's umask: the product refuses group/world-accessible state
         os.makedirs(os.path.join(base, "keys"), mode=0o700)
         os.makedirs(os.path.join(base, "data"), mode=0o700)
+        for sub in ("keys", "data"):
+            os.chmod(os.path.join(base, sub), 0o700)
         key = secrets.token_hex(32)
         self.secrets.append(key)
         with open(os.path.join(base, "keys", "master.key"), "w", opener=lambda p, f: os.open(p, f, 0o600)) as fh:
@@ -160,7 +176,7 @@ class Env:
             cmd += ["-v", base + "/keys/master.key:/run/secrets/mandatary_master_key:ro",
                     "-e", "MANDATARY_MASTER_KEY_FILE=/run/secrets/mandatary_master_key"]
         if socket_mount:
-            cmd += ["-v", "/var/run/docker.sock:/var/run/docker.sock", "--group-add", self.docker_gid,
+            cmd += ["-v", self.sock + ":/var/run/docker.sock", "--group-add", self.docker_gid,
                     "-e", "MANDATARY_DOCKER_SOCKET=unix:///var/run/docker.sock"]
         for k, v in (env or {}).items():
             cmd += ["-e", k + "=" + v]
@@ -448,7 +464,7 @@ class Env:
         ident = re.compile(r"(?:[A-Z2-7]{4}-){12}[A-Z2-7]{4}")
 
         def helper(args, caps):
-            argv = ["docker", "run", "--rm", "-t", "--name", self.track(self.pfx + "-ph"), "--pull", "never", "--cap-drop", "ALL"]
+            argv = ["docker", "--host", self.ep, "run", "--rm", "-t", "--name", self.track(self.pfx + "-ph"), "--pull", "never", "--cap-drop", "ALL"]
             for c in caps:
                 argv += ["--cap-add", c]
             argv += ["--security-opt", "no-new-privileges:true", "--user", "0:0", "-v", self.a.host_binary + ":/mandatary:ro",
@@ -539,10 +555,34 @@ def main():
     ap.add_argument("--sha", required=True)
     ap.add_argument("--scenarios", default="IMG,HARD,SELF,PRIV,STACK")
     ap.add_argument("--results", required=True)
+    # S1.4 / SELF-13: no ambient endpoint. The caller names the fixture daemon and declares its identity.
+    ap.add_argument("--docker-host", required=True, help="explicit fixture daemon socket, unix:///absolute/path (DOCKER_HOST and the CLI context are never used)")
+    ap.add_argument("--expect-daemon-id", help="the fixture daemon's `docker info` ID")
+    ap.add_argument("--expect-daemon-name", help="the fixture daemon's `docker info` Name (host name)")
     a = ap.parse_args()
+    if not (a.expect_daemon_id or a.expect_daemon_name):
+        ap.error("--expect-daemon-id and/or --expect-daemon-name is mandatory (the isolation identity of the fixture daemon)")
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-    env = Env(a)
     started = time.time()
+    # Nothing ambient may select the daemon, for this process or any child.
+    os.environ.pop("DOCKER_CONTEXT", None)
+    os.environ["DOCKER_HOST"] = a.docker_host
+
+    def write(doc):
+        with open(a.results, "w") as fh:
+            json.dump(doc, fh, indent=1)
+        print("SUMMARY pass=%d not_pass=%d" % (doc["pass"], doc["not_pass"]))
+        return 1 if doc["not_pass"] else 0
+
+    try:  # before the first file, container or network exists
+        isolation.verify(a.docker_host, a.expect_daemon_id, a.expect_daemon_name)
+    except isolation.Refused as e:
+        print("FAIL ISO-00 the Docker endpoint is not an approved isolated fixture daemon -- " + str(e), flush=True)
+        item = {"id": "ISO-00", "name": "the Docker endpoint is not an approved isolated fixture daemon", "status": "FAIL", "detail": str(e)}
+        return write({"task": "t_7f9cfaf3", "source_sha": a.sha, "image": a.image, "platform": a.platform, "seconds": round(time.time() - started),
+                      "pass": 0, "not_pass": 1, "results": [item]})
+    env = Env(a)
+    env.res.check("ISO-00", "the Docker endpoint is the declared isolated fixture daemon (explicit endpoint, identity verified, not Unraid)", True)
     try:
         for s in a.scenarios.split(","):
             fn = {"IMG": env.scenario_img, "HARD": env.scenario_hard, "SELF": env.scenario_self, "PRIV": env.scenario_priv, "STACK": env.scenario_stack}[s]
@@ -553,11 +593,19 @@ def main():
             except Exception as e:  # noqa: BLE001 - report, never crash silently
                 env.res.check(s + "-ERROR", s + " scenario crashed", False, env.scrub(type(e).__name__ + ": " + str(e))[:300])
     finally:
-        env.cleanup()
+        try:  # a different daemon at cleanup time: nothing is stopped, removed or pruned
+            isolation.verify(a.docker_host, a.expect_daemon_id, a.expect_daemon_name)
+            same = True
+        except isolation.Refused as e:
+            same = False
+            env.res.check("ISO-01", "the daemon is still the declared fixture daemon before cleanup", False, "cleanup refused: " + str(e))
+        if same:
+            env.res.check("ISO-01", "the daemon is still the declared fixture daemon before cleanup", True)
+            env.cleanup()
     fails = [i for i in env.res.items if i["status"] != "PASS"]
     doc = {"task": "t_7f9cfaf3", "source_sha": a.sha, "image": a.image, "platform": a.platform, "prefix": env.pfx,
-           "docker": env.docker("version", "--format", "{{.Server.Version}} api {{.Server.APIVersion}} {{.Server.Os}}/{{.Server.Arch}}", check=False).stdout.strip(),
-           "compose": env.docker("compose", "version", "--short", check=False).stdout.strip(),
+           "docker": env.docker("version", "--format", "{{.Server.Version}} api {{.Server.APIVersion}} {{.Server.Os}}/{{.Server.Arch}}", check=False).stdout.strip() if same else "",
+           "compose": env.docker("compose", "version", "--short", check=False).stdout.strip() if same else "",
            "image_facts": getattr(env, "image_facts", None), "seconds": round(time.time() - started),
            "pass": sum(1 for i in env.res.items if i["status"] == "PASS"), "not_pass": len(fails), "results": env.res.items}
     with open(a.results, "w") as fh:

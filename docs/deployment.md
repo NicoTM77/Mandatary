@@ -209,8 +209,9 @@ policy at `--ready`: restarting does not repair a missing binding.
   master key at the host level separately if you need them.
 * **Updates**: pull and pin a new digest, `docker compose up -d`. The store migrates forward on start; there is no
   automatic downgrade. Read the release notes for the version, and rebuild the host helper from the same commit.
-* **Resource use**: the image is about 41 MB uncompressed on amd64 (the layer sum compresses well below the 60 MB
-  budget). Idle and load memory were **not** measured by this card; those budgets are P1.20 evidence.
+* **Resource use**: the image is about 26 MB as reported by the Docker image store in the hosted job (a larger
+  figure appears under the containerd image store) and about 12 MB as the gzip-compressed layer sum, against the
+  60 MB budget; the figures depend on the store, so treat them as an order of magnitude. Idle and load memory were **not** measured by this card; those budgets are P1.20 evidence.
 
 ## 9. Not implemented (planned) and not provided
 
@@ -222,8 +223,11 @@ and a release. A socket proxy, high availability and multi-instance operation ar
 
 ## 10. Evidence and limits
 
-The acceptance harness `tests/image/acceptance.py` ran on the project's isolated test VM (Ubuntu 26.04, Docker
-Engine 29.9.3, API 1.56, Compose 5.7.1, `linux/amd64`). The recorded results, image digests, SBOM and scanner
+The acceptance harness `tests/image/acceptance.py` never uses an ambient Docker endpoint: it requires an explicit
+`--docker-host unix:///absolute/path` and the declared identity of that daemon (`--expect-daemon-id` and/or
+`--expect-daemon-name`, from `docker info`), verifies it before it creates anything and again before it cleans up, and
+refuses an Unraid host (`ISO-00`, `ISO-01`; hermetic tests: `python3 tests/image/test_isolation.py`). It ran on the
+project's isolated test VM (Ubuntu 26.04, Docker Engine 29.9.3, API 1.56, Compose 5.7.1, `linux/amd64`). The recorded results, image digests, SBOM and scanner
 output are in the pull request and review thread, not restated here as facts. Known limits of that evidence:
 
 * **arm64** cannot run on that VM (no emulation configured). The `linux/arm64` image is built and run natively by
@@ -237,6 +241,14 @@ output are in the pull request and review thread, not restated here as facts. Kn
 * The mail fixture is a verified-TLS (STARTTLS, fixture CA) receiver on the isolated host; no real relay, no real
   mail, and no authenticated relay was exercised.
 * Behind the proxy, per-IP throttling sees the proxy's address (no forwarded header is trusted by design).
+* **No native real-socket mode** (SELF-13). With a real socket the process must be provably inside a container: its
+  cgroup names the container, or it is the root of a private cgroup namespace (Compose on a cgroup v2 host). A process
+  started directly on a host, a masked or absent `/proc/self/cgroup`, and a binding that names someone else's
+  container all leave readiness false (`TestSELFNativeEvidenceWithARealSocketNeverVerifies`). A native run is possible
+  only with the in-memory mock (`MANDATARY_DEV_MOCK_DOCKER=true`), which has no socket.
+* **SQLite temporary files**: the root file system is read-only and the service has no `/tmp`. SQLite writes temporary
+  files only for large sorts and similar operations; the acceptance flows did not need one, and behaviour with a very
+  large data set is **unverified** (P1.20). Add a small `tmpfs: [/tmp]` to the service if it is ever observed.
 * Daemon *event* subscription is not implemented: loss of continuity is detected by the per-request check and a
   periodic inventory heartbeat, and recovery is only a fresh verification. This is the documented fail-closed behaviour.
 * No NIST, FIPS, product-qualification or Engine/OS compatibility claim follows from this document or from package
@@ -246,7 +258,7 @@ output are in the pull request and review thread, not restated here as facts. Kn
 
 `docs/findings-ledger.json` still lists these rows as `future_gate`. This table states what the P1.19 change adds; the status
 change itself is for the reviewer and the orchestrator after the exact-head review, because the evidence is the review's to accept.
-Scenario ids are those of `tests/image/acceptance.py` (`IMG`, `HARD`, `SELF`, `PRIV`, `STACK`); Go tests are in `cmd/mandatary`.
+Scenario ids are those of `tests/image/acceptance.py` (`ISO`, `IMG`, `HARD`, `SELF`, `PRIV`, `STACK`); Go tests are in `cmd/mandatary`.
 
 | Ledger row | What this change provides | Still open |
 | --- | --- | --- |

@@ -134,7 +134,7 @@ cancellation cannot mask an independently returned transport fault.
 | `SELF-10` Shared safety state under concurrency | `TestSELF10_SharedSafetyStateConcurrentAccess` | P1.13, P1.14 |
 | `SELF-11` Private cgroup namespace + instance-UUID binding | `TestSELF11_PrivateCgroupInstanceUUIDBindingAndOverlap`, `TestParseCgroupContainerID` | P1.19 (container packaging) |
 | `SELF-12` All-state protected peers (`created`..`dead`) | `TestSELF12_AllStateProtectedPeersDeniedAndHidden` | P1.13, P1.14 |
-| `SELF-13` Mock isolation & no native real-socket exemption | `TestSELF13_MockIsolationAndNoImplicitSocketAccess` | P1.14, P1.19 |
+| `SELF-13` Mock isolation & no native real-socket exemption | `TestSELF13_MockIsolationAndNoImplicitSocketAccess`; composed binary: `TestSELFNativeEvidenceWithARealSocketNeverVerifies` (native cgroup v1, native cgroup v2 and an absent `/proc/self/cgroup` stay unready even with a matching binding), `TestSELFContainerEvidenceWithARealSocketStillVerifies` (positive controls) | P1.14, P1.19 |
 | `SUP-03` Engine API `>= 1.44` negotiation | `TestEngineAPINegotiationAndMinimum144` | P1.19 (live Engine matrix) |
 | TD §§1.1–1.2 Inspect allowlists, secret/entropy redaction, error redaction | `TestInspectStatusAllowlistAndUnknownFields`, `TestInspectConfigEnvCommandMountAndResourceSanitization`, `TestTransportAndSDKErrorsRedacted` | P1.13, P1.14, P1.16 |
 | TD §§1.2, 5, 10.4 Operation catalog, parameter bounds, SDK & mock parity | `TestOperationParameterBounds`, `TestSDKAdapterAllowedOperationsAndBounds`, `TestMockBackendFullLifecycleAndFaultInjection` | P1.13, P1.14 |

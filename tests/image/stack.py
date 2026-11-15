@@ -169,7 +169,7 @@ def run_stack(e):
     env = {
         "MANDATARY_IMAGE": a.image, "MANDATARY_INSTANCE_UUID": bind, "MANDATARY_PUBLIC_ORIGIN": "https://%s:%d" % (HOST, port),
         "MANDATARY_PUBLIC_HOST": HOST, "MANDATARY_DATA_HOST_DIR": base + "/data", "MANDATARY_MASTER_KEY_HOST_FILE": base + "/keys/master.key",
-        "MANDATARY_DOCKER_SOCKET_HOST": "/var/run/docker.sock", "DOCKER_SOCKET_GID": e.docker_gid,
+        "MANDATARY_DOCKER_SOCKET_HOST": e.sock, "DOCKER_SOCKET_GID": e.docker_gid,
         "MANDATARY_SMTP_RELAY": "smtp.test:1025", "MANDATARY_SMTP_TLS": "starttls", "MANDATARY_SMTP_SENDER": "mandatary@mandatary.test",
         "MANDATARY_NOTICE_CONTACT": "ops@mandatary.test", "MANDATARY_PROXY_HTTPS_PORT": str(port), "MANDATARY_LOG_LEVEL": "debug",
         "ACC_UID": str(uid), "ACC_GID": str(gid), "ACC_CERTS_DIR": certs, "ACC_MAILPIT_PORT": str(mp_port),
@@ -177,7 +177,7 @@ def run_stack(e):
     with open(envfile, "w", opener=lambda p, f: os.open(p, f, 0o600)) as fh:
         fh.write("".join("%s=%s\n" % kv for kv in env.items()))
     project = e.pfx + "stk"
-    base_cmd = ["docker", "compose", "-p", project, "--env-file", envfile, "-f", "docker-compose.yml", "-f", "deploy/compose.proxy.yml", "-f", "tests/image/compose.acceptance.yml"]
+    base_cmd = ["docker", "--host", e.ep, "compose", "-p", project, "--env-file", envfile, "-f", "docker-compose.yml", "-f", "deploy/compose.proxy.yml", "-f", "tests/image/compose.acceptance.yml"]
     e.stacks.append({"down": base_cmd + ["down", "-v", "--timeout", "10"]})
 
     def compose(*args, check=True):
@@ -188,8 +188,8 @@ def run_stack(e):
 
     # ---- the unmodified production files must render (required variables enforced) ---------------------
     p = compose("config", "-q", check=False)
-    r.check("STACK-00", "docker-compose.yml + deploy/compose.proxy.yml + overlay render (Compose %s)" % sh(["docker", "compose", "version", "--short"]).stdout.strip(), p.returncode == 0, p.stderr[-200:])
-    bare = subprocess.run(["docker", "compose", "-f", "docker-compose.yml", "config", "-q"], cwd=e.repo, capture_output=True, text=True, env={k: v for k, v in os.environ.items() if not k.startswith("MANDATARY_")})
+    r.check("STACK-00", "docker-compose.yml + deploy/compose.proxy.yml + overlay render (Compose %s)" % sh(["docker", "--host", e.ep, "compose", "version", "--short"]).stdout.strip(), p.returncode == 0, p.stderr[-200:])
+    bare = subprocess.run(["docker", "--host", e.ep, "compose", "-f", "docker-compose.yml", "config", "-q"], cwd=e.repo, capture_output=True, text=True, env={k: v for k, v in os.environ.items() if not k.startswith("MANDATARY_")})
     r.check("STACK-00N", "the production file refuses to render without its required variables (no silent defaults)", bare.returncode != 0, bare.stderr[-120:])
     rendered = json.loads(compose("config", "--format", "json").stdout)
     svc = rendered["services"]["mandatary"]
