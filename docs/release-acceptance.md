@@ -32,13 +32,13 @@ digest and the binary digest next to every result. The evidence commit that foll
 All budgets use **MB = 10^6 bytes** (the stricter reading of MB/MiB); the report states raw bytes as well. A missing, zero,
 negative, boolean or non-numeric measurement is never a pass (`footprint.within`).
 
-* **Image <= 60 MB compressed.** Sum of the manifest, config and every layer blob of the image in the OCI archive that the daemon
-  exports (the attestation manifest is not part of the runtime image and is not counted). Measured per CPU.
-* **Idle <= 50 MB resident.** `VmRSS` of the service process read from `/proc/<pid>/status` on the host of the disposable daemon
+* **Image <= 60 MB compressed.** Sum of the manifest, config and every layer blob of the OCI archive that `buildx --output type=oci,compression=gzip` exports for the same source
+  (the attestation manifest is not part of the runtime image and is not counted); the diffIDs of that archive must equal the layers of the image under test. Where the daemon's buildx driver cannot export OCI (the hosted runners' `docker` driver), every layer of `docker save` of the image under test is gzip-compressed at level 6 and summed with the config and manifest; the report names that as an **estimate** (on the VM it was within 0.15% of the real export: 12 400 226 against 12 418 702 bytes). Measured per CPU.
+* **Idle <= 50 MB resident** (technical-decisions.md 10.2: "after startup with SQLite initialized and 1 local Docker endpoint connected"). `VmRSS` of the service process read from `/proc/<pid>/status` on the host of the disposable daemon
   (container PID namespaces are read through the host PID), sampled every 5 s over a curve from readiness (300 s after a start, 120 s for the long-running configured installation), with the
   budget applied to the **steady state** (the last 60 s). It is measured three times: right after the first start (before any
   administrator exists), after configuration and a long run, and after a restart of an installation that holds data. The whole curve
-  is recorded. Because a start-up transient is a real property of the product, a separate check (`REL-FOOT-SETTLE-*`) requires that
+  is recorded. "After startup" is not given a duration in the decision record, so the harness does not choose one silently: because a start-up transient is a real property of the product, a separate check (`REL-FOOT-SETTLE-*`) requires that
   the process is back under the budget, and stays there, within the window; the time it took is reported.
 * **Load <= 150 MB resident.** The approved workload: **20 concurrent clients** - 10 REST pollers (status and logs) and 10 real-MCP
   sessions (status and logs) - plus **5 active follow-log streams**, for 40 s of load, against the deployment through its TLS proxy.

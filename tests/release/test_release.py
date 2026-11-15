@@ -403,6 +403,24 @@ class Docs(unittest.TestCase):
         self.assertEqual([k for k, v in self.run_check(bad).items() if not v], ["REL-DOCS-LIMITS"])
 
 
+class EnvironmentFacts(unittest.TestCase):
+    VERSION = json.dumps({"Client": {"Version": "29.9.3"}, "Server": {"Version": "29.9.3", "ApiVersion": "1.56", "Os": "linux", "Arch": "amd64"}})
+    INFO = json.dumps({"ID": "abc", "KernelVersion": "7.0.0", "OperatingSystem": "Ubuntu", "NCPU": 4, "MemTotal": 33_000_000_000, "Driver": "overlayfs", "CgroupDriver": "systemd", "CgroupVersion": "2"})
+
+    def test_a_complete_description_names_every_fact(self):
+        import release
+        got = release.describe_environment(self.VERSION, self.INFO, "5.7.1")
+        self.assertEqual((got["docker_server"], got["api"], got["os_arch"], got["kernel"], got["cpus"], got["compose"], got["daemon_id"]), ("29.9.3", "1.56", "linux/amd64", "7.0.0", 4, "5.7.1", "abc"))
+        self.assertNotIn("missing", got)
+
+    def test_a_missing_fact_is_named_and_unreadable_output_is_an_error_not_an_empty_record(self):
+        import release
+        got = release.describe_environment(json.dumps({"Server": {"Version": "1"}}), self.INFO, "")
+        self.assertIn("api", got["missing"])
+        self.assertIn("compose", got["missing"])
+        self.assertEqual(release.describe_environment("not json", self.INFO, "x")["error"], "docker version/info unreadable")
+
+
 class Harness(unittest.TestCase):
     def test_the_release_harness_refuses_to_run_without_a_declared_daemon_identity(self):
         p = subprocess.run([sys.executable, "-I", os.path.join(HERE, "release.py"), "--image", "x", "--platform", "linux/amd64", "--repo", ".", "--work", "/nonexistent/w",

@@ -60,18 +60,26 @@ def stage(c, name, fn):
 
 def environment(c):
     e = c.e
-    v = e.docker("version", "--format", "{{json .}}", check=False).stdout
-    info = e.docker("info", "--format", "{{json .}}", check=False).stdout
-    try:
-        vd, idoc = json.loads(v), json.loads(info)
-        c.ev["environment"].update({"docker_server": vd["Server"]["Version"], "api": vd["Server"]["APIVersion"], "os_arch": "%s/%s" % (vd["Server"]["Os"], vd["Server"]["Arch"]),
-                                    "kernel": idoc.get("KernelVersion"), "os": idoc.get("OperatingSystem"), "cpus": idoc.get("NCPU"), "memory_bytes": idoc.get("MemTotal"),
-                                    "storage_driver": idoc.get("Driver"), "cgroup": "%s v%s" % (idoc.get("CgroupDriver"), idoc.get("CgroupVersion")),
-                                    "compose": e.docker("compose", "version", "--short", check=False).stdout.strip(), "daemon_id": idoc.get("ID")})
-    except (ValueError, KeyError):
-        c.ev["environment"]["error"] = "docker version/info unreadable"
+    c.ev["environment"].update(describe_environment(e.docker("version", "--format", "{{json .}}", check=False).stdout, e.docker("info", "--format", "{{json .}}", check=False).stdout,
+                                                    e.docker("compose", "version", "--short", check=False).stdout.strip()))
     c.ev["environment"]["fsync_4k_work_filesystem"] = footprint.fsync_latency(c.e.work)
     c.ev["environment"]["host_cpus"] = os.cpu_count()
+
+
+def describe_environment(version_json, info_json, compose):
+    """The facts a reader needs to judge a measurement. A missing field is recorded as null and named in `missing`; it is never silently dropped."""
+    try:
+        srv = json.loads(version_json).get("Server") or {}
+        info = json.loads(info_json)
+    except ValueError:
+        return {"error": "docker version/info unreadable", "missing": ["all"]}
+    out = {"docker_server": srv.get("Version"), "api": srv.get("ApiVersion"), "os_arch": "%s/%s" % (srv.get("Os"), srv.get("Arch")), "kernel": info.get("KernelVersion"),
+           "os": info.get("OperatingSystem"), "cpus": info.get("NCPU"), "memory_bytes": info.get("MemTotal"), "storage_driver": info.get("Driver"),
+           "cgroup": "%s v%s" % (info.get("CgroupDriver"), info.get("CgroupVersion")), "compose": compose or None, "daemon_id": info.get("ID")}
+    missing = [k for k, v in out.items() if v in (None, "", "None/None", "None vNone")]
+    if missing:
+        out["missing"] = missing
+    return out
 
 
 def run(c):
