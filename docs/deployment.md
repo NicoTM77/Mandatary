@@ -226,7 +226,10 @@ and a release. A socket proxy, high availability and multi-instance operation ar
 The acceptance harness `tests/image/acceptance.py` never uses an ambient Docker endpoint: it requires an explicit
 `--docker-host unix:///absolute/path` and the declared identity of that daemon (`--expect-daemon-id` and/or
 `--expect-daemon-name`, from `docker info`), verifies it before it creates anything and again before it cleans up, and
-refuses an Unraid host (`ISO-00`, `ISO-01`; hermetic tests: `python3 tests/image/test_isolation.py`). It ran on the
+refuses an Unraid host (`ISO-00`, `ISO-01`; hermetic tests: `python3 tests/image/test_isolation.py`). It also refuses,
+before creating anything, a `--work` path beneath a group/world-writable directory, which the product's storage rule
+would refuse (`WORK-00`; create the parent with `umask 022`). `SELF-13N` runs the binary natively against the real
+daemon with a borrowed instance UUID and requires readiness to stay false. It ran on the
 project's isolated test VM (Ubuntu 26.04, Docker Engine 29.9.3, API 1.56, Compose 5.7.1, `linux/amd64`). The recorded results, image digests, SBOM and scanner
 output are in the pull request and review thread, not restated here as facts. Known limits of that evidence:
 
