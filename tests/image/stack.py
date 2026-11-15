@@ -49,7 +49,7 @@ def make_certs(d):
         fh.write("subjectAltName=DNS:smtp.test\nextendedKeyUsage=serverAuth\nbasicConstraints=CA:FALSE\n")
     o("x509", "-req", "-in", "smtp.csr", "-CA", "ca.crt", "-CAkey", "ca.key", "-CAcreateserial", "-out", "smtp.crt", "-days", "2", "-extfile", "ext.cnf")
     for f in os.listdir(d):
-        os.chmod(os.path.join(d, f), 0o644)
+        os.chmod(os.path.join(d, f), 0o600)  # same uid reads them inside the fixtures; nothing here is world-readable
 
 
 class _Conn(http.client.HTTPSConnection):
