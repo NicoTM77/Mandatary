@@ -121,7 +121,62 @@ what the sealed evidence produces. The criteria and the check ids they link are 
 
 The VM run is produced from a `git archive` of the code commit; the evidence commit that follows adds this directory and the report
 only. `docs/release/evidence/manifest.json` records the code commit, the baseline, the image and binary digests and states that
-the product tree is unchanged from the merged baseline (`GATE-PRODUCT-TREE`).
+the local gates and the browser suites ran on a clean worktree at exactly that code commit, so no product file differs between what
+they judged and what the VM archive built (`GATE-PRODUCT-TREE`; since the UX and R2 changes the product tree is no longer the merged
+baseline, so the comparison is against the code commit, not against `main`).
+
+## R2 measurement: bounded continuity freshness (interleaved A/B)
+
+The refusals of SH-2d were traced to a saturated fixture daemon that the service loaded further: one admitted status call issued 12
+daemon reads (9 of them continuity checks), a tail-logs call 33, and the open follow streams re-verified continuously
+(`docs/docker-backend.md`, "Bounded continuity freshness"). R2 changes the product so that one continuity check (daemon ID, own
+container, all-state inventory) covers the other reads and stream deliveries for less than one second; nothing else is cached.
+The measurement follows the reviewer protocol and was run on the isolated VM (4 vCPU, Docker 29.9.3), one release-harness run per
+point, **interleaved** A/B, each arm built from its own `git archive`, the same harness, the same workload (20 clients + 5 streams,
+40 s), no changed limit:
+
+* **Arm A** is the product without the cache but with the request counters (the counters-only commit b93ddae/9984df2 product
+  tree); **arm B** is the cache (`d12331c`/`0f7d879`). The counters are the only difference to the pre-R2 product that A carries; they
+  only count (`docker daemon requests`, closed kinds, counts only).
+* **Clean**: 10 A + 10 B, strictly alternating. **Contended**: 15 A + 30 B in blocks (ABB/BAB/BBA) with two bounded host CPU
+  burners (plain shell loops, `timeout`-bounded, killed by PID after each run), i.e. the fixture under CPU pressure.
+* The window's own daemon requests are the difference between the counter line before it and the one written at the graceful stop
+  after it. Daemon CPU is the 1 Hz `/proc` sample of `dockerd` + `containerd` inside the window. Latency is the client-side latency of
+  successful calls.
+* Every run is kept (`docs/release/evidence/diagnostics/r2-ab/`: per-run rows, summaries, raw `release.json` of every run, the driver
+  logs, schedules and the analysis script). Two disclosures: (1) the first driver version stopped reading its clean schedule after
+  `clean-A01` because `ssh` consumed the rest of standard input, and its chain went on into the contended schedule; the arm-A
+  contended run it started (`burn-A00-orphan`) was allowed to finish and is kept and listed, but it is **not** one of the 15 counted A
+  runs (it failed `REL-LOAD-STABLE` like the others: 47 timeouts, no drop), and both schedules were then restarted (the clean one from
+  `clean-B01`); (2) a harness smoke run (`smoke-B`) preceded the schedules and is kept too.
+
+| Result (median of runs) | clean A | clean B | change |
+|---|---|---|---|
+| metadata reads (`/info` + list + inspect) per admitted call | 44.5 | 3.22 | **-92.8 %** (target >= 65 %) |
+| `/info` calls per admitted call | 13.16 | 0.028 | **-99.8 %** (target >= 90 %) |
+| daemon CPU seconds per admitted call | 0.523 | 0.071 | **-86.4 %** (target >= 30 %) |
+| metadata reads per second | 261 | 118 | -55 % (calls are served ~5.6 times faster, so this is the raw load on the daemon) |
+| daemon CPU in the 40 s window | 140 s | 106 s | -24 % |
+| p95 latency, status / logs | 2.13 s / 5.99 s | 0.48 s / 0.49 s | not worse (target) |
+| admitted calls in the window | 266 | 1497 | |
+| runs with a refusal, proof drop or timeout | 1 of 10 (5 log timeouts) | 0 of 10 | clean B: 0 (target) |
+| `REL-LOAD-STABLE` | 9/10 PASS | 10/10 PASS | |
+
+| Result (contended) | A (15 runs) | B (30 runs) |
+|---|---|---|
+| runs with a proof drop | 2 | 0 |
+| `REL-LOAD-STABLE` | 0/15 PASS | 30/30 PASS |
+| median timed-out calls per run | 45 | 0 |
+| refusals (`safety_unverified` / `default_deny`) | 183 / 8 (2 runs) | 0 / 0 |
+| median p95 latency, status / logs | 5.4 s / 13.4 s | 0.94 s / 0.94 s |
+
+**What is and is not established.** All clean-host targets are met (per-call reductions, p95, 0 refusals/drops/timeouts in 10 runs).
+The contended arm is far better in the observable failure (0 of 30 B runs against 15 of 15 A runs failing the stability result,
+timeouts 669 against 0), but the pre-registered statistic on the **drop rate alone is not met**: 2 of 15 against 0 of 30 gives a
+one-sided Fisher exact p = 0.106 (target p < 0.05), because the drop is rare even under contention in arm A. R2 is therefore **not**
+claimed as resolved on the stated target; the evidence is that the cause is established (daemon saturation amplified by the service's
+own continuity reads) and that removing most of that amplification removes the observed timeouts and failures in this fixture. The
+sealed adverse runs of SH-2d stay `open` until a reviewed change dispositions them.
 
 ## Known limits of this evidence
 
