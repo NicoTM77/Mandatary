@@ -121,6 +121,39 @@ class UsageBand(unittest.TestCase):
         self.assertEqual(list(t.bands.values()), [3])
 
 
+class SealedAdverseRuns(unittest.TestCase):
+    """A clean final run never erases a contradictory same-content failure (P1.20 R2/A)."""
+
+    CRIT = lambda self, state: [{"id": "C", "text": "", "evidence": ["A@r"],
+                                 "adverse": {"state": state, "refs": ["X@diagnostics/d.json"], "disposition": "why"}}]
+
+    def test_an_open_adverse_failure_fails_the_criterion_despite_a_passing_final_run(self):
+        import report
+        rows = report.evaluate(self.CRIT("open"), {"A@r": "PASS"}, {"r": "00", "diagnostics/d.json": "11"}, {"X@diagnostics/d.json": "FAIL"})
+        self.assertEqual(rows[0]["status"], "FAIL")
+
+    def test_a_dispositioned_adverse_failure_no_longer_counts_but_stays_listed(self):
+        import report
+        rows = report.evaluate(self.CRIT("dispositioned"), {"A@r": "PASS"}, {"r": "00", "diagnostics/d.json": "11"}, {"X@diagnostics/d.json": "FAIL"})
+        self.assertEqual(rows[0]["status"], "PASS")
+        self.assertEqual(rows[0]["adverse_links"][0]["result"], "FAIL")
+
+    def test_an_open_adverse_run_that_cannot_be_read_is_unverified_never_a_pass(self):
+        import report
+        rows = report.evaluate(self.CRIT("open"), {"A@r": "PASS"}, {"r": "00"}, {})
+        self.assertEqual(rows[0]["status"], "UNVERIFIED")
+
+    def test_an_open_adverse_run_that_passed_does_not_fail_the_criterion(self):
+        import report
+        rows = report.evaluate(self.CRIT("open"), {"A@r": "PASS"}, {"r": "00", "diagnostics/d.json": "11"}, {"X@diagnostics/d.json": "PASS"})
+        self.assertEqual(rows[0]["status"], "PASS")
+
+    def test_a_criterion_without_adverse_runs_is_unchanged(self):
+        import report
+        rows = report.evaluate([{"id": "C", "text": "", "evidence": ["A@r"]}], {"A@r": "PASS"}, {"r": "00"})
+        self.assertEqual(rows[0]["status"], "PASS")
+
+
 class HostSampling(unittest.TestCase):
     @unittest.skipUnless(os.path.exists("/proc/stat"), "needs a Linux /proc")
     def test_the_sampler_reads_the_host_and_the_named_processes_from_proc_only(self):

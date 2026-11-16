@@ -46,6 +46,16 @@ negative, boolean or non-numeric measurement is never a pass (`footprint.within`
   sessions (status and logs) - plus **5 active follow-log streams**, for 40 s of load, against the deployment through its TLS proxy.
   `VmHWM` is reset (`/proc/<pid>/clear_refs`) immediately before the window so the peak covers only the window; the sampled peak
   and the kernel high-water mark are both gated. The cgroup `memory.peak` is recorded for information (it includes page cache).
+* **Stability under the workload (SH-2d, `REL-LOAD-STABLE`).** Every attempt of the workload is traced (revision, interface, operation,
+  outcome or error reason, duration) and correlated with the service's own `docker safety proof dropped` / `restored` log lines
+  (closed `reason`/`step`/`cause` vocabulary, durations and counts only; never an error text, path, ID or payload), a probe of the
+  fixture daemon's own latency, and a once-a-second `/proc` sample of the host CPU and of `dockerd`, `containerd`, the proxy and the
+  service (`host_cpu` in the record). The harness therefore says, for every refusal, whether a recorded safety transition explains it.
+  A client-visible refusal or timeout does not decide what the server accounted: the usage totals of a cell with unobserved attempts
+  are held to the documented rule (every observed success accounted, at most the unobserved attempts more), never recomputed from
+  client successes; a cell without unobserved attempts stays exact. A criterion may name **sealed adverse runs**
+  (`adverse` in `tests/release/criteria.json`): while their state is `open`, a failing one fails the criterion even when the final run is
+  clean; only a reviewed change that records the established cause (product, fixture or harness) sets `dispositioned`.
 * **Environment.** Docker server/API/Compose versions, kernel, OS, CPU count, memory, storage driver, 4 KiB `fsync` latency of the
   work file system and the daemon ID are recorded in the evidence.
 

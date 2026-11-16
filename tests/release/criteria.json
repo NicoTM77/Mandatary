@@ -13,6 +13,8 @@
      "limits": "The workload is the one defined in docs/release-acceptance.md; it is a footprint workload, not a throughput claim."},
     {"id": "SH-2d", "group": "Shared release criteria", "text": "The service keeps authorizing legitimate calls under the approved workload (no spurious fail-closed refusal of a granted call while 20 clients and 5 streams are active).",
      "evidence": ["REL-LOAD-STABLE@vm-amd64", "REL-LOAD-STABLE@ci-amd64", "REL-LOAD-STABLE@ci-arm64"],
+     "adverse": {"state": "open", "refs": ["REL-LOAD-RUN@diagnostics/vm-diag-loop-1.json", "REL-LOAD-RUN@diagnostics/vm-diag-loop-2.json"],
+                 "disposition": "OPEN (P1.20 R2): contradictory failures of the same product content are unresolved until the root cause is established and dispositioned by a reviewed change."},
      "limits": "Not a named budget: it is the precondition for the load figure to describe a working service, so it is recorded as its own criterion and never folded into the memory result."},
     {"id": "SH-3", "group": "Shared release criteria", "text": "The documented local development workflow runs the application and unit tests without building or running a container.",
      "evidence": ["REL-DEV-01@vm-amd64", "REL-DEV-02@vm-amd64", "REL-DEV-03@vm-amd64", "REL-DEV-04@vm-amd64", "GATE-GOTEST@gates", "GATE-WEB-VITEST@gates"]},

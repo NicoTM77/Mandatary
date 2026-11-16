@@ -9,6 +9,11 @@ a committed evidence file whose SHA-256 is computed here, never typed in. A crit
   UNVERIFIED  anything else: no link at all, a link with no result, a BLOCKED/skipped result, an artifact without a
               digest. A missing target, browser or architecture can therefore never count as a pass.
 
+A criterion may also name sealed ADVERSE runs (`adverse.refs`, "CHECK@diagnostics/<file>.json": failed or contradictory runs that are kept
+in the evidence). While `adverse.state` is "open", a FAIL among them fails the criterion whatever the final run says; it stops counting only when a
+reviewed change sets the state to "dispositioned" and records the disposition (cause established, product/fixture/harness) in `adverse.disposition`.
+A clean final run therefore never erases a contradictory same-content failure.
+
 The overall verdict is "ACCEPTED" only when every criterion is PASS. `--check` recomputes the report from the
 committed evidence and fails when the committed markdown is stale or was edited by hand (tests/release/
 test_report_consistency.py runs it in CI).
@@ -32,7 +37,7 @@ def sha256_file(path):
     return h.hexdigest()
 
 
-def evaluate(criteria, results, digests):
+def evaluate(criteria, results, digests, adverse=None):
     """criteria: [{id, text, evidence: ["CHECK@artifact", ...], ...}]; results: {"CHECK@artifact": "PASS"|...}; digests: {artifact: sha256}.
     Returns one row per criterion with its status and the evaluated links."""
     rows = []
@@ -53,7 +58,14 @@ def evaluate(criteria, results, digests):
             links.append({"ref": ref, "result": res or "none", "digest": dig, "link": link})
             if ORDER[link] < ORDER[status]:
                 status = link
-        rows.append(dict(c, status=status, links=links))
+        adv = c.get("adverse") or {}
+        adverse_links = []
+        for ref in adv.get("refs", []):
+            res = (adverse or {}).get(ref)
+            adverse_links.append({"ref": ref, "result": res or "none", "digest": digests.get(ref.rsplit("@", 1)[1] if "@" in ref else "")})
+            if adv.get("state") != "dispositioned" and res != "PASS" and ORDER["FAIL" if res == "FAIL" else "UNVERIFIED"] < ORDER[status]:
+                status = "FAIL" if res == "FAIL" else "UNVERIFIED"
+        rows.append(dict(c, status=status, links=links, adverse_links=adverse_links))
     return rows
 
 
@@ -84,6 +96,24 @@ def verify_sums(evdir):
                 on_disk.add(rel)
     problems += ["not listed: " + n for n in sorted(on_disk - set(listed))]
     return problems
+
+
+def load_adverse(evdir, criteria):
+    """Results of the sealed adverse runs a criterion names: ({"CHECK@file": status}, {file: sha256}). A missing file stays unlinked (UNVERIFIED)."""
+    res, dig = {}, {}
+    for c in criteria:
+        for ref in (c.get("adverse") or {}).get("refs", []):
+            check, _, rel = ref.partition("@")
+            path = os.path.join(evdir, rel)
+            if not rel or not os.path.exists(path):
+                continue
+            dig[rel] = sha256_file(path)
+            with open(path) as fh:
+                doc = json.load(fh)
+            for r in doc.get("results", []):
+                if r.get("id") == check:
+                    res[ref] = r.get("status")
+    return res, dig
 
 
 def load_evidence(evdir):
@@ -194,7 +224,12 @@ def render(manifest, rows, digests, meta, results, evdir):
         w("| --- | --- | --- | --- | --- |")
         for r in [x for x in rows if x["group"] == g]:
             links = "<br>".join("%s `%s` %s" % ("✔" if l["link"] == "PASS" else ("✘" if l["link"] == "FAIL" else "?"), l["ref"].split("@")[0] + "@" + l["ref"].split("@")[1], (l["digest"] or "no digest")[:12]) for l in r["links"]) or "none"
-            w("| %s | %s | **%s** | %s | %s |" % (r["id"], r["text"].replace("|", "\\|"), r["status"], links, (r.get("limits") or "").replace("|", "\\|")))
+            lim = (r.get("limits") or "")
+            adv = r.get("adverse") or {}
+            if adv:
+                lim += (" " if lim else "") + "Sealed adverse runs (%s): %s. %s" % (
+                    adv.get("state", "open"), ", ".join("%s %s" % (a["ref"], a["result"]) for a in r["adverse_links"]), adv.get("disposition", ""))
+            w("| %s | %s | **%s** | %s | %s |" % (r["id"], r["text"].replace("|", "\\|"), r["status"], links, lim.replace("|", "\\|")))
         w("")
     if manifest.get("findings"):
         w("## 5. Findings recorded by this run")
@@ -216,7 +251,9 @@ def build(evdir, criteria_path):
     manifest, results, digests, meta = load_evidence(evdir)
     with open(criteria_path) as fh:
         criteria = json.load(fh)["criteria"]
-    rows = evaluate(criteria, results, digests)
+    adverse, adverse_digests = load_adverse(evdir, criteria)
+    digests = dict(digests, **adverse_digests)
+    rows = evaluate(criteria, results, digests, adverse)
     return manifest, rows, digests, meta, results
 
 
