@@ -3,7 +3,9 @@ package docker
 import (
 	"context"
 	"errors"
+	"io"
 	"net"
+	"syscall"
 	"time"
 )
 
@@ -60,10 +62,14 @@ const (
 type DropCause string
 
 const (
-	CauseDeadline    DropCause = "deadline"
-	CauseCanceled    DropCause = "canceled"
-	CauseTransport   DropCause = "transport"
-	CauseDaemonError DropCause = "daemon_error"
+	CauseDeadline    DropCause = "deadline"     // the step's context deadline passed
+	CauseCanceled    DropCause = "canceled"     // the step's context was canceled
+	CauseEOF         DropCause = "eof"          // the daemon closed the connection before a complete answer
+	CauseConnReset   DropCause = "conn_reset"   // connection reset / broken pipe
+	CauseDial        DropCause = "dial"         // the socket could not be connected (refused, would block, missing, no descriptors)
+	CauseNetTimeout  DropCause = "net_timeout"  // a network-level timeout that is not the step's context deadline
+	CauseTransport   DropCause = "transport"    // any other transport error
+	CauseDaemonError DropCause = "daemon_error" // the daemon answered with an error status
 	CauseNone        DropCause = "none"
 )
 
@@ -92,6 +98,7 @@ type TransitionObserver func(Transition)
 // classifyCause maps an error to its closed cause class without reading the error text.
 func classifyCause(err error) DropCause {
 	var netErr net.Error
+	var opErr *net.OpError
 	switch {
 	case err == nil:
 		return CauseNone
@@ -99,6 +106,15 @@ func classifyCause(err error) DropCause {
 		return CauseDeadline
 	case errors.Is(err, context.Canceled):
 		return CauseCanceled
+	case errors.Is(err, io.EOF), errors.Is(err, io.ErrUnexpectedEOF):
+		return CauseEOF
+	case errors.Is(err, syscall.ECONNRESET), errors.Is(err, syscall.EPIPE), errors.Is(err, syscall.ECONNABORTED):
+		return CauseConnReset
+	case errors.Is(err, syscall.EAGAIN), errors.Is(err, syscall.ECONNREFUSED), errors.Is(err, syscall.ENOENT), errors.Is(err, syscall.EMFILE),
+		errors.Is(err, syscall.ENFILE), errors.Is(err, syscall.ETIMEDOUT), errors.As(err, &opErr) && opErr.Op == "dial":
+		return CauseDial
+	case errors.As(err, &netErr) && netErr.Timeout():
+		return CauseNetTimeout
 	case errors.As(err, &netErr):
 		return CauseTransport
 	case errors.Is(err, ErrBackendFailed):

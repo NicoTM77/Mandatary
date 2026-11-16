@@ -95,10 +95,12 @@ def sample_rss(pid, seconds, every=1.0):
 
 
 def measure_idle(c: Ctx, label, window=None, every=5, tail=60):
-    """Idle footprint of the running service with no request in flight: the RSS curve for `window` seconds from
-    readiness (1 Hz not needed: a resident set does not move on that scale at idle), gated on the steady state
-    (the last `tail` seconds). The start-up transient is recorded, never discarded: when it exceeds the budget
-    the time until the process settles under it is reported too."""
+    """Idle footprint of the running service with no request in flight (technical-decisions.md 10.2: <= 50 MB
+    after stabilization, measured over the final 60 s of a 300 s observation window after readiness, SQLite
+    initialized, one local Docker endpoint connected). The RSS curve is sampled every `every` seconds for `window`
+    seconds from readiness; the budget gates the MAXIMUM of the samples inside the final `tail` seconds (the median
+    is reported too). The start-up transient is a separate, reported result: its peak and the time until the
+    process settles under the budget are recorded, never discarded, and the idle limit does not apply to it."""
     window = window or c.a.idle_window
     pid = c.dep.host_pid()
     t0 = time.time()
@@ -121,14 +123,15 @@ def measure_idle(c: Ctx, label, window=None, every=5, tail=60):
            "VmRSS_peak_in_window": peak, "settled_under_budget_at_s": settled_at, "VmHWM_process_lifetime": st.get("VmHWM"), "RssAnon_last": curve[-1][2], "RssFile_last": curve[-1][3],
            "curve_s_rss_anon_file": curve, "cgroup": cg}
     c.ev["footprint"].setdefault("idle", []).append(rec)
-    c.check("REL-FOOT-IDLE-" + label, "idle RSS <= 50 MB (%s: steady state, last %ds of a %ds window from readiness)" % (label, tail, window), footprint.within(rec["VmRSS_steady_max"], budget),
+    c.check("REL-FOOT-IDLE-" + label, "idle RSS <= 50 MB after stabilization (%s: maximum of the %d samples taken every %d s over the final %d s of a %d s observation window after readiness)" % (label, len(steady), every, tail, window), footprint.within(rec["VmRSS_steady_max"], budget),
             "steady max %.2f MB (median %.2f MB, anon %.2f MB, file %.2f MB); peak in window %.2f MB; settled under 50 MB at %s s; process VmHWM %.2f MB" % (
                 rec["VmRSS_steady_max"] / footprint.MB, rec["VmRSS_steady_median"] / footprint.MB, curve[-1][2] / footprint.MB, curve[-1][3] / footprint.MB, peak / footprint.MB, settled_at, (rec["VmHWM_process_lifetime"] or 0) / footprint.MB))
     # The start-up transient is a measured property of the product, not a rounding detail: after a start (reproduced natively with the container env: one ~64 MiB heap allocation 85 ms after start when SMTP is configured; the
-    # cause inside the product is not asserted here) the process stays resident until the Go runtime's 2-minute forced GC lets the scavenger return it. Reported, and the service must
-    # be back under the budget within the window; a window that ends before it settles is a failure, never a pass.
-    c.check("REL-FOOT-SETTLE-" + label, "after a start the resident set is back under 50 MB and stays there (settled at %s s of a %d s window; peak %.2f MB)" % (settled_at, window, peak / footprint.MB),
-            settled_at is not None and settled_at <= window - tail, "peak in window %.2f MB; settled under budget at %s s" % (peak / footprint.MB, settled_at))
+    # cause inside the product is not asserted here) the process stays resident until the Go runtime's 2-minute forced GC lets the scavenger return it. By the owner's clarification of
+    # technical-decisions.md 10.2 the idle limit does not apply to this transient; its PEAK and the TIME TO STABILIZATION are reported as their own result. The result is a pass only
+    # when both were actually measured (the curve settled under the budget inside the window); a curve that never settles has no stabilization time and fails here and in the idle check.
+    c.check("REL-FOOT-SETTLE-" + label, "start-up transient reported separately (%s): peak %.2f MB, stabilized under 50 MB at %s s after readiness; the idle limit does not apply to this transient" % (label, peak / footprint.MB, settled_at),
+            settled_at is not None and peak > 0, "start-up peak in the %d s window %.2f MB; time to stabilization %s s; steady-state maximum %.2f MB" % (window, peak / footprint.MB, settled_at, rec["VmRSS_steady_max"] / footprint.MB))
     return rec
 
 

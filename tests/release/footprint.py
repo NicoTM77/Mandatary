@@ -2,7 +2,10 @@
 
 Budgets are technical-decisions.md §10.2 and are numbers, not adjectives:
   image   <= 60 MB compressed
-  idle    <= 50 MB RSS  (after startup, SQLite initialized, 1 local Docker endpoint connected)
+  idle    <= 50 MB RSS  after stabilization: the final 60 s of a 300 s observation window after readiness, SQLite
+          initialized, 1 local Docker endpoint connected. The start-up peak and the time to stabilization are reported
+          separately and the limit does not apply to that start-up transient (technical-decisions.md 10.2 as clarified).
+          Aggregation actually applied: the MAXIMUM of the samples (one every 5 s) inside the final 60 s; the median is reported too.
   load    <= 150 MB RSS (20 concurrent API/MCP clients polling status/logs + 5 active log streams)
 A megabyte is applied as 10^6 bytes, the smaller and therefore stricter reading (1 MiB = 1048576 bytes would
 admit about 5% more). Every report states the raw byte count and both units so the choice cannot hide a failure.

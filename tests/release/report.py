@@ -127,7 +127,7 @@ def measured_table(evdir, manifest):
 
         def steady(label):
             r = idle.get(label)
-            return "%s steady; peak %s; under 50 MB from %s s" % (mb(r.get("VmRSS_steady_max")), mb(r.get("VmRSS_peak_in_window")), r.get("settled_under_budget_at_s")) if r else "not measured"
+            return "%s idle (max of the final %s s of %s s); start-up peak %s, stabilized at %s s" % (mb(r.get("VmRSS_steady_max")), r.get("steady_window_s"), r.get("window_s"), mb(r.get("VmRSS_peak_in_window")), r.get("settled_under_budget_at_s")) if r else "not measured"
         rows.append((name, "%s %s, %s CPUs, Docker %s" % (env.get("os_arch"), env.get("os"), env.get("cpus"), env.get("docker_server")), mb(img.get("bytes")), steady("fresh"), steady("configured"), steady("after-restart"),
                      "peak %s; high-water mark %s; %s s; REST %s ok / %s non-200, MCP %s ok / %s errors" % (mb(ld.get("VmRSS_peak_sampled")), mb(ld.get("VmHWM_after")), ld.get("seconds"), sum((ld.get("rest") or {}).get(k, 0) for k in ("status", "logs")),
                                                                                                          (ld.get("rest") or {}).get("errors"), (ld.get("mcp") or {}).get("ok"), (ld.get("mcp") or {}).get("errors"))))
@@ -172,7 +172,9 @@ def render(manifest, rows, digests, meta, results, evdir):
     w("")
     w("## 3. Measured values behind the budgets")
     w("")
-    w("Budgets (technical-decisions.md 10.2, MB = 10^6 bytes): image <= 60 MB compressed; idle <= 50 MB resident after startup; load <= 150 MB resident under 20 clients and 5 streams.")
+    w("Budgets (technical-decisions.md 10.2, MB = 10^6 bytes): image <= 60 MB compressed; idle <= 50 MB resident after stabilization (final 60 s of a 300 s observation window after readiness, SQLite initialized, one local Docker endpoint connected); load <= 150 MB resident under 20 clients and 5 streams.")
+    w("")
+    w("Idle method as applied: RSS (`VmRSS` of the service process, read on the host) is sampled every 5 s from readiness for 300 s; the gated value is the **maximum** of the samples inside the final 60 s (the strictest aggregation; the median is in the evidence). The **start-up transient** (its peak and the time until the process stabilizes under 50 MB) is reported in the same cells and as its own check; the idle limit does not apply to it. The 150 MB load budget and the 60 MB image budget are unchanged.")
     w("")
     w("| Environment (artifact) | Host | Compressed image | Idle after first start | Idle configured | Idle after restart | Load |")
     w("| --- | --- | --- | --- | --- | --- | --- |")

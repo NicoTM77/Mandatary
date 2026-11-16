@@ -100,7 +100,7 @@ def run(c):
     stage(c, "MATRIX", core.run_matrix)
     stage(c, "LIFECYCLE", core.lifecycle)
     stage(c, "LATENCY", ops.latency_probe)
-    stage(c, "IDLE-CONFIGURED", lambda c: core.measure_idle(c, "configured", window=120))
+    stage(c, "IDLE-CONFIGURED", lambda c: core.measure_idle(c, "configured"))
     stage(c, "LOAD", lambda c: ops.load(c, c.a.load_seconds))
     stage(c, "PERSISTENCE", ops.persistence)
     stage(c, "RESTORE", recovery.restore_scenarios)

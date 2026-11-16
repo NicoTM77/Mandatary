@@ -50,7 +50,10 @@ var dropSteps = map[string]bool{
 	"ping": true, "info": true, "inventory": true, "inspect_self": true, "inspect_target": true,
 	"verify": true, "continuity": true, "operation": true, "stream": true, "none": true,
 }
-var dropCauses = map[string]bool{"deadline": true, "canceled": true, "transport": true, "daemon_error": true, "none": true}
+var dropCauses = map[string]bool{
+	"deadline": true, "canceled": true, "eof": true, "conn_reset": true, "dial": true, "net_timeout": true,
+	"transport": true, "daemon_error": true, "none": true,
+}
 
 // maxCount bounds the numeric diagnostics of the proof events (a count or a millisecond duration).
 const maxCount = int64(1) << 40

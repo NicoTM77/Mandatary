@@ -34,12 +34,14 @@ negative, boolean or non-numeric measurement is never a pass (`footprint.within`
 
 * **Image <= 60 MB compressed.** Sum of the manifest, config and every layer blob of the OCI archive that `buildx --output type=oci,compression=gzip` exports for the same source
   (the attestation manifest is not part of the runtime image and is not counted); the diffIDs of that archive must equal the layers of the image under test. Where the daemon's buildx driver cannot export OCI (the hosted runners' `docker` driver), every layer of `docker save` of the image under test is gzip-compressed at level 6 and summed with the config and manifest; the report names that as an **estimate** (on the VM it was within 0.15% of the real export: 12 400 226 against 12 418 702 bytes). Measured per CPU.
-* **Idle <= 50 MB resident** (technical-decisions.md 10.2: "after startup with SQLite initialized and 1 local Docker endpoint connected"). `VmRSS` of the service process read from `/proc/<pid>/status` on the host of the disposable daemon
-  (container PID namespaces are read through the host PID), sampled every 5 s over a curve from readiness (300 s after a start, 120 s for the long-running configured installation), with the
-  budget applied to the **steady state** (the last 60 s). It is measured three times: right after the first start (before any
-  administrator exists), after configuration and a long run, and after a restart of an installation that holds data. The whole curve
-  is recorded. "After startup" is not given a duration in the decision record, so the harness does not choose one silently: because a start-up transient is a real property of the product, a separate check (`REL-FOOT-SETTLE-*`) requires that
-  the process is back under the budget, and stays there, within the window; the time it took is reported.
+* **Idle <= 50 MB resident after stabilization** (technical-decisions.md 10.2, clarified by the owner during the P1.20 review remediation: "measured over the final 60 seconds of a 300-second observation
+  window after readiness, with SQLite initialized and 1 local Docker endpoint connected; the start-up memory peak and the time to stabilization are reported separately and the idle limit does not apply to that
+  start-up transient"). Method actually applied: `VmRSS` of the service process read from `/proc/<pid>/status` on the host of the disposable daemon (container PID namespaces are read through the host PID),
+  sampled every 5 s for 300 s from readiness; the **gated value is the maximum of the samples inside the final 60 s** (twelve samples; the strictest aggregation, the median is in the evidence). It is measured three times:
+  right after the first start (before any administrator exists), after configuration and a long run, and after a restart of an installation that holds data, each with its own 300 s window. The whole curve is recorded.
+  The **start-up transient** is a real property of the product (about 100 MB for about 2.5 minutes after every start, observed on all three platforms; its in-product cause is not asserted here, it is not optimized and no authentication change was made for it). Its peak
+  and the time to stabilization (the first sample after which every later sample is within 50 MB) are reported in the report's footprint table and as their own result (`REL-FOOT-SETTLE-*`, a pass only when both were measured); the idle limit is not applied to it.
+  A sign-in or setup burst has its own, larger high-water mark (observed about 180 MB; not asserted to be a particular allocation); it lies outside the approved workload and is reported as evidence, not as a budget failure.
 * **Load <= 150 MB resident.** The approved workload: **20 concurrent clients** - 10 REST pollers (status and logs) and 10 real-MCP
   sessions (status and logs) - plus **5 active follow-log streams**, for 40 s of load, against the deployment through its TLS proxy.
   `VmHWM` is reset (`/proc/<pid>/clear_refs`) immediately before the window so the peak covers only the window; the sampled peak

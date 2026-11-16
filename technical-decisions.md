@@ -268,7 +268,7 @@ Because Docker container IDs change whenever a container is recreated (e.g., `do
 ### 10.2 Measurable Footprint & Performance Budgets
 Every phase release is measured against these concrete budgets in CI:
 - **Production Container Image Size:** **<= 60 MB compressed** (target ~25–35 MB using `distroless/static` + embedded React SPA).
-- **Idle Memory Usage (RSS):** **<= 50 MB** after startup with SQLite initialized and 1 local Docker endpoint connected.
+- **Idle Memory Usage (RSS):** **<= 50 MB** after stabilization, measured over the final 60 seconds of a 300-second observation window after readiness, with SQLite initialized and 1 local Docker endpoint connected. The start-up memory peak and the time to stabilization are reported separately; the idle limit does not apply to that start-up transient. (Clarified by the owner during the P1.20 review remediation; the 50 MB figure itself is unchanged.)
 - **Load Memory Usage (RSS):** **<= 150 MB** under the benchmark workload (20 concurrent API/MCP clients polling container status/logs + 5 active log streams).
 
 ### 10.3 First-Admin Bootstrap & Emergency Recovery

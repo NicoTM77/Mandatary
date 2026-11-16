@@ -2,8 +2,15 @@ package docker
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"io"
+	"net"
 	"net/http"
+	"net/url"
+	"os"
 	"sync"
+	"syscall"
 	"testing"
 	"time"
 )
@@ -215,3 +222,35 @@ func TestTransitionObserverCannotChangeADecision(t *testing.T) {
 		t.Fatal("the proof must be dropped (and reported once) even when the observer faults")
 	}
 }
+
+func TestClassifyCauseNamesTheTransportFailureWithoutReadingItsText(t *testing.T) {
+	dial := &net.OpError{Op: "dial", Net: "unix", Err: &os.SyscallError{Syscall: "connect", Err: syscall.EAGAIN}}
+	read := &net.OpError{Op: "read", Net: "unix", Err: &os.SyscallError{Syscall: "read", Err: syscall.ECONNRESET}}
+	for _, tc := range []struct {
+		name string
+		err  error
+		want DropCause
+	}{
+		{"nil", nil, CauseNone},
+		{"deadline", fmt.Errorf("Get: %w", context.DeadlineExceeded), CauseDeadline},
+		{"canceled", &url.Error{Op: "Get", Err: context.Canceled}, CauseCanceled},
+		{"eof", &url.Error{Op: "Get", Err: io.EOF}, CauseEOF},
+		{"unexpected eof", io.ErrUnexpectedEOF, CauseEOF},
+		{"reset", &url.Error{Op: "Get", Err: read}, CauseConnReset},
+		{"dial would block", &url.Error{Op: "Get", Err: dial}, CauseDial},
+		{"dial refused", &net.OpError{Op: "dial", Err: syscall.ECONNREFUSED}, CauseDial},
+		{"net timeout", &url.Error{Op: "Get", Err: timeoutErr{}}, CauseNetTimeout},
+		{"other transport", &url.Error{Op: "Get", Err: errors.New("anything")}, CauseTransport},
+		{"daemon error", errors.New("Error response from daemon"), CauseDaemonError},
+	} {
+		if got := classifyCause(tc.err); got != tc.want {
+			t.Errorf("%s: classifyCause = %q, want %q", tc.name, got, tc.want)
+		}
+	}
+}
+
+type timeoutErr struct{}
+
+func (timeoutErr) Error() string   { return "i/o timeout" }
+func (timeoutErr) Timeout() bool   { return true }
+func (timeoutErr) Temporary() bool { return true }
