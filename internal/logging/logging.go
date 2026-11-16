@@ -52,8 +52,11 @@ var dropSteps = map[string]bool{
 }
 var dropCauses = map[string]bool{
 	"deadline": true, "canceled": true, "eof": true, "conn_reset": true, "dial": true, "net_timeout": true,
-	"transport": true, "daemon_error": true, "none": true,
+	"connect": true, "transport": true, "daemon_error": true, "none": true,
 }
+
+// dialClasses is the closed vocabulary of the last failed connect to the Docker socket (cmd/mandatary dialMonitor).
+var dialClasses = map[string]bool{"would_block": true, "refused": true, "timeout": true, "no_descriptors": true, "reset": true, "eof": true, "other": true}
 
 // maxCount bounds the numeric diagnostics of the proof events (a count or a millisecond duration).
 const maxCount = int64(1) << 40
@@ -200,7 +203,11 @@ func sanitize(a slog.Attr, deny bool) slog.Attr {
 		if a.Value.Kind() == slog.KindString && dropCauses[a.Value.String()] {
 			return a
 		}
-	case "elapsed_ms", "outage_ms", "inflight", "streams":
+	case "dial_last":
+		if a.Value.Kind() == slog.KindString && dialClasses[a.Value.String()] {
+			return a
+		}
+	case "elapsed_ms", "outage_ms", "inflight", "streams", "dial_faults":
 		if a.Value.Kind() == slog.KindInt64 && a.Value.Int64() >= 0 && a.Value.Int64() <= maxCount {
 			return a
 		}

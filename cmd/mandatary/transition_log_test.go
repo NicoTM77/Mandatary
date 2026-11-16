@@ -18,7 +18,7 @@ func TestTransitionLoggerNamesReasonStepCauseAndOutage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	obs := transitionLogger(logger)
+	obs := transitionLogger(logger, nil)
 	obs(docker.Transition{Drop: docker.Drop{Reason: docker.DropCheckDeadline, Step: docker.StepInventory, Cause: docker.CauseDeadline, Elapsed: 2100 * time.Millisecond}, Inflight: 31, Streams: 5})
 	obs(docker.Transition{Verified: true, Outage: 4200 * time.Millisecond})
 	got := out.String()
@@ -41,7 +41,7 @@ func TestTransitionLoggerCannotCarryARuntimeValue(t *testing.T) {
 		t.Fatal(err)
 	}
 	// every field a hostile caller could reach is outside the closed vocabularies
-	transitionLogger(logger)(docker.Transition{Drop: docker.Drop{Reason: docker.DropReason(canary), Step: docker.DropStep(canary), Cause: docker.DropCause(canary), Elapsed: -time.Second}, Inflight: -5, Streams: -1})
+	transitionLogger(logger, nil)(docker.Transition{Drop: docker.Drop{Reason: docker.DropReason(canary), Step: docker.DropStep(canary), Cause: docker.DropCause(canary), Elapsed: -time.Second}, Inflight: -5, Streams: -1})
 	got := out.String()
 	if strings.Contains(got, canary) || strings.Contains(got, "docker.sock") || strings.Contains(got, "token") {
 		t.Fatalf("a runtime value reached the log: %s", got)

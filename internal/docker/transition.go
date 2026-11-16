@@ -7,6 +7,8 @@ import (
 	"net"
 	"syscall"
 	"time"
+
+	"github.com/moby/moby/client"
 )
 
 // Safety-proof transition diagnostics (P1.20, R2).
@@ -68,6 +70,7 @@ const (
 	CauseConnReset   DropCause = "conn_reset"   // connection reset / broken pipe
 	CauseDial        DropCause = "dial"         // the socket could not be connected (refused, would block, missing, no descriptors)
 	CauseNetTimeout  DropCause = "net_timeout"  // a network-level timeout that is not the step's context deadline
+	CauseConnect     DropCause = "connect"      // the Docker SDK reported a connection failure and discarded the underlying error (a timeout or a failed unix dial)
 	CauseTransport   DropCause = "transport"    // any other transport error
 	CauseDaemonError DropCause = "daemon_error" // the daemon answered with an error status
 	CauseNone        DropCause = "none"
@@ -117,6 +120,10 @@ func classifyCause(err error) DropCause {
 		return CauseNetTimeout
 	case errors.As(err, &netErr):
 		return CauseTransport
+	case client.IsErrConnectionFailed(err):
+		// The SDK keeps the chain of an ordinary transport failure (matched above) but REPLACES the error of a timeout or a
+		// failed unix dial with a fixed "cannot connect" text; nothing more can be said from the error alone.
+		return CauseConnect
 	case errors.Is(err, ErrBackendFailed):
 		return CauseTransport
 	default:

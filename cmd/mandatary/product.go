@@ -3,10 +3,13 @@ package main
 import (
 	"context"
 	"errors"
+	"io"
 	"log/slog"
 	"net"
 	"net/http"
 	"sync"
+	"sync/atomic"
+	"syscall"
 	"time"
 
 	"github.com/NicoTM77/Mandatary/internal/api"
@@ -87,15 +90,16 @@ func composeProduct(ctx context.Context, logger *slog.Logger, c config.Config, r
 		logger.Warn(logging.DockerMockActive)
 	} else {
 		evidence := mandatoryEvidence(opts.evidence)
+		dials := &dialMonitor{}
 		adapter, err := docker.NewSDKAdapter(docker.SDKOptions{
 			EndpointID: local,
-			Transport:  unixTransport(c.DockerSocket),
+			Transport:  observeRoundTrips(unixTransport(c.DockerSocket), dials),
 			Identity: docker.SelfIdentityConfig{
 				EndpointID:          local,
 				ExplicitContainerID: c.SelfContainerID,
 				InstanceUUID:        c.SelfInstanceUUID,
 				EvidenceReader:      evidence,
-				Observer:            transitionLogger(logger),
+				Observer:            transitionLogger(logger, dials),
 			},
 		})
 		if err != nil {
@@ -243,16 +247,81 @@ func (v *verifier) run(ctx context.Context) {
 // operator saw authorized calls refused with safety_unverified and nothing in the log. Only members of the
 // closed vocabularies in internal/docker/transition.go and counts or durations are logged; the logging
 // boundary admits nothing else, so no error text, path, ID, token or payload can reach the line.
-func transitionLogger(logger *slog.Logger) docker.TransitionObserver {
+func transitionLogger(logger *slog.Logger, dials *dialMonitor) docker.TransitionObserver {
 	return func(tr docker.Transition) {
 		if tr.Verified {
 			logger.Info(logging.DockerSafetyRestored, "outage_ms", tr.Outage.Milliseconds())
 			return
 		}
-		logger.Warn(logging.DockerSafetyDropped,
+		attrs := []any{
 			"reason", string(tr.Drop.Reason), "step", string(tr.Drop.Step), "cause", string(tr.Drop.Cause),
-			"elapsed_ms", tr.Drop.Elapsed.Milliseconds(), "inflight", tr.Inflight, "streams", int64(tr.Streams))
+			"elapsed_ms", tr.Drop.Elapsed.Milliseconds(), "inflight", tr.Inflight, "streams", int64(tr.Streams),
+		}
+		// The Docker SDK discards the error behind a connection failure, so the failed connects since the last
+		// report are counted at the dialer, with the class of the last one.
+		if n, last := dials.take(); n > 0 {
+			attrs = append(attrs, "dial_faults", n, "dial_last", last)
+		}
+		logger.Warn(logging.DockerSafetyDropped, attrs...)
 	}
+}
+
+// dialMonitor counts the transport failures of the calls to the Docker socket by a closed class (diagnostics only).
+// The Docker SDK replaces the error behind a connection failure with a fixed text, so the class is taken here, below it.
+type dialMonitor struct {
+	faults atomic.Int64
+	last   atomic.Value // string
+}
+
+// observedTransport records the class of every failed round trip, then returns the error unchanged.
+type observedTransport struct {
+	base http.RoundTripper
+	mon  *dialMonitor
+}
+
+func observeRoundTrips(base http.RoundTripper, mon *dialMonitor) http.RoundTripper {
+	return &observedTransport{base: base, mon: mon}
+}
+
+func (t *observedTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	resp, err := t.base.RoundTrip(req)
+	t.mon.record(err)
+	return resp, err
+}
+
+func (m *dialMonitor) record(err error) {
+	// A caller's own cancellation or deadline is not a transport fault.
+	if m == nil || err == nil || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return
+	}
+	class := "other"
+	var ne net.Error
+	switch {
+	case errors.Is(err, syscall.EAGAIN):
+		class = "would_block"
+	case errors.Is(err, syscall.ECONNREFUSED):
+		class = "refused"
+	case errors.Is(err, syscall.EMFILE), errors.Is(err, syscall.ENFILE):
+		class = "no_descriptors"
+	case errors.Is(err, syscall.ECONNRESET), errors.Is(err, syscall.EPIPE):
+		class = "reset"
+	case errors.Is(err, io.EOF), errors.Is(err, io.ErrUnexpectedEOF):
+		class = "eof"
+	case errors.Is(err, syscall.ETIMEDOUT), errors.As(err, &ne) && ne.Timeout():
+		class = "timeout"
+	}
+	m.last.Store(class)
+	m.faults.Add(1)
+}
+
+// take returns the failed round trips since the previous call and the class of the last one.
+func (m *dialMonitor) take() (int64, string) {
+	if m == nil {
+		return 0, ""
+	}
+	n := m.faults.Swap(0)
+	last, _ := m.last.Load().(string)
+	return n, last
 }
 
 func dockerReason(err error) string {
