@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useState, type ReactNode } from 'react';
 
 export type Theme = 'light' | 'dark';
 
@@ -39,7 +39,9 @@ export function ThemeProvider({ children, initial }: { children: ReactNode; init
     return () => query.removeEventListener('change', onChange);
   }, []);
 
-  useEffect(() => {
+  // A layout effect, so data-theme is set before the browser paints the first committed frame: the page and the
+  // brand mark (whose colours are theme tokens) are never painted once in the light default on a dark system.
+  useLayoutEffect(() => {
     const root = document.documentElement;
     root.dataset.theme = theme;
     return () => {

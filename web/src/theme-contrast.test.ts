@@ -67,6 +67,12 @@ const PAIRS: ReadonlyArray<readonly [string, string, number, string]> = [
   ['focus', 'surface', 3, 'focus ring on panels'],
   ['focus', 'bg', 3, 'focus ring on the page'],
   ['focus', 'sunken', 3, 'focus ring on sunken areas'],
+  // The header wordmark is real text in the approved Ice/Midnight. The mint gateway and periwinkle pillars are
+  // logo artwork (exempt from 1.4.3/1.4.11 as a logotype); they carry no meaning and are never text or controls.
+  ['brand-wordmark', 'surface', 7, 'header wordmark (sidebar and pre-session bar sit on the page/surface)'],
+  ['brand-wordmark', 'bg', 7, 'pre-session top bar wordmark on the page'],
+  ['brand-mark', 'surface', 7, 'M symbol of the header icon'],
+  ['brand-mark', 'bg', 7, 'M symbol on the page'],
 ];
 
 test.each(['light', 'dark'] as const)('%s theme defines every token the pairs use', (theme) => {

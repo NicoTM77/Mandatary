@@ -102,7 +102,7 @@ export function SecretReveal({ heading, intro, value, items, groupEvery, copyLab
   };
 
   return (
-    <section ref={region} tabIndex={-1} aria-labelledby={headingId} className="rounded-panel border-2 border-dashed border-warn bg-warn-soft p-5 outline-none focus-visible:outline-2 sm:p-6">
+    <section ref={region} tabIndex={-1} aria-labelledby={headingId} className="rounded-panel border-2 border-dashed border-warn bg-warn-soft p-4 outline-none focus-visible:outline-2 sm:p-6">
       <div className="flex flex-wrap items-center gap-2">
         <h2 id={headingId} className="text-lg font-semibold text-fg">
           {heading}
@@ -112,7 +112,7 @@ export function SecretReveal({ heading, intro, value, items, groupEvery, copyLab
       <p className="mt-2 font-medium text-warn">This is the only time it will be shown. Reloading or leaving this page removes it for good.</p>
       {intro ? <div className="mt-2 text-sm text-fg">{intro}</div> : null}
 
-      <div translate="no" className="mt-4 rounded-control border border-line-strong bg-surface p-4 font-mono text-[0.95rem] leading-relaxed text-fg">
+      <div translate="no" className="mt-4 rounded-control border border-line-strong bg-surface p-3 sm:p-4 font-mono text-[0.95rem] leading-relaxed text-fg">
         {items ? (
           <ol className="grid list-decimal grid-cols-1 gap-x-8 gap-y-1.5 pl-6 sm:grid-cols-2">
             {items.map((item, position) => (
@@ -138,7 +138,7 @@ export function SecretReveal({ heading, intro, value, items, groupEvery, copyLab
       </div>
 
       {acknowledge ? (
-        <div className="mt-5 border-t border-warn/40 pt-4">
+        <div className="mt-4 border-t border-warn/40 pt-3 sm:mt-5 sm:pt-4">
           <label className="flex cursor-pointer items-start gap-3 text-fg">
             <input type="checkbox" checked={acknowledged} onChange={(event) => setAcknowledged(event.target.checked)} className="mt-0.5 size-5 shrink-0 accent-accent" />
             <span>{acknowledge.confirmLabel}</span>

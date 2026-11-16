@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { Badge } from './Alert';
+import { BrandLockup } from './BrandMark';
 import { Button } from './Button';
 import { Icon, type IconName } from './Icon';
 import { ThemeToggle } from './ThemeToggle';
@@ -74,12 +75,7 @@ export function AdminShell({ nav, currentId, account, onSignOut, signingOut = fa
 
       <div className="border-b border-line bg-surface lg:sticky lg:top-0 lg:h-screen lg:overflow-y-auto lg:border-r lg:border-b-0">
         <div className="flex h-14 items-center justify-between gap-3 px-4 lg:h-16">
-          <p className="flex items-center gap-2 text-base font-semibold tracking-tight">
-            <span className="grid size-8 place-items-center rounded-control bg-accent text-accent-fg">
-              <Icon name="shield" className="size-5" />
-            </span>
-            Mandatary
-          </p>
+          <BrandLockup size="header" />
           <button
             ref={toggle}
             type="button"
@@ -170,16 +166,11 @@ export function CenteredFrame({ children, width = 'max-w-md' }: { children: Reac
       <a href="#main-content" className="skip-link">
         Skip to main content
       </a>
-      <div className="flex justify-end px-4 pt-4 sm:px-6">
+      <div className="flex h-14 items-center justify-between gap-3 px-4 sm:px-6">
+        <BrandLockup size="frame" />
         <ThemeToggle />
       </div>
-      <main id="main-content" tabIndex={-1} className={`mx-auto w-full ${width} px-4 pb-16 pt-6 outline-none sm:pt-12`}>
-        <p className="mb-6 flex items-center justify-center gap-2 text-lg font-semibold tracking-tight">
-          <span className="grid size-9 place-items-center rounded-control bg-accent text-accent-fg">
-            <Icon name="shield" className="size-5" />
-          </span>
-          Mandatary
-        </p>
+      <main id="main-content" tabIndex={-1} className={`mx-auto w-full ${width} px-4 pb-16 pt-4 outline-none sm:pt-10`}>
         {children}
       </main>
     </div>
