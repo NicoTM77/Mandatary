@@ -82,6 +82,34 @@ class Correlation(unittest.TestCase):
         self.assertEqual(c["daemon_probe_ms"]["n"], 1)
 
 
+class RequestCounters(unittest.TestCase):
+    KINDS = {"ping": 1, "info": 2, "list": 3, "inspect": 4, "logs": 5, "start": 6, "stop": 7, "restart": 8, "other": 9}
+
+    def counter_line(self, t, **over):
+        f = {"req_" + k: v for k, v in self.KINDS.items()}
+        f.update(over)
+        return "mandatary-1  | " + line(t, "docker daemon requests", **f)
+
+    def test_the_counter_lines_are_parsed_in_order_with_only_the_closed_kinds(self):
+        log = "\n".join([self.counter_line("2026-11-16T10:00:00.000Z"), "garbage", self.counter_line("2026-11-16T10:01:00.000Z", req_info=40, secret="x"),
+                         line("2026-11-16T10:01:01Z", "request completed", status=200)])
+        got = rca.parse_request_counts(log)
+        self.assertEqual([g[1]["info"] for g in got], [2, 40])
+        self.assertLess(got[0][0], got[1][0])
+        self.assertEqual(set(got[1][1]), set(rca.REQUEST_KINDS))
+
+    def test_a_line_with_a_missing_or_malformed_count_is_ignored_never_guessed(self):
+        bad = json.loads(self.counter_line("2026-11-16T10:00:00Z").split("|", 1)[1])
+        del bad["req_logs"]
+        self.assertEqual(rca.parse_request_counts(json.dumps(bad)), [])
+        bad2 = json.loads(self.counter_line("2026-11-16T10:00:00Z").split("|", 1)[1])
+        bad2["req_info"] = "many"
+        self.assertEqual(rca.parse_request_counts(json.dumps(bad2)), [])
+
+    def test_metadata_reads_are_info_plus_list_plus_inspect(self):
+        self.assertEqual(rca.metadata_reads(self.KINDS), 2 + 3 + 4)
+
+
 class UsageBand(unittest.TestCase):
     """The server's documented accounting rule is not recomputed from what the client saw (P1.20 R2, L2): an observed refusal may
     still be accounted `allowed` (the daemon completed it after the authorization ended) or `denied` or not at all."""

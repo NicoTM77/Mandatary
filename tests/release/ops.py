@@ -165,6 +165,13 @@ def load(c: Ctx, seconds):
     rec["host_cpu"] = cpu_rows  # [t_ms, host busy %, {process: % of one CPU}] once a second
     rec["service_safety_events"] = events
     rec["correlation"] = rca.correlate(sorted(attempts), probe_rows, events)
+    if getattr(c.a, "count_requests", False):
+        # Diagnostics for the R2 measurement (never in the final evidence run): a graceful stop makes the service log the totals of its
+        # daemon requests since it started (cmd/mandatary/daemon_requests.go), then it is started again. The counters therefore
+        # cover everything since the last restart: the latency probe and this workload.
+        code, took = dep.stop()
+        rec["daemon_requests"] = {"graceful_exit": code, "lines": rca.parse_request_counts(dep.logs())[-4:]}
+        dep.start()
     c.ev["footprint"]["load"] = rec
     hwm = after.get("VmHWM", 0)
     ran = (not mcp_out.get("err") and streams["opened"] == 5 and streams["failed"] == 0 and rest["status"] > 0 and rest["logs"] > 0 and m.get("ok", 0) > 0

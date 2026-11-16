@@ -126,6 +126,7 @@ def main():
     ap.add_argument("--results", required=True)
     ap.add_argument("--oci-archive", help="a precomputed OCI archive of the image under test (otherwise built with buildx)")
     ap.add_argument("--load-seconds", type=int, default=60)
+    ap.add_argument("--count-requests", action="store_true", help="diagnostics only (R2 measurement): stop the service gracefully after the load window to read its daemon request counters, then start it again")
     ap.add_argument("--idle-window", type=int, default=300, help="seconds of RSS curve per idle measurement")
     ap.add_argument("--docker-host", required=True)
     ap.add_argument("--skip", default="", help="comma list of stage names to skip (diagnostics only; the final evidence run never skips)")

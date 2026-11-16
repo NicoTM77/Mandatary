@@ -126,6 +126,37 @@ def parse_service_events(log_text):
     return out
 
 
+REQUEST_KINDS = ("ping", "info", "list", "inspect", "logs", "start", "stop", "restart", "other")
+
+
+def parse_request_counts(log_text):
+    """The service's daemon request counter lines ("docker daemon requests", one count per closed kind, totals since the
+    process started): [[t_ms, {kind: n}]] in log order. Nothing else of a line is kept."""
+    out = []
+    for ln in log_text.splitlines():
+        i = ln.find("{")
+        if i < 0:
+            continue
+        try:
+            d = json.loads(ln[i:])
+        except ValueError:
+            continue
+        if d.get("msg") != "docker daemon requests":
+            continue
+        try:
+            t = datetime.fromisoformat(d["time"].replace("Z", "+00:00")).astimezone(timezone.utc)
+            counts = {k: int(d["req_" + k]) for k in REQUEST_KINDS}
+        except (KeyError, ValueError, TypeError):
+            continue
+        out.append([int(t.timestamp() * 1000), counts])
+    return out
+
+
+def metadata_reads(counts):
+    """The reads that verify safety: /info, container list and container inspect."""
+    return counts["info"] + counts["list"] + counts["inspect"]
+
+
 def outages(events):
     """Pair each drop with the next restoration -> [{start, end, fields}] (end None when never restored)."""
     res, cur = [], None
