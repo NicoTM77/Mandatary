@@ -188,45 +188,51 @@ func parseMajorMinor(v string) (int, int, error) {
 
 func (a *SDKAdapter) VerifySelf(ctx context.Context) error {
 	epoch := a.safety.beginVerification()
+	unsupported := Drop{Reason: DropUnsupportedAPI, Step: StepPing, Cause: CauseNone}
+	started := time.Now()
+	done := a.safety.trackCall()
 	pingRes, err := a.cli.Ping(ctx, client.PingOptions{
 		NegotiateAPIVersion: true,
 		ForceNegotiate:      true,
 	})
+	done()
 	if strings.TrimSpace(pingRes.APIVersion) != "" {
 		if c, vErr := compareAPIVersion(pingRes.APIVersion, MinEngineAPIVersion); vErr != nil || c < 0 {
-			a.safety.Invalidate()
+			a.safety.drop(unsupported)
 			return ErrUnsupportedAPIVersion
 		}
 	}
 	if err != nil {
-		a.safety.Invalidate()
+		a.safety.drop(dropFor(ctx, StepPing, started, err))
 		return SanitizeError(err)
 	}
 
 	if strings.TrimSpace(pingRes.APIVersion) == "" {
-		a.safety.Invalidate()
+		a.safety.drop(unsupported)
 		return ErrUnsupportedAPIVersion
 	}
 	negotiated := a.cli.ClientVersion()
 	if c, vErr := compareAPIVersion(negotiated, MinEngineAPIVersion); vErr != nil || c < 0 {
-		a.safety.Invalidate()
+		a.safety.drop(unsupported)
 		return ErrUnsupportedAPIVersion
 	}
 
+	started = time.Now()
+	done = a.safety.trackCall()
 	infoRes, err := a.cli.Info(ctx, client.InfoOptions{})
+	done()
 	if err != nil {
-		a.safety.Invalidate()
+		a.safety.drop(dropFor(ctx, StepInfo, started, err))
 		return SanitizeError(err)
 	}
 	daemonID := strings.TrimSpace(infoRes.Info.ID)
 	if daemonID == "" || (a.expectedDaemon != "" && daemonID != a.expectedDaemon) {
-		a.safety.Invalidate()
+		a.safety.dropIdentity()
 		return ErrUnverified
 	}
 
 	listItems, err := a.safetyListContainers(ctx)
 	if err != nil {
-		a.safety.Invalidate()
 		return err
 	}
 
@@ -234,7 +240,7 @@ func (a *SDKAdapter) VerifySelf(ctx context.Context) error {
 	for _, item := range listItems {
 		cid, cErr := ParseContainerID(item.ID)
 		if cErr != nil {
-			a.safety.Invalidate()
+			a.safety.dropIdentity()
 			return ErrUnverified
 		}
 		candidates = append(candidates, SafetyCandidate{
@@ -244,7 +250,7 @@ func (a *SDKAdapter) VerifySelf(ctx context.Context) error {
 	}
 
 	err = a.safety.verifyAt(ctx, epoch, daemonID, candidates, func(cid ContainerID) (SafetyCandidate, error) {
-		raw, iErr := a.safetyInspectContainer(ctx, cid)
+		raw, iErr := a.safetyInspectContainerAt(ctx, StepInspectSelf, cid)
 		if iErr != nil {
 			return SafetyCandidate{}, iErr
 		}
@@ -268,7 +274,8 @@ func (a *SDKAdapter) VerifySelf(ctx context.Context) error {
 		}, nil
 	})
 	if err != nil {
-		a.safety.Invalidate()
+		// verifyAt already reported the transition with its own reason; this only guarantees the state.
+		a.safety.drop(Drop{Reason: DropIdentity, Step: StepVerify, Cause: CauseNone})
 		return ErrUnverified
 	}
 
@@ -279,9 +286,10 @@ func (a *SDKAdapter) VerifySelf(ctx context.Context) error {
 }
 
 func (a *SDKAdapter) safetyListContainers(ctx context.Context) ([]container.Summary, error) {
+	started := time.Now()
 	items, err := a.readSafetyInventory(ctx)
 	if err != nil {
-		a.safety.Invalidate()
+		a.safety.drop(dropFor(ctx, StepInventory, started, err))
 		return nil, SanitizeError(err)
 	}
 	return items, nil
@@ -291,57 +299,68 @@ func (a *SDKAdapter) safetyListContainers(ctx context.Context) ([]container.Summ
 // In particular, stream-local aborts must be identified before any invalidation.
 func (a *SDKAdapter) readSafetyInventory(ctx context.Context) ([]container.Summary, error) {
 	a.safetyListCalls.Add(1)
+	defer a.safety.trackCall()()
 	res, err := a.cli.ContainerList(ctx, client.ContainerListOptions{All: true})
 	return res.Items, err
 }
 
 func (a *SDKAdapter) safetyInspectContainer(ctx context.Context, cid ContainerID) (container.InspectResponse, error) {
+	return a.safetyInspectContainerAt(ctx, StepInspectTarget, cid)
+}
+
+func (a *SDKAdapter) safetyInspectContainerAt(ctx context.Context, step DropStep, cid ContainerID) (container.InspectResponse, error) {
+	started := time.Now()
 	raw, err := a.readSafetyInspect(ctx, cid)
 	if err != nil {
-		return container.InspectResponse{}, a.operationError(err)
+		return container.InspectResponse{}, a.operationErrorTimed(ctx, step, started, err)
 	}
 	return raw, nil
 }
 
 func (a *SDKAdapter) readSafetyInspect(ctx context.Context, cid ContainerID) (container.InspectResponse, error) {
 	a.safetyInspectCalls.Add(1)
+	defer a.safety.trackCall()()
 	res, err := a.cli.ContainerInspect(ctx, string(cid), client.ContainerInspectOptions{})
 	return res.Container, err
 }
 
 func (a *SDKAdapter) verifySelfContinuity(ctx context.Context) error {
-	return a.checkSelfContinuity(ctx, func(error) error {
-		a.safety.Invalidate()
+	return a.checkSelfContinuity(ctx, func(step DropStep, started time.Time, err error) error {
+		a.safety.drop(dropFor(ctx, step, started, err))
 		return ErrUnverified
 	})
 }
 
 func (a *SDKAdapter) verifyStreamContinuity(ctx context.Context) error {
-	return a.checkSelfContinuity(ctx, func(err error) error {
+	return a.checkSelfContinuity(ctx, func(step DropStep, started time.Time, err error) error {
 		// Only an error matching a known canceled consumer request is local.
 		// Independent transport faults and our internal watchdog still revoke,
 		// even if the consumer has also canceled by the time I/O returns.
 		if isStreamConsumerAbort(ctx, err) {
 			return SanitizeError(err)
 		}
-		a.safety.Invalidate()
+		a.safety.drop(dropFor(ctx, step, started, err))
 		return ErrUnverified
 	})
 }
 
-func (a *SDKAdapter) checkSelfContinuity(ctx context.Context, onError func(error) error) error {
+func (a *SDKAdapter) checkSelfContinuity(ctx context.Context, onError func(DropStep, time.Time, error) error) error {
 	epoch := a.safety.currentEpoch()
 	selfID, ok := a.safety.SelfContainerID()
 	if !ok {
 		return ErrUnverified
 	}
+	started := time.Now()
+	done := a.safety.trackCall()
 	infoRes, err := a.cli.Info(ctx, client.InfoOptions{})
+	done()
 	if err != nil {
-		return onError(err)
+		return onError(StepInfo, started, err)
 	}
+	started = time.Now()
 	rawSelf, err := a.readSafetyInspect(ctx, selfID)
 	if err != nil {
-		return onError(err)
+		return onError(StepInspectSelf, started, err)
 	}
 	var startedAt string
 	if rawSelf.State != nil {
@@ -353,7 +372,7 @@ func (a *SDKAdapter) checkSelfContinuity(ctx context.Context, onError func(error
 	}
 	parsedID, err := ParseContainerID(rawSelf.ID)
 	if err != nil {
-		a.safety.Invalidate()
+		a.safety.dropIdentity()
 		return ErrUnverified
 	}
 	if err := a.safety.VerifyContinuity(strings.TrimSpace(infoRes.Info.ID), SafetyCandidate{
@@ -364,9 +383,10 @@ func (a *SDKAdapter) checkSelfContinuity(ctx context.Context, onError func(error
 	}); err != nil {
 		return err
 	}
+	started = time.Now()
 	items, err := a.readSafetyInventory(ctx)
 	if err != nil {
-		return onError(err)
+		return onError(StepInventory, started, err)
 	}
 	candidates := make([]SafetyCandidate, 0, len(items))
 	for _, item := range items {
@@ -376,7 +396,7 @@ func (a *SDKAdapter) checkSelfContinuity(ctx context.Context, onError func(error
 		return err
 	}
 	if err := ctx.Err(); err != nil {
-		return onError(err)
+		return onError(StepContinuity, started, err)
 	}
 	return a.safety.requireEpoch(epoch)
 }
@@ -550,7 +570,9 @@ func (a *SDKAdapter) Logs(ctx context.Context, target TargetIdentity, opts LogOp
 	}
 
 	a.operationalLogs.Add(1)
+	done := a.safety.trackCall()
 	rc, err := a.cli.ContainerLogs(streamCtx, string(target.ContainerID), sdkOpts)
+	done()
 	if err != nil {
 		unregister()
 		return nil, a.operationError(err)
@@ -561,7 +583,9 @@ func (a *SDKAdapter) Logs(ctx context.Context, target TargetIdentity, opts LogOp
 		isTTY = raw.Config.Tty
 	}
 
-	stream := newSDKLogStream(streamCtx, rc, unregister, isTTY, normOpts.Follow, a.operationError)
+	stream := newSDKLogStream(streamCtx, rc, unregister, isTTY, normOpts.Follow, func(err error) error {
+		return a.safety.operationErrorAt(StepStream, err)
+	})
 	return guardLogStream(streamCtx, stream, a.verifyStreamContinuity, a.operationError), nil
 }
 
@@ -570,13 +594,29 @@ func (a *SDKAdapter) Start(ctx context.Context, target TargetIdentity) error {
 		return err
 	}
 	a.operationalStarts.Add(1)
+	done := a.safety.trackCall()
 	_, err := a.cli.ContainerStart(ctx, string(target.ContainerID), client.ContainerStartOptions{})
+	done()
 	return a.operationError(err)
 }
 
 // operationError never lets uncertain I/O preserve a cached safety proof.
 func (a *SDKAdapter) operationError(err error) error {
 	return a.safety.operationError(err)
+}
+
+// operationErrorTimed is operationError for a daemon read: the transition report also carries how long the
+// failing call ran and tells the stream watchdog's own deadline from the caller's and the daemon's.
+func (a *SDKAdapter) operationErrorTimed(ctx context.Context, step DropStep, started time.Time, err error) error {
+	safe := SanitizeError(err)
+	if safe != nil && !errors.Is(safe, ErrTargetNotFound) && !errors.Is(safe, ErrInvalidParameter) {
+		d := dropFor(ctx, step, started, err)
+		if d.Reason == DropDaemonUnreachable {
+			d.Reason = DropOperationFault
+		}
+		a.safety.drop(d)
+	}
+	return safe
 }
 
 func (a *SDKAdapter) Stop(ctx context.Context, target TargetIdentity, opts StopOptions) error {
@@ -588,9 +628,11 @@ func (a *SDKAdapter) Stop(ctx context.Context, target TargetIdentity, opts StopO
 		return err
 	}
 	a.operationalStops.Add(1)
+	done := a.safety.trackCall()
 	_, err = a.cli.ContainerStop(ctx, string(target.ContainerID), client.ContainerStopOptions{
 		Timeout: &timeoutSec,
 	})
+	done()
 	return a.operationError(err)
 }
 
@@ -603,9 +645,11 @@ func (a *SDKAdapter) Restart(ctx context.Context, target TargetIdentity, opts Re
 		return err
 	}
 	a.operationalRestarts.Add(1)
+	done := a.safety.trackCall()
 	_, err = a.cli.ContainerRestart(ctx, string(target.ContainerID), client.ContainerRestartOptions{
 		Timeout: &timeoutSec,
 	})
+	done()
 	return a.operationError(err)
 }
 

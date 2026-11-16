@@ -30,10 +30,30 @@ const (
 	DockerVerified   = "docker backend verified"
 	DockerUnverified = "docker backend unverified"
 	DockerMockActive = "mock docker backend active"
+	// Safety-proof transitions (P1.20, R2). A drop names its fixed reason, the step that was running, the
+	// class of the error that ended it, how long that step ran, and how many daemon calls and streams were
+	// live. A restoration names how long the proof was missing. Nothing else is admitted.
+	DockerSafetyDropped  = "docker safety proof dropped"
+	DockerSafetyRestored = "docker safety proof restored"
 )
 
 // dockerReasons are the only admitted reasons of the Docker-backend events; no path, error text or ID.
-var dockerReasons = map[string]bool{"unreachable": true, "unsupported_api": true, "identity": true}
+var dockerReasons = map[string]bool{
+	"unreachable": true, "unsupported_api": true, "identity": true,
+	// proof-drop reasons (internal/docker DropReason)
+	"daemon_unreachable": true, "check_deadline": true, "operation_fault": true, "stream_fault": true,
+	"reverify": true, "external": true, "closed": true,
+}
+
+// dropSteps and dropCauses are the closed vocabularies of the proof-drop event (internal/docker DropStep, DropCause).
+var dropSteps = map[string]bool{
+	"ping": true, "info": true, "inventory": true, "inspect_self": true, "inspect_target": true,
+	"verify": true, "continuity": true, "operation": true, "stream": true, "none": true,
+}
+var dropCauses = map[string]bool{"deadline": true, "canceled": true, "transport": true, "daemon_error": true, "none": true}
+
+// maxCount bounds the numeric diagnostics of the proof events (a count or a millisecond duration).
+const maxCount = int64(1) << 40
 
 // SetupReasons are the only admitted values of the "reason" attribute.
 var setupReasons = map[string]bool{"origin_not_configured": true, "rotation_required": true, "storage": true, "clock": true}
@@ -89,7 +109,7 @@ func (h *handler) Enabled(ctx context.Context, level slog.Level) bool {
 func (h *handler) Handle(ctx context.Context, r slog.Record) error {
 	message := redacted
 	switch r.Message {
-	case RequestCompleted, RequestPanicked, ServerStarted, StartupFailed, ServerFailed, StorageCloseFailed, SetupAvailable, SetupUnavailable, SetupNoMail, DockerVerified, DockerUnverified, DockerMockActive:
+	case RequestCompleted, RequestPanicked, ServerStarted, StartupFailed, ServerFailed, StorageCloseFailed, SetupAvailable, SetupUnavailable, SetupNoMail, DockerVerified, DockerUnverified, DockerMockActive, DockerSafetyDropped, DockerSafetyRestored:
 		message = r.Message
 	}
 	level := r.Level
@@ -167,6 +187,18 @@ func sanitize(a slog.Attr, deny bool) slog.Attr {
 		}
 	case "reason":
 		if a.Value.Kind() == slog.KindString && (setupReasons[a.Value.String()] || dockerReasons[a.Value.String()]) {
+			return a
+		}
+	case "step":
+		if a.Value.Kind() == slog.KindString && dropSteps[a.Value.String()] {
+			return a
+		}
+	case "cause":
+		if a.Value.Kind() == slog.KindString && dropCauses[a.Value.String()] {
+			return a
+		}
+	case "elapsed_ms", "outage_ms", "inflight", "streams":
+		if a.Value.Kind() == slog.KindInt64 && a.Value.Int64() >= 0 && a.Value.Int64() <= maxCount {
 			return a
 		}
 	case "generation":

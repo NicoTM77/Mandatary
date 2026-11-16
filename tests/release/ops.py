@@ -6,6 +6,7 @@ import time
 
 import footprint
 import matrix
+import rca
 import stack
 from core import measure_idle
 from ctx import Ctx
@@ -49,6 +50,7 @@ def load(c: Ctx, seconds):
     classes = {}  # (http status, error code) of every non-200 answer, so a protective answer is told apart from a failure
     lat = []
     samples = []
+    attempts = []  # [t_ms, interface, op, outcome, duration_ms]: every client call, correlated with the service's safety-proof log (rca.py)
     streams = {"load1": 0, "load2": 0, "opened": 0, "failed": 0, "frames": 0}
 
     def poller(i):
@@ -63,11 +65,15 @@ def load(c: Ctx, seconds):
             try:
                 st, _, body = cl.req("GET", path, bearer=c.tokens["load1"])
                 if st != 200 and isinstance(body, dict):
-                    code = str((body.get("error") or {}).get("code", ""))
+                    err = body.get("error") or {}
+                    code = str(err.get("code", ""))
+                    if err.get("reason"):
+                        code += "/" + str(err.get("reason"))  # the closed 403 reason (safety_unverified is not default_deny)
             except OSError as ex:
                 st, code = 0, type(ex).__name__
             d = (time.time() - t0) * 1000
             with lock:
+                attempts.append([int(t0 * 1000), "rest", op, "ok" if st == 200 else "%s/%s" % (st, code), round(d, 1)])
                 if st == 200:
                     rest[op] += 1
                     lat.append(d)
@@ -117,6 +123,8 @@ def load(c: Ctx, seconds):
         except Exception as exc:  # noqa: BLE001
             mcp_out["err"] = str(exc)[:200]
 
+    probe = rca.DaemonProbe(dep.e.sock)
+    probe.start()
     reset = footprint.reset_peak(pid)  # VmHWM then covers exactly this window (not the one-time Argon2id memory of an earlier sign-in)
     before = footprint.read_status(pid)
     threads = [threading.Thread(target=poller, args=(i,)) for i in range(10)]
@@ -132,6 +140,7 @@ def load(c: Ctx, seconds):
     for t in threads:
         t.join(30)
     wall = time.time() - t0
+    probe_rows = probe.finish()
     after = footprint.read_status(pid)
     cg = footprint.cgroup_memory(pid)
     m = mcp_out.get("r") or {}
@@ -140,7 +149,18 @@ def load(c: Ctx, seconds):
     rec = {"peak_reset_before_window": reset, "clients": {"rest_pollers": 10, "mcp_sessions": 10, "follow_streams": 5}, "seconds": round(wall, 1), "rest": dict(rest), "rest_error_classes": dict(classes), "rest_latency": footprint.latency_summary(lat),
            "mcp": m, "mcp_error": mcp_out.get("err"), "streams": dict(streams), "VmRSS_peak_sampled": peak_rss, "VmRSS_before": before.get("VmRSS"), "VmRSS_after": after.get("VmRSS"),
            "VmHWM_after": after.get("VmHWM"), "cgroup": cg, "rss_samples": len(samples)}
-    rec["service_log_safety_lines"] = [ln[:240] for ln in dep.logs().splitlines() if re.search(r"unverified|safety|heartbeat|backend", ln, re.I)][-12:]
+    log_text = dep.logs()
+    rec["service_log_safety_lines"] = [ln[:240] for ln in log_text.splitlines() if re.search(r"unverified|safety|heartbeat|backend", ln, re.I)][-12:]
+    # R2: the complete, correlated record of every call, the daemon's own latency and every safety-proof transition of the window.
+    for e in (m.get("trace") or []):
+        attempts.append([e["t"], "mcp", e["op"], e["out"], e["ms"]])
+    if isinstance(m, dict):
+        m.pop("trace", None)  # moved into attempts below; the MCP summary stays small
+    events = rca.parse_service_events(log_text)
+    rec["attempts"] = sorted(attempts)
+    rec["daemon_probe"] = probe_rows
+    rec["service_safety_events"] = events
+    rec["correlation"] = rca.correlate(sorted(attempts), probe_rows, events)
     c.ev["footprint"]["load"] = rec
     hwm = after.get("VmHWM", 0)
     ran = (not mcp_out.get("err") and streams["opened"] == 5 and streams["failed"] == 0 and rest["status"] > 0 and rest["logs"] > 0 and m.get("ok", 0) > 0

@@ -95,6 +95,7 @@ func composeProduct(ctx context.Context, logger *slog.Logger, c config.Config, r
 				ExplicitContainerID: c.SelfContainerID,
 				InstanceUUID:        c.SelfInstanceUUID,
 				EvidenceReader:      evidence,
+				Observer:            transitionLogger(logger),
 			},
 		})
 		if err != nil {
@@ -234,6 +235,23 @@ func (v *verifier) run(ctx context.Context) {
 		case <-ticker.C:
 			v.attempt(ctx)
 		}
+	}
+}
+
+// transitionLogger reports every loss and restoration of the endpoint's safety proof (P1.20, R2). Without it
+// a proof lost during a request and re-established by the next verification tick left no trace at all, so an
+// operator saw authorized calls refused with safety_unverified and nothing in the log. Only members of the
+// closed vocabularies in internal/docker/transition.go and counts or durations are logged; the logging
+// boundary admits nothing else, so no error text, path, ID, token or payload can reach the line.
+func transitionLogger(logger *slog.Logger) docker.TransitionObserver {
+	return func(tr docker.Transition) {
+		if tr.Verified {
+			logger.Info(logging.DockerSafetyRestored, "outage_ms", tr.Outage.Milliseconds())
+			return
+		}
+		logger.Warn(logging.DockerSafetyDropped,
+			"reason", string(tr.Drop.Reason), "step", string(tr.Drop.Step), "cause", string(tr.Drop.Cause),
+			"elapsed_ms", tr.Drop.Elapsed.Milliseconds(), "inflight", tr.Inflight, "streams", int64(tr.Streams))
 	}
 }
 

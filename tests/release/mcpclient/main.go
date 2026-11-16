@@ -272,7 +272,20 @@ type loadReport struct {
 	P99      float64          `json:"p99_ms"`
 	ErrorSet []string         `json:"error_samples,omitempty"`
 	ByErr    map[string]int64 `json:"by_error,omitempty"` // tool error results by "code/reason": a protective answer is told apart from a failure
+	// Trace is one entry per call, in start order per worker: wall-clock start (unix ms), tool, duration (ms)
+	// and outcome ("ok", "code/reason" of a tool error, or "transport"). It carries no token or payload; the
+	// release harness correlates it with the service's own safety-proof log lines (P1.20 R2).
+	Trace []traceEntry `json:"trace,omitempty"`
 }
+
+type traceEntry struct {
+	T   int64   `json:"t"`
+	Op  string  `json:"op"`
+	Ms  float64 `json:"ms"`
+	Out string  `json:"out"`
+}
+
+const maxTrace = 20000
 
 func (e *env) load(ctx context.Context, l loadSpec) loadReport {
 	if l.Workers < 1 {
@@ -285,6 +298,7 @@ func (e *env) load(ctx context.Context, l loadSpec) loadReport {
 	byOp := map[string]int64{}
 	samples := map[string]bool{}
 	byErr := map[string]int64{}
+	var trace []traceEntry
 	var wg sync.WaitGroup
 	t0 := time.Now()
 	for w := 0; w < l.Workers; w++ {
@@ -314,13 +328,16 @@ func (e *env) load(ctx context.Context, l loadSpec) loadReport {
 				cancel()
 				d := float64(time.Since(s).Microseconds()) / 1000
 				calls.Add(1)
+				outcome := "ok"
 				if err != nil || out.IsError {
 					errc.Add(1)
 					mu.Lock()
 					if err != nil {
 						samples["call: "+sanitize(err)] = true
+						outcome = "transport"
 					} else {
 						samples["tool error result"] = true
+						outcome = "tool_error"
 						var eo struct {
 							Error struct {
 								Code   string `json:"code"`
@@ -329,6 +346,7 @@ func (e *env) load(ctx context.Context, l loadSpec) loadReport {
 						}
 						if raw, merr := json.Marshal(out.StructuredContent); merr == nil && json.Unmarshal(raw, &eo) == nil {
 							byErr[eo.Error.Code+"/"+eo.Error.Reason]++
+							outcome = eo.Error.Code + "/" + eo.Error.Reason
 						}
 					}
 					mu.Unlock()
@@ -339,6 +357,11 @@ func (e *env) load(ctx context.Context, l loadSpec) loadReport {
 					byOp[op]++
 					mu.Unlock()
 				}
+				mu.Lock()
+				if len(trace) < maxTrace {
+					trace = append(trace, traceEntry{T: s.UnixMilli(), Op: op, Ms: d, Out: outcome})
+				}
+				mu.Unlock()
 				time.Sleep(200 * time.Millisecond) // a polling client, not a flood
 			}
 		}(w)
@@ -351,7 +374,7 @@ func (e *env) load(ctx context.Context, l loadSpec) loadReport {
 		}
 		return lat[int(float64(len(lat)-1)*p)]
 	}
-	rep := loadReport{Workers: l.Workers, Seconds: time.Since(t0).Seconds(), Calls: calls.Load(), OK: okc.Load(), Errors: errc.Load(), ByOp: byOp, ByErr: byErr, P50: pct(0.5), P95: pct(0.95), P99: pct(0.99)}
+	rep := loadReport{Workers: l.Workers, Seconds: time.Since(t0).Seconds(), Calls: calls.Load(), OK: okc.Load(), Errors: errc.Load(), ByOp: byOp, ByErr: byErr, P50: pct(0.5), P95: pct(0.95), P99: pct(0.99), Trace: trace}
 	for k := range samples {
 		rep.ErrorSet = append(rep.ErrorSet, k)
 	}

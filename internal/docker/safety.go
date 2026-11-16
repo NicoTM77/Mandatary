@@ -8,6 +8,8 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
+	"time"
 
 	"github.com/NicoTM77/Mandatary/internal/domain"
 )
@@ -28,6 +30,9 @@ type SelfIdentityConfig struct {
 	ExplicitContainerID string
 	InstanceUUID        string
 	EvidenceReader      ProcessEvidenceReader
+	// Observer, when set, receives every loss and restoration of the safety proof (secret-free diagnostics
+	// only; see transition.go). It cannot influence a decision.
+	Observer TransitionObserver
 }
 
 // SafetyCandidate holds container safety metadata used during self and peer verification.
@@ -151,6 +156,11 @@ type SafetyMonitor struct {
 	protected     map[ContainerID]struct{}
 	nextStreamID  uint64
 	activeStreams map[uint64]context.CancelFunc
+
+	// Diagnostics only (transition.go): they never take part in a decision.
+	observer  TransitionObserver
+	inflight  atomic.Int64
+	droppedAt time.Time
 }
 
 func NewSafetyMonitor(cfg SelfIdentityConfig) (*SafetyMonitor, error) {
@@ -167,6 +177,7 @@ func NewSafetyMonitor(cfg SelfIdentityConfig) (*SafetyMonitor, error) {
 		state:         StateUnverified,
 		protected:     make(map[ContainerID]struct{}),
 		activeStreams: make(map[uint64]context.CancelFunc),
+		observer:      cfg.Observer,
 	}, nil
 }
 
@@ -178,9 +189,13 @@ func (m *SafetyMonitor) SetConfig(cfg SelfIdentityConfig) {
 	if cfg.EvidenceReader == nil {
 		cfg.EvidenceReader = DefaultProcessEvidenceReader
 	}
+	if cfg.Observer != nil {
+		m.observer = cfg.Observer
+	}
 	m.cfg = cfg
-	m.invalidateLocked()
+	tr := m.dropLocked(Drop{Reason: DropExternal, Step: StepNone, Cause: CauseNone})
 	m.mu.Unlock()
+	m.notify(tr)
 }
 
 func (m *SafetyMonitor) currentEpoch() uint64 {
@@ -254,17 +269,24 @@ func (m *SafetyMonitor) ProtectedSet() []ContainerID {
 }
 
 func (m *SafetyMonitor) Invalidate() {
-	m.mu.Lock()
-	m.invalidateLocked()
-	m.mu.Unlock()
+	m.drop(Drop{Reason: DropExternal, Step: StepNone, Cause: CauseNone})
 }
 
 // Only known logical target/input denials preserve proof. Unknown errors,
 // including canceled I/O, cannot establish current daemon continuity.
 func (m *SafetyMonitor) operationError(err error) error {
+	return m.operationErrorAt(StepOperation, err)
+}
+
+// operationErrorAt is operationError that also names the step for the transition report.
+func (m *SafetyMonitor) operationErrorAt(step DropStep, err error) error {
 	safe := SanitizeError(err)
 	if safe != nil && !errors.Is(safe, ErrTargetNotFound) && !errors.Is(safe, ErrInvalidParameter) {
-		m.Invalidate()
+		reason := DropOperationFault
+		if step == StepStream {
+			reason = DropStreamFault
+		}
+		m.drop(Drop{Reason: reason, Step: step, Cause: classifyCause(err)})
 	}
 	return safe
 }
@@ -297,16 +319,19 @@ func (m *SafetyMonitor) Verify(
 // Invalidation, config changes, closure and every newer attempt revoke this epoch.
 func (m *SafetyMonitor) beginVerification() uint64 {
 	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.invalidateLocked()
-	return m.epoch
+	tr := m.dropLocked(Drop{Reason: DropReverify, Step: StepVerify, Cause: CauseNone})
+	epoch := m.epoch
+	m.mu.Unlock()
+	m.notify(tr)
+	return epoch
 }
 
 func (m *SafetyMonitor) Close() {
 	m.mu.Lock()
-	defer m.mu.Unlock()
 	m.closed = true
-	m.invalidateLocked()
+	tr := m.dropLocked(Drop{Reason: DropClosed, Step: StepNone, Cause: CauseNone})
+	m.mu.Unlock()
+	m.notify(tr)
 }
 
 func (m *SafetyMonitor) verifyAt(ctx context.Context, epoch uint64, daemonID string, allContainers []SafetyCandidate, inspectFn func(ContainerID) (SafetyCandidate, error)) error {
@@ -319,13 +344,13 @@ func (m *SafetyMonitor) verifyAt(ctx context.Context, epoch uint64, daemonID str
 	}
 
 	if strings.TrimSpace(daemonID) == "" {
-		m.Invalidate()
+		m.dropIdentity()
 		return ErrUnverified
 	}
 
 	ev, err := cfg.EvidenceReader(ctx)
 	if err != nil {
-		m.Invalidate()
+		m.dropIdentity()
 		return ErrUnverified
 	}
 
@@ -333,7 +358,7 @@ func (m *SafetyMonitor) verifyAt(ctx context.Context, epoch uint64, daemonID str
 	if strings.TrimSpace(cfg.ExplicitContainerID) != "" {
 		parsed, pErr := ParseContainerID(cfg.ExplicitContainerID)
 		if pErr != nil {
-			m.Invalidate()
+			m.dropIdentity()
 			return ErrUnverified
 		}
 		explicitID = parsed
@@ -343,14 +368,14 @@ func (m *SafetyMonitor) verifyAt(ctx context.Context, epoch uint64, daemonID str
 	if strings.TrimSpace(ev.ContainerID) != "" {
 		parsed, pErr := ParseContainerID(ev.ContainerID)
 		if pErr != nil {
-			m.Invalidate()
+			m.dropIdentity()
 			return ErrUnverified
 		}
 		processID = parsed
 	}
 
 	if explicitID != "" && processID != "" && explicitID != processID {
-		m.Invalidate()
+		m.dropIdentity()
 		return ErrUnverified
 	}
 
@@ -358,7 +383,7 @@ func (m *SafetyMonitor) verifyAt(ctx context.Context, epoch uint64, daemonID str
 	if strings.TrimSpace(cfg.InstanceUUID) != "" {
 		parsedUUID, uErr := domain.ParseEndpointID(cfg.InstanceUUID)
 		if uErr != nil {
-			m.Invalidate()
+			m.dropIdentity()
 			return ErrUnverified
 		}
 		instanceUUID = string(parsedUUID)
@@ -370,7 +395,7 @@ func (m *SafetyMonitor) verifyAt(ctx context.Context, epoch uint64, daemonID str
 
 	for _, c := range allContainers {
 		if _, err := ParseContainerID(string(c.ID)); err != nil || seen[c.ID] {
-			m.Invalidate()
+			m.dropIdentity()
 			return ErrUnverified
 		}
 		seen[c.ID] = true
@@ -385,7 +410,7 @@ func (m *SafetyMonitor) verifyAt(ctx context.Context, epoch uint64, daemonID str
 	}
 
 	if instanceUUID != "" && len(uuidMatches) != 1 {
-		m.Invalidate()
+		m.dropIdentity()
 		return ErrUnverified
 	}
 
@@ -396,48 +421,48 @@ func (m *SafetyMonitor) verifyAt(ctx context.Context, epoch uint64, daemonID str
 	case ev.PrivateCgroupNS:
 		// Private cgroup namespace requires deployment instance-UUID binding.
 		if instanceUUID == "" || len(uuidMatches) != 1 {
-			m.Invalidate()
+			m.dropIdentity()
 			return ErrUnverified
 		}
 		candidateID = uuidMatches[0]
 		if explicitID != "" && explicitID != candidateID {
-			m.Invalidate()
+			m.dropIdentity()
 			return ErrUnverified
 		}
 	default:
 		if ev.Mandatory {
-			m.Invalidate()
+			m.dropIdentity()
 			return ErrUnverified
 		}
 		if instanceUUID != "" && len(uuidMatches) == 1 {
 			candidateID = uuidMatches[0]
 		}
 		if explicitID != "" && explicitID != candidateID {
-			m.Invalidate()
+			m.dropIdentity()
 			return ErrUnverified
 		}
 	}
 
 	if candidateID == "" {
-		m.Invalidate()
+		m.dropIdentity()
 		return ErrUnverified
 	}
 	if instanceUUID != "" && len(uuidMatches) == 1 && uuidMatches[0] != candidateID {
-		m.Invalidate()
+		m.dropIdentity()
 		return ErrUnverified
 	}
 
 	inspectedSelf, err := inspectFn(candidateID)
 	if err != nil {
-		m.Invalidate()
+		m.dropIdentity()
 		return ErrUnverified
 	}
 	if inspectedSelf.ID != candidateID || !HasExactSelfLabel(inspectedSelf.Labels) {
-		m.Invalidate()
+		m.dropIdentity()
 		return ErrUnverified
 	}
 	if instanceUUID != "" && strings.TrimSpace(inspectedSelf.Labels[SelfInstanceUUIDLabelKey]) != instanceUUID {
-		m.Invalidate()
+		m.dropIdentity()
 		return ErrUnverified
 	}
 
@@ -454,7 +479,9 @@ func (m *SafetyMonitor) verifyAt(ctx context.Context, epoch uint64, daemonID str
 	m.selfCreated = inspectedSelf.Created
 	m.selfStartedAt = inspectedSelf.StartedAt
 	m.protected = protected
+	tr := m.restoredLocked()
 	m.mu.Unlock()
+	m.notify(tr)
 
 	return nil
 }
@@ -474,14 +501,14 @@ func (m *SafetyMonitor) VerifyContinuity(currentDaemonID string, currentSelf Saf
 		return ErrUnverified
 	}
 	if currentDaemonID == "" || currentDaemonID != daemonID {
-		m.Invalidate()
+		m.drop(Drop{Reason: DropIdentity, Step: StepContinuity, Cause: CauseNone})
 		return ErrUnverified
 	}
 	if currentSelf.ID != selfID ||
 		!HasExactSelfLabel(currentSelf.Labels) ||
 		currentSelf.Created != created ||
 		currentSelf.StartedAt != startedAt {
-		m.Invalidate()
+		m.drop(Drop{Reason: DropIdentity, Step: StepContinuity, Cause: CauseNone})
 		return ErrUnverified
 	}
 	return nil
@@ -491,16 +518,19 @@ func (m *SafetyMonitor) VerifyContinuity(currentDaemonID string, currentSelf Saf
 // binding uniqueness. An overlap invalidates proof until explicit re-verification;
 // merely removing the overlapping member cannot resurrect cached authority.
 func (m *SafetyMonitor) VerifyInventory(all []SafetyCandidate) error {
+	var tr *Transition
+	defer func() { m.notify(tr) }() // runs after the unlock below
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.state != StateVerified {
 		return ErrUnverified
 	}
+	idDrop := Drop{Reason: DropIdentity, Step: StepContinuity, Cause: CauseNone}
 	seen := make(map[ContainerID]bool, len(all))
 	var matches []ContainerID
 	for _, c := range all {
 		if _, err := ParseContainerID(string(c.ID)); err != nil || seen[c.ID] {
-			m.invalidateLocked()
+			tr = m.dropLocked(idDrop)
 			return ErrUnverified
 		}
 		seen[c.ID] = true
@@ -512,7 +542,7 @@ func (m *SafetyMonitor) VerifyInventory(all []SafetyCandidate) error {
 		}
 	}
 	if !seen[m.selfID] || (m.cfg.InstanceUUID != "" && (len(matches) != 1 || matches[0] != m.selfID)) {
-		m.invalidateLocked()
+		tr = m.dropLocked(idDrop)
 		return ErrUnverified
 	}
 	return nil
