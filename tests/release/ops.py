@@ -123,6 +123,17 @@ def load(c: Ctx, seconds):
         except Exception as exc:  # noqa: BLE001
             mcp_out["err"] = str(exc)[:200]
 
+    count_before = None
+    if getattr(c.a, "count_requests", False):
+        # R2 measurement (diagnostics only): start the window right after the next periodic daemon-request counter line of the service
+        # (at most a minute away), so the totals of that line are the baseline of exactly this window.
+        seen = len(rca.parse_request_counts(dep.logs()))
+        give_up = time.time() + 90
+        while time.time() < give_up and count_before is None:
+            time.sleep(1)
+            lines = rca.parse_request_counts(dep.logs())
+            if len(lines) > seen:
+                count_before = lines[-1]
     probe = rca.DaemonProbe(dep.e.sock)
     probe.start()
     hostcpu = rca.HostSampler([pid])
@@ -165,12 +176,15 @@ def load(c: Ctx, seconds):
     rec["host_cpu"] = cpu_rows  # [t_ms, host busy %, {process: % of one CPU}] once a second
     rec["service_safety_events"] = events
     rec["correlation"] = rca.correlate(sorted(attempts), probe_rows, events)
-    if getattr(c.a, "count_requests", False):
+    if count_before is not None:
         # Diagnostics for the R2 measurement (never in the final evidence run): a graceful stop makes the service log the totals of its
-        # daemon requests since it started (cmd/mandatary/daemon_requests.go), then it is started again. The counters therefore
-        # cover everything since the last restart: the latency probe and this workload.
+        # daemon requests since it started (cmd/mandatary/daemon_requests.go), then it is started again. The window's own requests are
+        # the difference to the periodic line that preceded the window.
         code, took = dep.stop()
-        rec["daemon_requests"] = {"graceful_exit": code, "lines": rca.parse_request_counts(dep.logs())[-4:]}
+        lines = rca.parse_request_counts(dep.logs())
+        count_after = next((ln for ln in reversed(lines) if ln[0] >= int(t0 * 1000)), None)
+        rec["daemon_requests"] = {"graceful_exit": code, "before": count_before, "after": count_after, "window_ms": [int(t0 * 1000), int((t0 + wall) * 1000)],
+                                  "delta": ({k: count_after[1][k] - count_before[1][k] for k in rca.REQUEST_KINDS} if count_after and count_before else None)}
         dep.start()
     c.ev["footprint"]["load"] = rec
     hwm = after.get("VmHWM", 0)
