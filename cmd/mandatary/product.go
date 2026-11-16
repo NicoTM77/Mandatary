@@ -78,6 +78,7 @@ func composeProduct(ctx context.Context, logger *slog.Logger, c config.Config, r
 		return nil, false
 	}
 	var backend docker.DockerBackend
+	var counts *requestCounts // set only for a real daemon: the mock sends no request
 	if c.MockDocker {
 		// SELF-13: the mock identifies a synthetic protected fixture and applies the identical state
 		// machine. There is no real socket in this branch and no fallback to one.
@@ -91,9 +92,10 @@ func composeProduct(ctx context.Context, logger *slog.Logger, c config.Config, r
 	} else {
 		evidence := mandatoryEvidence(opts.evidence)
 		dials := &dialMonitor{}
+		counts = &requestCounts{}
 		adapter, err := docker.NewSDKAdapter(docker.SDKOptions{
 			EndpointID: local,
-			Transport:  observeRoundTrips(unixTransport(c.DockerSocket), dials),
+			Transport:  observeRoundTrips(unixTransport(c.DockerSocket), dials, counts),
 			Identity: docker.SelfIdentityConfig{
 				EndpointID:          local,
 				ExplicitContainerID: c.SelfContainerID,
@@ -156,12 +158,17 @@ func composeProduct(ctx context.Context, logger *slog.Logger, c config.Config, r
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() { defer wg.Done(); v.run(background) }()
+	if counts != nil {
+		wg.Add(1)
+		go func() { defer wg.Done(); counts.run(background, logger, requestLogInterval) }()
+	}
 	var once sync.Once
 	p.stop = func() {
 		once.Do(func() {
 			cancel()
 			wg.Wait()
 			_ = az.Close() // cancels every active stream and closes the backends
+			counts.log(logger)
 		})
 	}
 	return p, true
@@ -275,15 +282,17 @@ type dialMonitor struct {
 
 // observedTransport records the class of every failed round trip, then returns the error unchanged.
 type observedTransport struct {
-	base http.RoundTripper
-	mon  *dialMonitor
+	base   http.RoundTripper
+	mon    *dialMonitor
+	counts *requestCounts
 }
 
-func observeRoundTrips(base http.RoundTripper, mon *dialMonitor) http.RoundTripper {
-	return &observedTransport{base: base, mon: mon}
+func observeRoundTrips(base http.RoundTripper, mon *dialMonitor, counts *requestCounts) http.RoundTripper {
+	return &observedTransport{base: base, mon: mon, counts: counts}
 }
 
 func (t *observedTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	t.counts.record(req)
 	resp, err := t.base.RoundTrip(req)
 	t.mon.record(err)
 	return resp, err

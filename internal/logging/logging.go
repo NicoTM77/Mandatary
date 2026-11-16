@@ -35,7 +35,16 @@ const (
 	// live. A restoration names how long the proof was missing. Nothing else is admitted.
 	DockerSafetyDropped  = "docker safety proof dropped"
 	DockerSafetyRestored = "docker safety proof restored"
+	// Daemon request counters (P1.20, R2): how many requests of each closed kind this process has sent to the
+	// Docker daemon since it started. Counts only; see dockerRequestKeys.
+	DockerRequests = "docker daemon requests"
 )
+
+// dockerRequestKeys are the only admitted attributes of DockerRequests: one non-negative count per request kind.
+var dockerRequestKeys = map[string]bool{
+	"req_ping": true, "req_info": true, "req_list": true, "req_inspect": true, "req_logs": true,
+	"req_start": true, "req_stop": true, "req_restart": true, "req_other": true,
+}
 
 // dockerReasons are the only admitted reasons of the Docker-backend events; no path, error text or ID.
 var dockerReasons = map[string]bool{
@@ -115,7 +124,7 @@ func (h *handler) Enabled(ctx context.Context, level slog.Level) bool {
 func (h *handler) Handle(ctx context.Context, r slog.Record) error {
 	message := redacted
 	switch r.Message {
-	case RequestCompleted, RequestPanicked, ServerStarted, StartupFailed, ServerFailed, StorageCloseFailed, SetupAvailable, SetupUnavailable, SetupNoMail, DockerVerified, DockerUnverified, DockerMockActive, DockerSafetyDropped, DockerSafetyRestored:
+	case RequestCompleted, RequestPanicked, ServerStarted, StartupFailed, ServerFailed, StorageCloseFailed, SetupAvailable, SetupUnavailable, SetupNoMail, DockerVerified, DockerUnverified, DockerMockActive, DockerSafetyDropped, DockerSafetyRestored, DockerRequests:
 		message = r.Message
 	}
 	level := r.Level
@@ -209,6 +218,10 @@ func sanitize(a slog.Attr, deny bool) slog.Attr {
 		}
 	case "elapsed_ms", "outage_ms", "inflight", "streams", "dial_faults":
 		if a.Value.Kind() == slog.KindInt64 && a.Value.Int64() >= 0 && a.Value.Int64() <= maxCount {
+			return a
+		}
+	case "req_ping", "req_info", "req_list", "req_inspect", "req_logs", "req_start", "req_stop", "req_restart", "req_other":
+		if dockerRequestKeys[a.Key] && a.Value.Kind() == slog.KindInt64 && a.Value.Int64() >= 0 && a.Value.Int64() <= maxCount {
 			return a
 		}
 	case "generation":
