@@ -8,8 +8,13 @@ import (
 	"time"
 )
 
-// This cause distinguishes our fail-closed watchdog from consumer deadlines.
-var errStreamCheckDeadline = errors.New("stream continuity check deadline")
+// ErrSafetyCheckDeadline is the context cause of every deadline this process sets on a safety check itself (the
+// stream watchdog, the readiness heartbeat and the ceiling of one continuity refresh). It tells our fail-closed
+// deadline, which revokes the proof, from a deadline or cancellation that belongs to the caller, which does not.
+var ErrSafetyCheckDeadline = errors.New("safety check deadline")
+
+// errStreamCheckDeadline is the stream watchdog's name for the same cause.
+var errStreamCheckDeadline = ErrSafetyCheckDeadline
 
 func isStreamConsumerAbort(ctx context.Context, err error) bool {
 	if ctx.Err() == nil || context.Cause(ctx) == errStreamCheckDeadline {

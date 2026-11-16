@@ -157,6 +157,17 @@ type SafetyMonitor struct {
 	nextStreamID  uint64
 	activeStreams map[uint64]context.CancelFunc
 
+	// Bounded continuity freshness (continuity.go); all of it is guarded by mu, like the epoch it is bound to.
+	ttl         time.Duration
+	clock       func() time.Time
+	contValid   bool        // a successful check of contEpoch started at contStart (sequence contSeq)
+	contStart   time.Time   // the clock reading taken immediately before that check's first read
+	contEpoch   uint64      // the safety epoch the check belongs to
+	contSeq     uint64      // the check's rank among the refreshes of this monitor
+	flight      *contFlight // the refresh in progress, if any
+	flightSeq   uint64      // the rank of the last refresh started
+	contWaiters atomic.Int64
+
 	// Diagnostics only (transition.go): they never take part in a decision.
 	observer  TransitionObserver
 	inflight  atomic.Int64
@@ -293,6 +304,7 @@ func (m *SafetyMonitor) operationErrorAt(step DropStep, err error) error {
 
 func (m *SafetyMonitor) invalidateLocked() {
 	m.epoch++
+	m.contValid = false // no snapshot outlives a revocation
 	m.state = StateUnverified
 	m.selfID = ""
 	m.daemonID = ""

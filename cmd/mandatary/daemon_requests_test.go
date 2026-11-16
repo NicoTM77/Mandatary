@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"errors"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -10,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/NicoTM77/Mandatary/internal/docker"
 	"github.com/NicoTM77/Mandatary/internal/logging"
 )
 
@@ -83,4 +85,39 @@ func TestRequestCountsRunLogsPeriodically(t *testing.T) {
 	}
 	cancel()
 	<-done
+}
+
+// The composed adapter's bound is the fixed one-second constant, the largest the adapter accepts.
+func TestComposedAdapterContinuityIsOneSecond(t *testing.T) {
+	d := newFakeDaemon(t, fakeContainer{selfFullID, selfLabels(instanceUUID)})
+	c := composeFor(t, map[string]string{"MANDATARY_DOCKER_SOCKET": "unix://" + d.path, "MANDATARY_SELF_INSTANCE_UUID": instanceUUID}, productOptions{evidence: privateCgroup})
+	adapter, ok := c.p.backend.(*docker.SDKAdapter)
+	if !ok {
+		t.Fatalf("the composed backend is %T, want the SDK adapter", c.p.backend)
+	}
+	if got := adapter.ContinuityTTL(); got != time.Second {
+		t.Fatalf("the composed adapter's continuity TTL = %v, want exactly 1 s", got)
+	}
+	if continuityTTL > docker.MaxContinuityTTL {
+		t.Fatal("the production TTL exceeds what the adapter accepts")
+	}
+}
+
+// The mock sends no request, so no counters are composed for it.
+func TestMockBackendComposesNoRequestCounters(t *testing.T) {
+	c := composeFor(t, map[string]string{"MANDATARY_DEV_MOCK_DOCKER": "true"}, productOptions{})
+	if _, ok := c.p.backend.(*docker.SDKAdapter); ok {
+		t.Fatal("the mock composition built an SDK adapter")
+	}
+}
+
+// The readiness heartbeat's deadline is one of ours, so a heartbeat that waits for another caller's check past it
+// revokes the proof like the stream watchdog's deadline.
+func TestHeartbeatDeadlineCarriesTheSafetyCheckCause(t *testing.T) {
+	ctx, cancel := heartbeatContext(context.Background(), time.Millisecond)
+	defer cancel()
+	<-ctx.Done()
+	if !errors.Is(context.Cause(ctx), docker.ErrSafetyCheckDeadline) {
+		t.Fatalf("the heartbeat's deadline cause = %v, want docker.ErrSafetyCheckDeadline", context.Cause(ctx))
+	}
 }

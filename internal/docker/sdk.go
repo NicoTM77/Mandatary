@@ -29,6 +29,12 @@ type SDKOptions struct {
 	Transport      http.RoundTripper
 	ExpectedDaemon string
 	Identity       SelfIdentityConfig
+	// ContinuityTTL bounds how long one successful continuity check (daemon ID, own container, all-state
+	// inventory) may cover later READ admissions and stream deliveries. Zero (the default) never reuses a
+	// check: every caller gets its own. The accepted range is 0 to MaxContinuityTTL; see continuity.go.
+	ContinuityTTL time.Duration
+	// Clock supplies the monotonic reading that ages a continuity check; nil means time.Now. Tests inject one.
+	Clock func() time.Time
 }
 
 // OperationalCounters records SDK call counts separated between internal safety
@@ -68,6 +74,9 @@ type SDKAdapter struct {
 var _ DockerBackend = (*SDKAdapter)(nil)
 
 func NewSDKAdapter(opts SDKOptions) (*SDKAdapter, error) {
+	if sdkOptionsTestHook != nil {
+		sdkOptionsTestHook(&opts)
+	}
 	epID, err := domain.ParseEndpointID(string(opts.EndpointID))
 	if err != nil {
 		return nil, ErrInvalidConfig
@@ -82,10 +91,15 @@ func NewSDKAdapter(opts SDKOptions) (*SDKAdapter, error) {
 		return nil, ErrInvalidConfig
 	}
 
+	if opts.ContinuityTTL < 0 || opts.ContinuityTTL > MaxContinuityTTL {
+		return nil, ErrInvalidConfig
+	}
+
 	safety, err := NewSafetyMonitor(idCfg)
 	if err != nil {
 		return nil, err
 	}
+	safety.configureContinuity(opts.ContinuityTTL, opts.Clock)
 
 	host := strings.TrimSpace(opts.Host)
 	if host == "" {
@@ -127,6 +141,9 @@ func (a *SDKAdapter) VerificationState() VerificationState {
 func (a *SDKAdapter) InvalidateSafety() {
 	a.safety.Invalidate()
 }
+
+// ContinuityTTL is the freshness one continuity check is allowed to cover (zero: none is reused).
+func (a *SDKAdapter) ContinuityTTL() time.Duration { return a.safety.ttl }
 
 func (a *SDKAdapter) Counters() OperationalCounters {
 	return OperationalCounters{
@@ -401,7 +418,25 @@ func (a *SDKAdapter) checkSelfContinuity(ctx context.Context, onError func(DropS
 	return a.safety.requireEpoch(epoch)
 }
 
-func (a *SDKAdapter) verifyTargetForOperation(ctx context.Context, target TargetIdentity) (container.InspectResponse, error) {
+// freshVerifiedInventory reads the all-state inventory now and checks it as a whole (self present, deployment
+// binding unique, every ID well formed and unique) before anything is matched against it. The continuity check
+// may be shared; this list never is.
+func (a *SDKAdapter) freshVerifiedInventory(ctx context.Context) ([]container.Summary, error) {
+	items, err := a.safetyListContainers(ctx)
+	if err != nil {
+		return nil, err
+	}
+	candidates := make([]SafetyCandidate, 0, len(items))
+	for _, item := range items {
+		candidates = append(candidates, SafetyCandidate{ID: ContainerID(item.ID), Labels: item.Labels})
+	}
+	if err := a.safety.VerifyInventory(candidates); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+func (a *SDKAdapter) verifyTargetForOperation(ctx context.Context, target TargetIdentity, mode contMode) (container.InspectResponse, error) {
 	epoch := a.safety.currentEpoch()
 	if !a.safety.Ready() {
 		return container.InspectResponse{}, ErrUnverified
@@ -417,7 +452,7 @@ func (a *SDKAdapter) verifyTargetForOperation(ctx context.Context, target Target
 		return container.InspectResponse{}, ErrProtectedTarget
 	}
 
-	if err := a.verifySelfContinuity(ctx); err != nil {
+	if err := a.ensureContinuity(ctx, mode, kindAdmission); err != nil {
 		return container.InspectResponse{}, err
 	}
 
@@ -443,10 +478,10 @@ func (a *SDKAdapter) ListContainers(ctx context.Context) ([]ContainerSummary, er
 	if !a.safety.Ready() {
 		return nil, ErrUnverified
 	}
-	if err := a.verifySelfContinuity(ctx); err != nil {
+	if err := a.ensureContinuity(ctx, modeRead, kindAdmission); err != nil {
 		return nil, err
 	}
-	items, err := a.safetyListContainers(ctx)
+	items, err := a.freshVerifiedInventory(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -486,11 +521,12 @@ func (a *SDKAdapter) ResolveTarget(ctx context.Context, nameOrID string) (Contai
 	if cid, err := ParseContainerID(cleaned); err == nil && a.safety.IsProtected(cid) {
 		return ContainerSummary{}, ErrProtectedTarget
 	}
-	if err := a.verifySelfContinuity(ctx); err != nil {
+	if err := a.ensureContinuity(ctx, modeRead, kindAdmission); err != nil {
 		return ContainerSummary{}, err
 	}
 
-	items, err := a.safetyListContainers(ctx)
+	// Never match a name against anything but a list read now and checked as a whole.
+	items, err := a.freshVerifiedInventory(ctx)
 	if err != nil {
 		return ContainerSummary{}, err
 	}
@@ -523,7 +559,7 @@ func (a *SDKAdapter) ResolveTarget(ctx context.Context, nameOrID string) (Contai
 }
 
 func (a *SDKAdapter) InspectStatus(ctx context.Context, target TargetIdentity) (InspectStatus, error) {
-	raw, err := a.verifyTargetForOperation(ctx, target)
+	raw, err := a.verifyTargetForOperation(ctx, target, modeRead)
 	if err != nil {
 		return InspectStatus{}, err
 	}
@@ -532,7 +568,7 @@ func (a *SDKAdapter) InspectStatus(ctx context.Context, target TargetIdentity) (
 }
 
 func (a *SDKAdapter) InspectConfig(ctx context.Context, target TargetIdentity) (InspectConfig, error) {
-	raw, err := a.verifyTargetForOperation(ctx, target)
+	raw, err := a.verifyTargetForOperation(ctx, target, modeRead)
 	if err != nil {
 		return InspectConfig{}, err
 	}
@@ -545,7 +581,7 @@ func (a *SDKAdapter) Logs(ctx context.Context, target TargetIdentity, opts LogOp
 	if err != nil {
 		return nil, err
 	}
-	raw, err := a.verifyTargetForOperation(ctx, target)
+	raw, err := a.verifyTargetForOperation(ctx, target, modeRead)
 	if err != nil {
 		return nil, err
 	}
@@ -586,11 +622,13 @@ func (a *SDKAdapter) Logs(ctx context.Context, target TargetIdentity, opts LogOp
 	stream := newSDKLogStream(streamCtx, rc, unregister, isTTY, normOpts.Follow, func(err error) error {
 		return a.safety.operationErrorAt(StepStream, err)
 	})
-	return guardLogStream(streamCtx, stream, a.verifyStreamContinuity, a.operationError), nil
+	return guardLogStream(streamCtx, stream, func(c context.Context) error {
+		return a.ensureContinuity(c, modeRead, kindStream)
+	}, a.operationError), nil
 }
 
 func (a *SDKAdapter) Start(ctx context.Context, target TargetIdentity) error {
-	if _, err := a.verifyTargetForOperation(ctx, target); err != nil {
+	if _, err := a.verifyTargetForOperation(ctx, target, modeFresh); err != nil {
 		return err
 	}
 	a.operationalStarts.Add(1)
@@ -624,7 +662,7 @@ func (a *SDKAdapter) Stop(ctx context.Context, target TargetIdentity, opts StopO
 	if err != nil {
 		return err
 	}
-	if _, err := a.verifyTargetForOperation(ctx, target); err != nil {
+	if _, err := a.verifyTargetForOperation(ctx, target, modeFresh); err != nil {
 		return err
 	}
 	a.operationalStops.Add(1)
@@ -641,7 +679,7 @@ func (a *SDKAdapter) Restart(ctx context.Context, target TargetIdentity, opts Re
 	if err != nil {
 		return err
 	}
-	if _, err := a.verifyTargetForOperation(ctx, target); err != nil {
+	if _, err := a.verifyTargetForOperation(ctx, target, modeFresh); err != nil {
 		return err
 	}
 	a.operationalRestarts.Add(1)
