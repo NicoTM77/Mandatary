@@ -125,6 +125,8 @@ def load(c: Ctx, seconds):
 
     probe = rca.DaemonProbe(dep.e.sock)
     probe.start()
+    hostcpu = rca.HostSampler([pid])
+    hostcpu.start()
     reset = footprint.reset_peak(pid)  # VmHWM then covers exactly this window (not the one-time Argon2id memory of an earlier sign-in)
     before = footprint.read_status(pid)
     threads = [threading.Thread(target=poller, args=(i,)) for i in range(10)]
@@ -141,6 +143,7 @@ def load(c: Ctx, seconds):
         t.join(30)
     wall = time.time() - t0
     probe_rows = probe.finish()
+    cpu_rows = hostcpu.finish()
     after = footprint.read_status(pid)
     cg = footprint.cgroup_memory(pid)
     m = mcp_out.get("r") or {}
@@ -159,6 +162,7 @@ def load(c: Ctx, seconds):
     events = rca.parse_service_events(log_text)
     rec["attempts"] = sorted(attempts)
     rec["daemon_probe"] = probe_rows
+    rec["host_cpu"] = cpu_rows  # [t_ms, host busy %, {process: % of one CPU}] once a second
     rec["service_safety_events"] = events
     rec["correlation"] = rca.correlate(sorted(attempts), probe_rows, events)
     c.ev["footprint"]["load"] = rec
@@ -174,6 +178,13 @@ def load(c: Ctx, seconds):
         peak_rss / footprint.MB, hwm / footprint.MB, "reset at the start of the window" if reset else "since process start (the reset was not permitted)"),
             footprint.within(max(peak_rss, hwm), footprint.BUDGET_LOAD_RSS_BYTES), "budget 150 MB; %d RSS samples at 1 Hz; rss before %.2f MB after %.2f MB" % (len(samples), (before.get("VmRSS") or 0) / footprint.MB, (after.get("VmRSS") or 0) / footprint.MB))
     # exact accounting of the workload: every successful poll and every opened stream is one outcome
+    # A call the client saw refused or time out may still have been accounted by the server (docs/usage-accounting.md): a band, never a guess.
+    nonok = {"status": 0, "logs": 0}
+    for _t, _iface, op, out, _ms in attempts:
+        if out != "ok":
+            nonok["status" if op in ("status", "container_status") else "logs"] += 1
+    c.tally.add_band("load1", "status", A, nonok["status"])
+    c.tally.add_band("load1", "logs", A, nonok["logs"])
     c.tally.add("load1", "status", A, "allowed", rest["status"] + by_op.get("container_status", 0))
     c.tally.add("load1", "logs", A, "allowed", rest["logs"] + by_op.get("container_logs", 0) + streams["load1"])
     c.tally.add("load2", "logs", A, "allowed", streams["load2"])
@@ -187,8 +198,9 @@ def read_usage(c: Ctx, label, stop_first=True, rebaseline=False):
     exp = c.tally.totals()
     daily = matrix.merge_rows(dep.usage_rows("usage_stats_daily"))
     hourly = matrix.merge_rows(dep.usage_rows("usage_stats_hourly"))
-    diffs = matrix.diff_totals(exp, daily)
-    hdiffs = matrix.diff_totals(exp, hourly)
+    bands = dict(c.tally.bands)
+    diffs = matrix.diff_totals(exp, daily, bands)
+    hdiffs = matrix.diff_totals(exp, hourly, bands)
     con = dep.db()
     try:
         recent = con.execute("SELECT count(*) FROM usage_recent_events").fetchone()[0]
@@ -206,6 +218,7 @@ def read_usage(c: Ctx, label, stop_first=True, rebaseline=False):
         # The mismatch above is reported (and FAILS its check). Later checks continue from what the store really holds, so one anomaly is one
         # failure and not four, and each later stage is still compared exactly against its own additions.
         c.tally.t = {k: list(v) for k, v in daily.items()}
+        c.tally.bands = {}
         c.ev["usage"][label]["rebaselined_to_measured"] = True
     cap = 1000
     c.check("REL-USAGE-RING-" + label, "recent-event ring is bounded (<= %d), holds no payload column, and the database passes integrity and foreign-key checks" % cap,

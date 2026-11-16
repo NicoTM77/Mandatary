@@ -13,6 +13,7 @@ import unittest
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "image"))
 sys.path.insert(0, HERE)
+import matrix  # noqa: E402
 import rca  # noqa: E402
 
 
@@ -79,6 +80,61 @@ class Correlation(unittest.TestCase):
         c = rca.correlate([], [[1, "/info", 20_000.0, False], [2, "/info", 10.0, True]], [])
         self.assertEqual(c["daemon_probe_failures"], 1)
         self.assertEqual(c["daemon_probe_ms"]["n"], 1)
+
+
+class UsageBand(unittest.TestCase):
+    """The server's documented accounting rule is not recomputed from what the client saw (P1.20 R2, L2): an observed refusal may
+    still be accounted `allowed` (the daemon completed it after the authorization ended) or `denied` or not at all."""
+
+    K = ("rel-load1", "rel-owner", "ctr-a", "container:status")
+
+    def test_without_unobserved_attempts_the_comparison_stays_exact(self):
+        self.assertEqual(matrix.diff_totals({self.K: (10, 0, 0)}, {self.K: (10, 0, 0)}, {}), [])
+        self.assertTrue(matrix.diff_totals({self.K: (10, 0, 0)}, {self.K: (11, 0, 0)}, {}))  # one more allowed than the client saw: a failure
+
+    def test_unobserved_attempts_may_be_accounted_as_allowed_or_denied_or_not_at_all(self):
+        exp = {self.K: (10, 0, 0)}
+        band = {self.K: 3}
+        for got in ((10, 0, 0), (13, 0, 0), (11, 2, 0), (10, 1, 0), (12, 0, 1)):
+            self.assertEqual(matrix.diff_totals(exp, {self.K: got}, band), [], got)
+
+    def test_more_outcomes_than_attempts_is_still_a_failure(self):
+        self.assertTrue(matrix.diff_totals({self.K: (10, 0, 0)}, {self.K: (14, 0, 0)}, {self.K: 3}))
+        self.assertTrue(matrix.diff_totals({self.K: (10, 0, 0)}, {self.K: (11, 3, 0)}, {self.K: 3}))
+
+    def test_an_observed_success_that_was_not_accounted_is_a_failure_even_inside_a_band(self):
+        self.assertTrue(matrix.diff_totals({self.K: (10, 0, 0)}, {self.K: (9, 3, 0)}, {self.K: 3}))
+        self.assertTrue(matrix.diff_totals({self.K: (10, 0, 0)}, {}, {self.K: 3}))
+
+    def test_a_band_applies_to_its_own_cell_only(self):
+        other = ("rel-load1", "rel-owner", "ctr-a", "container:logs")
+        exp = {self.K: (10, 0, 0), other: (5, 0, 0)}
+        got = {self.K: (12, 0, 0), other: (6, 0, 0)}
+        self.assertEqual(len(matrix.diff_totals(exp, got, {self.K: 2})), 1)
+
+    def test_the_tally_collects_bands_per_cell_and_clears_to_exact_with_no_attempts(self):
+        t = matrix.Tally(lambda who: "rel-" + who, lambda who: "rel-owner")
+        t.add_band("load1", "status", "ctr-a", 0)
+        self.assertEqual(t.bands, {})
+        t.add_band("load1", "status", "ctr-a", 2)
+        t.add_band("load1", "status", "ctr-a", 1)
+        self.assertEqual(list(t.bands.values()), [3])
+
+
+class HostSampling(unittest.TestCase):
+    @unittest.skipUnless(os.path.exists("/proc/stat"), "needs a Linux /proc")
+    def test_the_sampler_reads_the_host_and_the_named_processes_from_proc_only(self):
+        s = rca.HostSampler([os.getpid()])
+        s.start()
+        t_end = __import__("time").time() + 2.6
+        while __import__("time").time() < t_end:
+            sum(i * i for i in range(20000))
+        rows = s.finish()
+        self.assertGreaterEqual(len(rows), 1)
+        t, busy, per = rows[-1]
+        self.assertTrue(0.0 <= busy <= 100.0, busy)
+        self.assertIn("service:%d" % os.getpid(), per)  # the caller's own process is sampled like the service would be
+        self.assertGreater(per["service:%d" % os.getpid()], 0.0)
 
 
 if __name__ == "__main__":

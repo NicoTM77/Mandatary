@@ -196,6 +196,17 @@ class Tally:
     def __init__(self, agent_name, user_of):
         self.agent_name, self.user_of = agent_name, user_of
         self.t = {}
+        # Calls whose outcome the CLIENT could not observe (refused or timed out while in flight). The server accounts each of them
+        # per docs/usage-accounting.md (a call whose authorization ended meanwhile is `allowed` when the daemon completed it, `denied`
+        # when it was cut off or refused at admission, and nothing when it never reached accounting), so the exact total is only known to
+        # lie between the observed successes and the successes plus these attempts. {cell key: attempts}.
+        self.bands = {}
+
+    def add_band(self, who, op, selector, attempts):
+        """Record `attempts` calls of one cell whose accounting the client cannot observe. 0 attempts is exactness."""
+        if attempts:
+            k = (self.agent_name(who), self.user_of(who), selector, key(op))
+            self.bands[k] = self.bands.get(k, 0) + attempts
 
     def add(self, who, op, selector, outcome, n=1):
         k = (self.agent_name(who), self.user_of(who), selector, key(op))
@@ -214,13 +225,27 @@ class Tally:
         return sum(sum(v) for v in self.t.values())
 
 
-def diff_totals(expected, got):
-    """Human-readable differences between expected and measured totals ([] means exact equality)."""
+def diff_totals(expected, got, bands=None):
+    """Human-readable differences between expected and measured totals ([] means agreement).
+
+    Without `bands` the comparison is exact equality. A cell with a band of n unobserved attempts is held to the documented rule instead:
+    every observed outcome must be accounted (each measured component >= the expected one) and at most n further outcomes may exist
+    (total measured <= total expected + n). A cell without a band stays exact, so a clean run is compared exactly."""
+    bands = bands or {}
     out = []
     for k in sorted(set(expected) | set(got), key=str):
         e, g = expected.get(k), got.get(k)
-        if e != g:
+        if e == g:
+            continue
+        n = bands.get(k, 0)
+        if not n:
             out.append("%s expected %s got %s" % (k, e, g))
+            continue
+        base, have = e or (0, 0, 0), g or (0, 0, 0)
+        if any(h < b for b, h in zip(base, have)):
+            out.append("%s expected at least %s got %s" % (k, e, g))
+        elif sum(have) - sum(base) > n:
+            out.append("%s expected %s plus at most %d unobserved, got %s" % (k, e, n, g))
     return out
 
 

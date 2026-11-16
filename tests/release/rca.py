@@ -14,6 +14,7 @@ which the service had dropped its proof, which drops there were (reason/step/cau
 what the daemon's latency was before each drop, and which refusals are NOT explained by a recorded drop.
 """
 import json
+import os
 import re
 import socket
 import threading
@@ -23,6 +24,76 @@ from datetime import datetime, timezone
 from footprint import latency_summary
 
 REFUSAL = re.compile(r"^403/")
+
+
+def _proc_stat_total():
+    """(busy_jiffies, total_jiffies) of the whole host from /proc/stat."""
+    with open("/proc/stat") as fh:
+        f = [int(x) for x in fh.readline().split()[1:]]
+    idle = f[3] + (f[4] if len(f) > 4 else 0)
+    return sum(f) - idle, sum(f)
+
+
+def _find_pids(names):
+    out = {}
+    for d in os.listdir("/proc"):
+        if not d.isdigit():
+            continue
+        try:
+            with open("/proc/%s/comm" % d) as fh:
+                comm = fh.read().strip()
+        except OSError:
+            continue
+        if comm in names:
+            out.setdefault(comm, []).append(int(d))
+    return out
+
+
+def _cpu_jiffies(pid):
+    try:
+        with open("/proc/%d/stat" % pid) as fh:
+            f = fh.read().rsplit(")", 1)[1].split()
+        return int(f[11]) + int(f[12])  # utime + stime
+    except (OSError, IndexError, ValueError):
+        return None
+
+
+class HostSampler(threading.Thread):
+    """Once a second: the host's busy CPU share and the CPU share (of one CPU) of the daemon-side processes (dockerd,
+    containerd, the Caddy proxy, the service). It says whether the host or the daemon was the bottleneck while the workload ran.
+    Reads /proc only."""
+
+    NAMES = ("dockerd", "containerd", "caddy", "mandatary")
+
+    def __init__(self, extra_pids=()):
+        super().__init__(daemon=True)
+        self.stop_ev, self.rows, self.extra = threading.Event(), [], list(extra_pids)
+
+    def run(self):
+        hz = os.sysconf("SC_CLK_TCK")
+        pids = _find_pids(self.NAMES)
+        flat = {"%s:%d" % (n, p): p for n, ps in pids.items() for p in ps}
+        for p in self.extra:
+            flat.setdefault("service:%d" % p, p)
+        prev_total, prev_t = _proc_stat_total(), time.time()
+        prev = {k: _cpu_jiffies(p) for k, p in flat.items()}
+        while not self.stop_ev.wait(1.0):
+            now, total = time.time(), _proc_stat_total()
+            dt = max(now - prev_t, 1e-3)
+            busy = 100.0 * (total[0] - prev_total[0]) / max(total[1] - prev_total[1], 1)
+            per = {}
+            for k, p in flat.items():
+                cur = _cpu_jiffies(p)
+                if cur is not None and prev.get(k) is not None:
+                    per[k] = round(100.0 * (cur - prev[k]) / hz / dt, 1)
+                prev[k] = cur
+            self.rows.append([int(now * 1000), round(busy, 1), per])
+            prev_total, prev_t = total, now
+
+    def finish(self):
+        self.stop_ev.set()
+        self.join(10)
+        return self.rows
 
 
 def parse_service_events(log_text):
