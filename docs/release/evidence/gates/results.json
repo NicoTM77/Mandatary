@@ -1,27 +1,27 @@
 {
  "results": [
   {
-   "detail": "gofmt -l over cmd internal web tests/{security,adapters,release}: exit 0 in 0 s",
+   "detail": "gofmt -l over cmd internal web tests/{security,adapters,release}: exit 0 in 1 s",
    "id": "GATE-GOFMT",
    "status": "PASS"
   },
   {
-   "detail": "go vet ./...: exit 0 in 3 s",
+   "detail": "go vet ./...: exit 0 in 5 s",
    "id": "GATE-GOVET",
    "status": "PASS"
   },
   {
-   "detail": "go mod verify: exit 0 in 6 s",
+   "detail": "go mod verify: exit 0 in 11 s",
    "id": "GATE-GOMOD-VERIFY",
    "status": "PASS"
   },
   {
-   "detail": "pinned golangci-lint run ./...: exit 0 in 13 s",
+   "detail": "pinned golangci-lint run ./...: exit 0 in 6 s",
    "id": "GATE-GOLANGCI",
    "status": "PASS"
   },
   {
-   "detail": "pinned gosec ./...: exit 0 in 12 s",
+   "detail": "pinned gosec ./...: exit 0 in 23 s",
    "id": "GATE-GOSEC",
    "status": "PASS"
   },
@@ -41,27 +41,27 @@
    "status": "PASS"
   },
   {
-   "detail": "tests/image/test_isolation.py (isolation guard tests): exit 0 in 3 s",
+   "detail": "tests/image/test_isolation.py (isolation guard tests): exit 0 in 4 s",
    "id": "GATE-ISOLATION-TESTS",
    "status": "PASS"
   },
   {
-   "detail": "node --test scripts/*.test.mjs (CI budgets, toolchain pins, ledger, dependency residuals, generation): exit 0 in 25 s",
+   "detail": "node --test scripts/*.test.mjs (CI budgets, toolchain pins, ledger, dependency residuals, generation): exit 0 in 24 s",
    "id": "GATE-NODE-SCRIPTS",
    "status": "PASS"
   },
   {
-   "detail": "tsc --noEmit: exit 0 in 1 s",
+   "detail": "tsc --noEmit: exit 0 in 2 s",
    "id": "GATE-WEB-TYPECHECK",
    "status": "PASS"
   },
   {
-   "detail": "eslint --max-warnings 0: exit 0 in 10 s",
+   "detail": "eslint --max-warnings 0: exit 0 in 12 s",
    "id": "GATE-WEB-LINT",
    "status": "PASS"
   },
   {
-   "detail": "vitest run: exit 0, 753/753 tests passed in 35 files",
+   "detail": "vitest run: exit 0, 776/776 tests passed in 36 files",
    "id": "GATE-WEB-VITEST",
    "status": "PASS"
   },
@@ -71,7 +71,7 @@
    "status": "PASS"
   },
   {
-   "detail": "compared 8c1a55a301b4..fde3a293470f over cmd internal web Dockerfile docker-compose.yml deploy go.mod go.sum sqlc.yaml tools; 0 product file(s) differ",
+   "detail": "compared 1528ef025ad9..1528ef025ad9 over cmd internal web Dockerfile docker-compose.yml deploy go.mod go.sum sqlc.yaml tools; 0 product file(s) differ",
    "id": "GATE-PRODUCT-TREE",
    "status": "PASS"
   }

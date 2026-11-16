@@ -3,8 +3,8 @@ PASS REL-IMG-01 the image under test is the exact source revision (revision labe
 PASS REL-FOOT-IMG compressed image <= 60 MB (sum of real gzip OCI blobs)
 PASS REL-FOOT-SAME the measured archive has exactly the uncompressed layers (diffIDs) of the image under test
 PASS REL-DEP-01 clean Compose deployment (unmodified docker-compose.yml + proxy file) starts, is healthy and READY on the real daemon
-PASS REL-FOOT-IDLE-fresh idle RSS <= 50 MB (fresh: steady state, last 60s of a 300s window from readiness)
-PASS REL-FOOT-SETTLE-fresh after a start the resident set is back under 50 MB and stays there (settled at 145.0 s of a 300 s window; peak 100.55 MB)
+PASS REL-FOOT-IDLE-fresh idle RSS <= 50 MB after stabilization (fresh: maximum of the 12 samples taken every 5 s over the final 60 s of a 300 s observation window after readiness)
+PASS REL-FOOT-SETTLE-fresh start-up transient reported separately (fresh): peak 100.83 MB, stabilized under 50 MB at 140.0 s after readiness; the idle limit does not apply to this transient
 PASS REL-SETUP-setup-reveal the host helper reveals the setup token on a real controlling terminal
 PASS REL-SETUP-setup-exchange the host-revealed token exchanges once for a setup-only session
 PASS REL-SETUP-setup-account administrator staged with two notification addresses
@@ -46,22 +46,22 @@ PASS REL-LIFE-POL-3 after the policy change the same credential is denied (403) 
 PASS REL-LIFE-POL-4 re-enabling the rules restores access (positive control); no operation was ever granted by the account itself
 PASS REL-LIFE-POL-5 deleting the rules denies again (403) on both transports
 PASS REL-LAT added latency of an accounted outcome measured (150 sequential calls per class)
-PASS REL-FOOT-IDLE-configured idle RSS <= 50 MB (configured: steady state, last 60s of a 120s window from readiness)
-PASS REL-FOOT-SETTLE-configured after a start the resident set is back under 50 MB and stays there (settled at 0.0 s of a 120 s window; peak 33.43 MB)
-PASS REL-LOAD-RUN benchmark workload ran for 43 s: 10 REST + 10 real-MCP polling clients and 5 follow streams, answered with 151 REST and 118 MCP successes (the footprint below is measured over exactly this window)
-PASS REL-LOAD-STABLE the service keeps authorizing legitimate calls under the workload: no non-200 REST answer and no MCP tool error in 43 s
-PASS REL-FOOT-LOAD RSS under the benchmark workload <= 150 MB (peak sampled 40.97 MB; kernel high-water mark VmHWM 42.46 MB reset at the start of the window)
-PASS REL-USAGE-AFTER-WORKLOAD exact usage totals per (agent, owner user, selector, operation) after AFTER-WORKLOAD: 730 accounted outcomes in 60 tuples match the executed sequence
+PASS REL-FOOT-IDLE-configured idle RSS <= 50 MB after stabilization (configured: maximum of the 12 samples taken every 5 s over the final 60 s of a 300 s observation window after readiness)
+PASS REL-FOOT-SETTLE-configured start-up transient reported separately (configured): peak 34.91 MB, stabilized under 50 MB at 0.0 s after readiness; the idle limit does not apply to this transient
+PASS REL-LOAD-RUN benchmark workload ran for 42 s: 10 REST + 10 real-MCP polling clients and 5 follow streams, answered with 562 REST and 625 MCP successes (the footprint below is measured over exactly this window)
+PASS REL-LOAD-STABLE the service keeps authorizing legitimate calls under the workload: no non-200 REST answer and no MCP tool error in 42 s
+PASS REL-FOOT-LOAD RSS under the benchmark workload <= 150 MB (peak sampled 39.85 MB; kernel high-water mark VmHWM 40.48 MB reset at the start of the window)
+PASS REL-USAGE-AFTER-WORKLOAD exact usage totals per (agent, owner user, selector, operation) after AFTER-WORKLOAD: 1648 accounted outcomes in 60 tuples match the executed sequence
 PASS REL-USAGE-RING-AFTER-WORKLOAD recent-event ring is bounded (<= 1000), holds no payload column, and the database passes integrity and foreign-key checks
-PASS REL-FOOT-IDLE-after-restart idle RSS <= 50 MB (after-restart: steady state, last 60s of a 300s window from readiness)
-PASS REL-FOOT-SETTLE-after-restart after a start the resident set is back under 50 MB and stays there (settled at 155.0 s of a 300 s window; peak 98.81 MB)
+PASS REL-FOOT-IDLE-after-restart idle RSS <= 50 MB after stabilization (after-restart: maximum of the 12 samples taken every 5 s over the final 60 s of a 300 s observation window after readiness)
+PASS REL-FOOT-SETTLE-after-restart start-up transient reported separately (after-restart): peak 98.22 MB, stabilized under 50 MB at 155.0 s after readiness; the idle limit does not apply to this transient
 PASS REL-RESTART-1 after stop/start the credential still authorizes A and still cannot touch B (policy and credential persisted)
 PASS REL-RESTART-2 the real MCP client sees the same after the restart
 PASS REL-RESTART-3 the administrator signs in again (password + TOTP) and the policy listing is intact after the restart
 PASS REL-RESTART-4 setup stays closed after a restart (404)
 PASS REL-CRASH-1 SIGKILL of the service process (from the host): Docker's restart policy restarts it (RestartCount >= 1, new StartedAt) and it is ready again after a fresh verification (1 s)
 PASS REL-CRASH-2 after the crash the credential still authorizes A
-PASS REL-USAGE-AFTER-CRASH exact usage totals per (agent, owner user, selector, operation) after AFTER-CRASH: 740 accounted outcomes in 60 tuples match the executed sequence
+PASS REL-USAGE-AFTER-CRASH exact usage totals per (agent, owner user, selector, operation) after AFTER-CRASH: 1658 accounted outcomes in 60 tuples match the executed sequence
 PASS REL-USAGE-RING-AFTER-CRASH recent-event ring is bounded (<= 1000), holds no payload column, and the database passes integrity and foreign-key checks
 PASS REL-BACKUP-EXPORT-full export a full backup as the administrator (fresh AAL2); the archive carries no password, TOTP seed, bearer token or master key (24948 bytes)
 PASS REL-R1-SETUP-setup-reveal the host helper reveals the setup token on a real controlling terminal
@@ -151,6 +151,6 @@ PASS REL-LOGLEVEL-KEY-error the error start logs no master key value
 PASS REL-LOGLEVEL a start at each of debug/info/warn/error emits no JSON line below its level
 PASS REL-LOGLEVEL-POS positive control: the info start emits info lines and the warn/error starts do not (the filter really acts)
 PASS REL-LOGLEVEL-INVALID an invalid MANDATARY_LOG_LEVEL refuses to start (non-zero exit) and echoes no key
-PASS REL-LOGS no setup token, password, TOTP seed, master key, bearer token, address proof or session cookie appears in any log of 5 deployments (1598927 bytes scanned, 51 secrets checked)
+PASS REL-LOGS no setup token, password, TOTP seed, master key, bearer token, address proof or session cookie appears in any log of 5 deployments (2639450 bytes scanned, 51 secrets checked)
 PASS ISO-01 the daemon is still the declared fixture daemon before cleanup
 SUMMARY pass=155 not_pass=0

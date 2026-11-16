@@ -17,13 +17,13 @@
 === RUN   TestAdminUIBrowser/webkit/login-flows/dark
     admin_ui_browser_test.go:257: Skipping host requirements validation logic because `PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS` env variable is set.
         {"scenario":"login-flows","scheme":"dark","engine":"webkit","browser":"27.2","requests":51,"blockedEgress":0,"secretsInConsole":0}
---- PASS: TestAdminUIBrowser (25.52s)
-    --- PASS: TestAdminUIBrowser/webkit/setup-login/light (4.27s)
-    --- PASS: TestAdminUIBrowser/webkit/setup-replay-expiry/light (3.46s)
-    --- PASS: TestAdminUIBrowser/webkit/login-flows/light (4.92s)
-    --- PASS: TestAdminUIBrowser/webkit/setup-login/dark (4.19s)
-    --- PASS: TestAdminUIBrowser/webkit/setup-replay-expiry/dark (3.52s)
-    --- PASS: TestAdminUIBrowser/webkit/login-flows/dark (5.14s)
+--- PASS: TestAdminUIBrowser (25.07s)
+    --- PASS: TestAdminUIBrowser/webkit/setup-login/light (4.37s)
+    --- PASS: TestAdminUIBrowser/webkit/setup-replay-expiry/light (3.40s)
+    --- PASS: TestAdminUIBrowser/webkit/login-flows/light (4.90s)
+    --- PASS: TestAdminUIBrowser/webkit/setup-login/dark (4.12s)
+    --- PASS: TestAdminUIBrowser/webkit/setup-replay-expiry/dark (3.36s)
+    --- PASS: TestAdminUIBrowser/webkit/login-flows/dark (4.92s)
 === RUN   TestRecoveryUIBrowser
 === RUN   TestRecoveryUIBrowser/webkit/export-flows/light
     recovery_ui_browser_test.go:282: Skipping host requirements validation logic because `PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS` env variable is set.
@@ -55,17 +55,17 @@
 === RUN   TestRecoveryUIBrowser/webkit/denial/dark
     recovery_ui_browser_test.go:282: Skipping host requirements validation logic because `PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS` env variable is set.
         {"scenario":"denial","scheme":"dark","engine":"webkit","browser":"27.2","requests":19,"blockedEgress":0,"secretsInConsole":0,"phoneChecks":false}
---- PASS: TestRecoveryUIBrowser (57.78s)
-    --- PASS: TestRecoveryUIBrowser/webkit/export-flows/light (4.32s)
-    --- PASS: TestRecoveryUIBrowser/webkit/restore-flows/light (12.37s)
-    --- PASS: TestRecoveryUIBrowser/webkit/restore-failure/light (4.21s)
-    --- PASS: TestRecoveryUIBrowser/webkit/parallel-restore/light (3.85s)
-    --- PASS: TestRecoveryUIBrowser/webkit/denial/light (4.75s)
-    --- PASS: TestRecoveryUIBrowser/webkit/export-flows/dark (4.44s)
-    --- PASS: TestRecoveryUIBrowser/webkit/restore-flows/dark (11.38s)
-    --- PASS: TestRecoveryUIBrowser/webkit/restore-failure/dark (4.01s)
-    --- PASS: TestRecoveryUIBrowser/webkit/parallel-restore/dark (3.78s)
-    --- PASS: TestRecoveryUIBrowser/webkit/denial/dark (4.68s)
+--- PASS: TestRecoveryUIBrowser (54.51s)
+    --- PASS: TestRecoveryUIBrowser/webkit/export-flows/light (4.10s)
+    --- PASS: TestRecoveryUIBrowser/webkit/restore-flows/light (10.99s)
+    --- PASS: TestRecoveryUIBrowser/webkit/restore-failure/light (4.05s)
+    --- PASS: TestRecoveryUIBrowser/webkit/parallel-restore/light (3.67s)
+    --- PASS: TestRecoveryUIBrowser/webkit/denial/light (4.56s)
+    --- PASS: TestRecoveryUIBrowser/webkit/export-flows/dark (4.34s)
+    --- PASS: TestRecoveryUIBrowser/webkit/restore-flows/dark (10.46s)
+    --- PASS: TestRecoveryUIBrowser/webkit/restore-failure/dark (4.02s)
+    --- PASS: TestRecoveryUIBrowser/webkit/parallel-restore/dark (3.75s)
+    --- PASS: TestRecoveryUIBrowser/webkit/denial/dark (4.57s)
 === RUN   TestSecurityUIBrowser
 === RUN   TestSecurityUIBrowser/webkit/a11y-selfcheck/light
     security_ui_browser_test.go:247: Skipping host requirements validation logic because `PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS` env variable is set.
@@ -103,18 +103,18 @@
 === RUN   TestSecurityUIBrowser/webkit/policy-flows/dark
     security_ui_browser_test.go:247: Skipping host requirements validation logic because `PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS` env variable is set.
         {"scenario":"policy-flows","scheme":"dark","engine":"webkit","browser":"27.2","requests":58,"blockedEgress":0,"secretsInConsole":0,"webkitSelectNotes":6}
---- PASS: TestSecurityUIBrowser (65.20s)
-    --- PASS: TestSecurityUIBrowser/webkit/a11y-selfcheck/light (1.86s)
-    --- PASS: TestSecurityUIBrowser/webkit/security-flows/light (9.21s)
-    --- PASS: TestSecurityUIBrowser/webkit/recovery-flow/light (6.24s)
-    --- PASS: TestSecurityUIBrowser/webkit/recovery-reveal-phone/light (3.48s)
-    --- PASS: TestSecurityUIBrowser/webkit/denial-matrix/light (3.62s)
-    --- PASS: TestSecurityUIBrowser/webkit/policy-flows/light (6.84s)
-    --- PASS: TestSecurityUIBrowser/webkit/a11y-selfcheck/dark (1.71s)
-    --- PASS: TestSecurityUIBrowser/webkit/security-flows/dark (9.96s)
-    --- PASS: TestSecurityUIBrowser/webkit/recovery-flow/dark (6.89s)
-    --- PASS: TestSecurityUIBrowser/webkit/recovery-reveal-phone/dark (3.92s)
-    --- PASS: TestSecurityUIBrowser/webkit/denial-matrix/dark (4.13s)
-    --- PASS: TestSecurityUIBrowser/webkit/policy-flows/dark (7.34s)
+--- PASS: TestSecurityUIBrowser (60.22s)
+    --- PASS: TestSecurityUIBrowser/webkit/a11y-selfcheck/light (1.57s)
+    --- PASS: TestSecurityUIBrowser/webkit/security-flows/light (8.93s)
+    --- PASS: TestSecurityUIBrowser/webkit/recovery-flow/light (6.29s)
+    --- PASS: TestSecurityUIBrowser/webkit/recovery-reveal-phone/light (3.67s)
+    --- PASS: TestSecurityUIBrowser/webkit/denial-matrix/light (3.80s)
+    --- PASS: TestSecurityUIBrowser/webkit/policy-flows/light (6.33s)
+    --- PASS: TestSecurityUIBrowser/webkit/a11y-selfcheck/dark (1.74s)
+    --- PASS: TestSecurityUIBrowser/webkit/security-flows/dark (8.92s)
+    --- PASS: TestSecurityUIBrowser/webkit/recovery-flow/dark (6.18s)
+    --- PASS: TestSecurityUIBrowser/webkit/recovery-reveal-phone/dark (3.39s)
+    --- PASS: TestSecurityUIBrowser/webkit/denial-matrix/dark (3.59s)
+    --- PASS: TestSecurityUIBrowser/webkit/policy-flows/dark (5.82s)
 PASS
-ok  	github.com/NicoTM77/Mandatary/internal/auth	148.533s
+ok  	github.com/NicoTM77/Mandatary/internal/auth	139.830s

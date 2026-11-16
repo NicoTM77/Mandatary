@@ -1,27 +1,27 @@
 {
  "results": [
   {
-   "detail": "go test -tags=webauthnbrowser (chromium-desktop): exit 0 in 130 s; 32 scenario/scheme subtests passed on ['chromium']; schemes ['dark', 'light']; failed/skipped 0",
+   "detail": "go test -tags=webauthnbrowser (chromium-desktop): exit 0 in 137 s; 32 scenario/scheme subtests passed on ['chromium']; schemes ['dark', 'light']; failed/skipped 0",
    "id": "GATE-BROWSER-chromium-desktop",
    "status": "PASS"
   },
   {
-   "detail": "go test -tags=webauthnbrowser (chromium-phone): exit 0 in 109 s; 30 scenario/scheme subtests passed on ['chromium']; schemes ['dark', 'light']; failed/skipped 0",
+   "detail": "go test -tags=webauthnbrowser (chromium-phone): exit 0 in 108 s; 30 scenario/scheme subtests passed on ['chromium']; schemes ['dark', 'light']; failed/skipped 0",
    "id": "GATE-BROWSER-chromium-phone",
    "status": "PASS"
   },
   {
-   "detail": "go test -tags=webauthnbrowser (firefox-desktop): exit 1 in 179 s; 26 scenario/scheme subtests passed on ['firefox']; schemes ['dark', 'light']; failed/skipped 3",
+   "detail": "go test -tags=webauthnbrowser (firefox-desktop): exit 0 in 181 s; 28 scenario/scheme subtests passed on ['firefox']; schemes ['dark', 'light']; failed/skipped 0",
    "id": "GATE-BROWSER-firefox-desktop",
-   "status": "FAIL"
+   "status": "PASS"
   },
   {
-   "detail": "go test -tags=webauthnbrowser (firefox-phone): exit 1 in 192 s; 26 scenario/scheme subtests passed on ['firefox']; schemes ['dark', 'light']; failed/skipped 3",
+   "detail": "go test -tags=webauthnbrowser (firefox-phone): exit 0 in 182 s; 28 scenario/scheme subtests passed on ['firefox']; schemes ['dark', 'light']; failed/skipped 0",
    "id": "GATE-BROWSER-firefox-phone",
-   "status": "FAIL"
+   "status": "PASS"
   },
   {
-   "detail": "go test -tags=webauthnbrowser (webkit-desktop): exit 0 in 151 s; 28 scenario/scheme subtests passed on ['webkit']; schemes ['dark', 'light']; failed/skipped 0",
+   "detail": "go test -tags=webauthnbrowser (webkit-desktop): exit 0 in 143 s; 28 scenario/scheme subtests passed on ['webkit']; schemes ['dark', 'light']; failed/skipped 0",
    "id": "GATE-BROWSER-webkit-desktop",
    "status": "PASS"
   },

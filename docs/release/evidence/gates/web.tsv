@@ -1,6 +1,6 @@
-typecheck	0	1
-eslint	0	10
-vitest	0	125
+typecheck	0	2
+eslint	0	12
+vitest	0	134
 npm-audit	0	2
-npm-audit-json	0	2
+npm-audit-json	0	3
 DONE

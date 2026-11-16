@@ -1,18 +1,18 @@
-ok  	github.com/NicoTM77/Mandatary/cmd/mandatary	11.555s
+ok  	github.com/NicoTM77/Mandatary/cmd/mandatary	11.802s
 ok  	github.com/NicoTM77/Mandatary/internal/api	0.015s
-ok  	github.com/NicoTM77/Mandatary/internal/auth	187.394s
+ok  	github.com/NicoTM77/Mandatary/internal/auth	188.827s
 ?   	github.com/NicoTM77/Mandatary/internal/auth/blocklistgen	[no test files]
-ok  	github.com/NicoTM77/Mandatary/internal/auth/nfc17	1.309s
-ok  	github.com/NicoTM77/Mandatary/internal/authz	26.436s
-ok  	github.com/NicoTM77/Mandatary/internal/backup	7.758s
+ok  	github.com/NicoTM77/Mandatary/internal/auth/nfc17	1.523s
+ok  	github.com/NicoTM77/Mandatary/internal/authz	27.856s
+ok  	github.com/NicoTM77/Mandatary/internal/backup	7.625s
 ok  	github.com/NicoTM77/Mandatary/internal/config	0.005s
-ok  	github.com/NicoTM77/Mandatary/internal/docker	20.663s
+ok  	github.com/NicoTM77/Mandatary/internal/docker	32.491s
 ok  	github.com/NicoTM77/Mandatary/internal/domain	0.004s
 ok  	github.com/NicoTM77/Mandatary/internal/logging	0.012s
 ?   	github.com/NicoTM77/Mandatary/internal/mcp	[no test files]
-ok  	github.com/NicoTM77/Mandatary/internal/ops	33.427s
-ok  	github.com/NicoTM77/Mandatary/internal/store	12.168s
-ok  	github.com/NicoTM77/Mandatary/tests/adapters	18.907s
+ok  	github.com/NicoTM77/Mandatary/internal/ops	34.414s
+ok  	github.com/NicoTM77/Mandatary/internal/store	11.535s
+ok  	github.com/NicoTM77/Mandatary/tests/adapters	19.273s
 ?   	github.com/NicoTM77/Mandatary/tests/release/mcpclient	[no test files]
 ?   	github.com/NicoTM77/Mandatary/tests/release/migfixture	[no test files]
 ok  	github.com/NicoTM77/Mandatary/tests/security	0.005s

@@ -1,28 +1,28 @@
-===== vm-prep-fde3a293470f.txt =====
-src files=639
-C:9cf7a696b1ec |N:0d77899c7a99 1d4163a01edf c614c3683a3f d908fcb7ebfa |V:p120-trivy-cache 
-16
-/dev/mapper/ubuntu--vg-ubuntu--lv   19G   14G  3.4G  81% /
+===== vm-prep-1528ef025ad9.txt =====
+src files=716
+C:9cf7a696b1ec |N:0d77899c7a99 1d4163a01edf c614c3683a3f d908fcb7ebfa |V:p1201373mstk_proxy_config p1201373mstk_proxy_data p120-trivy-cache 
+23
+/dev/mapper/ubuntu--vg-ubuntu--lv   19G   14G  3.3G  81% /
 
-===== vm-build-fde3a293470f.txt =====
+===== vm-build-1528ef025ad9.txt =====
 build exit=0
 host-binary exit=0
-id=sha256:3c365ee66d89ea49602acd85f4b823efbdfc8e2be39dc086f5efd532622a6b2e size=41504402 arch=amd64 user=65532:65532 rev=fde3a293470f99747c1a39468f0c0c092348ceb7
-14a38b81fb6e1103713a85d63ae8d715267784dc56fc30d7ec3eeaf9d7174730  /srv/mandatary/tests/p120-fde3a293470f/out/mandatary
+id=sha256:2f0093f1b0a883f346e3abbde589be420b61c383954de8f5c64cecdcda2a4fe7 size=41575561 arch=amd64 user=65532:65532 rev=1528ef025ad9af7ff1f40f64fa82e62db44118d4
+d7b926fa8e6fd058c29333b6f93d9086b229da39d1a0f8d6062d09d684012b34  /srv/mandatary/tests/p120-1528ef025ad9/out/mandatary
 
-===== vm-oci-fde3a293470f.txt =====
+===== vm-oci-1528ef025ad9.txt =====
 oci build exit=0
-4948 824b31664cdb0b54f6d3f36825c89fea07a9f00230f6ca684dbadfc8959ab256
+4948 716944469085ac921bd6c91abe8c21438edf823716233f27400328d5c984f594
 12675 c172f21841dff4c8cf45cde46589c1c2616cefe7e819965e92e6d3475c428aa0
 32093 d6b1b89eccacc15c2420b2776d72c1dae334a00805ed9af54bf2f71e4d536f28
 124525 2cc7ee286bf3a9e6af5f71756d7fc8e22e23ce65fec9047d774511ffcef79fa8
 142002 ec1b04bf2eb2122e86781f791b03ea0cf6588694e0f4a88245250224c186cdf0
 257706 777e9d0975e474519f4f14ff87e547cbb8f9fff4cfc4f1a147ac81906880e503
 290159 fc4330146a1cc76e06ce6def693f5da42c16e2615be6f49e1ea5b6e249ff8262
-11550090 ad65f04262f4012ce175dd11572c64d9ed259844c5758d96894183096b7f6254
-92d777a9a3cfb42dae231dfcb4dafa772b083300317d53106925f79c7a58d9ba  /srv/mandatary/tests/p120-fde3a293470f/ev/image-oci.tar
+11572098 9be9fb92583fdcaa92dca09c5b3a086d1c2b77075bbe44f3462caf77853aaeea
+6471400793e23bcba4f33fa89d90b6dcfe482f35bab1c32051457e4bd10320b3  /srv/mandatary/tests/p120-1528ef025ad9/ev/image-oci.tar
 
-===== vm-trivy-fde3a293470f.txt =====
+===== vm-trivy-1528ef025ad9.txt =====
 Version: 0.76.2
 Vulnerability DB:
   Version: 2
@@ -34,12 +34,12 @@ trivy-hc exit=0
 trivy-all exit=0
 sbom CycloneDX 1.7 components 63
 trivy HIGH/CRITICAL 0
-92d777a9a3cfb42dae231dfcb4dafa772b083300317d53106925f79c7a58d9ba  /srv/mandatary/tests/p120-fde3a293470f/ev/image-oci.tar
-sha256sum: /srv/mandatary/tests/p120-fde3a293470f/ev/oci: Is a directory
-2f70c1d9d6347f8cf7cbd8b185c7aeb9449660d13ebc38d2fc49dd5d9cf0a0d5  /srv/mandatary/tests/p120-fde3a293470f/ev/sbom.cdx.json
-519321aa103e65220c6859f65577577c0b4e60fc6591762be2058bbf2d02d665  /srv/mandatary/tests/p120-fde3a293470f/ev/trivy-all.json
-c1620c28a2e5626efcd8aa8f5e281424a239ee69da405cae83536d0d1c74cae6  /srv/mandatary/tests/p120-fde3a293470f/ev/trivy-hc.json
+6471400793e23bcba4f33fa89d90b6dcfe482f35bab1c32051457e4bd10320b3  /srv/mandatary/tests/p120-1528ef025ad9/ev/image-oci.tar
+sha256sum: /srv/mandatary/tests/p120-1528ef025ad9/ev/oci: Is a directory
+2e36127f532ba75c41bbd6efaea697e057a4a3b48168674e098cc5dff1c4dc5c  /srv/mandatary/tests/p120-1528ef025ad9/ev/sbom.cdx.json
+ab13dd7a4cd88ef55a9b5a09f3a890a24f1b50199c077308837887cd86e23f0a  /srv/mandatary/tests/p120-1528ef025ad9/ev/trivy-all.json
+6518e2dfafe6edcfe03d7955dfa799472ebc8dcb9c30dea81b0260912ed71ba5  /srv/mandatary/tests/p120-1528ef025ad9/ev/trivy-hc.json
 
-===== vm-release-fde3a293470f.txt =====
-started pid 949384
+===== vm-release-1528ef025ad9.txt =====
+started pid 2923038
 

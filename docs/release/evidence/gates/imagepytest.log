@@ -16,6 +16,6 @@ test_every_docker_call_names_the_explicit_endpoint (__main__.HarnessTests.test_e
 test_the_endpoint_argument_is_mandatory_and_nothing_is_created (__main__.HarnessTests.test_the_endpoint_argument_is_mandatory_and_nothing_is_created) ... ok
 
 ----------------------------------------------------------------------
-Ran 16 tests in 3.382s
+Ran 16 tests in 3.473s
 
 OK

@@ -38,12 +38,13 @@ test_parse_status_reads_kib_as_bytes (__main__.Proc.test_parse_status_reads_kib_
 test_percentiles_are_nearest_rank_and_empty_is_zero (__main__.Proc.test_percentiles_are_nearest_rank_and_empty_is_zero) ... ok
 test_a_criterion_without_a_result_or_digest_is_never_a_pass (__main__.Report.test_a_criterion_without_a_result_or_digest_is_never_a_pass) ... ok
 test_a_stale_or_hand_edited_report_is_detected (__main__.Report.test_a_stale_or_hand_edited_report_is_detected) ... ok
+test_measured_values_are_read_from_the_evidence_and_a_missing_value_says_so (__main__.Report.test_measured_values_are_read_from_the_evidence_and_a_missing_value_says_so) ... ok
 test_one_failing_link_fails_the_criterion_even_when_others_pass (__main__.Report.test_one_failing_link_fails_the_criterion_even_when_others_pass) ... ok
 test_the_verdict_is_accepted_only_when_every_criterion_passes (__main__.Report.test_the_verdict_is_accepted_only_when_every_criterion_passes) ... ok
 test_an_unrecognised_archive_is_an_error_not_a_size (__main__.SaveSize.test_an_unrecognised_archive_is_an_error_not_a_size) ... ok
 test_the_size_is_every_layer_compressed_plus_config_and_manifest (__main__.SaveSize.test_the_size_is_every_layer_compressed_plus_config_and_manifest) ... ok
 
 ----------------------------------------------------------------------
-Ran 44 tests in 0.667s
+Ran 45 tests in 0.757s
 
 OK

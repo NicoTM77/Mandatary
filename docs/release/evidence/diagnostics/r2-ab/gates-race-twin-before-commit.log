@@ -1,0 +1,44 @@
+head=9984df21d3c08e4c3081f1bdc139de84b3b6783f dirty=12 2026-11-16T16:15:33Z
+go version go1.27.4 linux/amd64
+--- gofmt:
+gofmt clean
+--- vet:
+vet clean
+--- race: docker authz ops api cmd/mandatary logging
+ok  	github.com/NicoTM77/Mandatary/internal/docker	36.643s
+ok  	github.com/NicoTM77/Mandatary/internal/authz	148.902s
+ok  	github.com/NicoTM77/Mandatary/internal/ops	138.451s
+ok  	github.com/NicoTM77/Mandatary/internal/api	1.070s
+ok  	github.com/NicoTM77/Mandatary/internal/logging	1.039s
+ok  	github.com/NicoTM77/Mandatary/cmd/mandatary	73.907s
+race rc=0
+--- twin race (whole existing docker suite through the cached path)
+ok  	github.com/NicoTM77/Mandatary/internal/docker	36.252s
+twin rc=0
+--- twin race, new tests verbose summary
+     76 PASS:
+--- python
+Ran 23 tests in 2.611s
+
+OK
+Ran 45 tests in 0.763s
+
+OK
+Ran 16 tests in 3.455s
+
+OK
+--- node
+✔ CI pins only patched Go versions and has no vulnerable label (0.561015ms)
+✔ current development documentation names the patched releases and vulnerable ones only beside the advisory (3.934122ms)
+✔ browser fixture accepts only its explicit synthetic HTTPS loopback mapping (3.236786ms)
+✔ browser egress permits only exact fixture origin and known routes/methods (2.365087ms)
+ℹ tests 67
+ℹ suites 0
+ℹ pass 67
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 24791.463509
+2026-11-16T16:19:42Z
+CORE_DONE
