@@ -1,0 +1,1342 @@
+{
+ "artifact": "adverse-ci-e5e1856",
+ "evidence": {
+  "environment": {
+   "api": "1.48",
+   "cgroup": "systemd v2",
+   "compose": "2.38.2",
+   "compose_project": "p120ee95mstk",
+   "cpus": 4,
+   "daemon_id": "0fef2a29-aadb-43ca-98b5-edbc7a28f18a",
+   "docker_server": "28.0.4",
+   "fsync_4k_work_filesystem": {
+    "mean_ms": 0.151,
+    "n": 200,
+    "p50_ms": 0.063,
+    "p95_ms": 0.189,
+    "p99_ms": 0.553
+   },
+   "host_cpus": 4,
+   "kernel": "7.0.0-1017-azure",
+   "memory_bytes": 16760348672,
+   "os": "Ubuntu 24.04.5 LTS",
+   "os_arch": "linux/amd64",
+   "storage_driver": "overlay2"
+  },
+  "footprint": {
+   "idle": [
+    {
+     "RssAnon_last": 10940416,
+     "RssFile_last": 17215488,
+     "VmHWM_process_lifetime": 99209216,
+     "VmRSS_peak_in_window": 99409920,
+     "VmRSS_steady_max": 28155904,
+     "VmRSS_steady_median": 28016640,
+     "cgroup": {
+      "memory.current": 13164544,
+      "memory.max": "max",
+      "memory.peak": 88911872
+     },
+     "curve_s_rss_anon_file": {
+      "omitted_list_length": 60
+     },
+     "label": "fresh",
+     "pid_namespace": "host",
+     "settled_under_budget_at_s": 140.0,
+     "steady_window_s": 60,
+     "window_s": 300
+    },
+    {
+     "RssAnon_last": 16572416,
+     "RssFile_last": 18448384,
+     "VmHWM_process_lifetime": 183345152,
+     "VmRSS_peak_in_window": 35225600,
+     "VmRSS_steady_max": 35139584,
+     "VmRSS_steady_median": 35024896,
+     "cgroup": {
+      "memory.current": 22966272,
+      "memory.max": "max",
+      "memory.peak": 173998080
+     },
+     "curve_s_rss_anon_file": {
+      "omitted_list_length": 60
+     },
+     "label": "configured",
+     "pid_namespace": "host",
+     "settled_under_budget_at_s": 0.0,
+     "steady_window_s": 60,
+     "window_s": 300
+    },
+    {
+     "RssAnon_last": 9371648,
+     "RssFile_last": 17084416,
+     "VmHWM_process_lifetime": 97439744,
+     "VmRSS_peak_in_window": 97656832,
+     "VmRSS_steady_max": 26636288,
+     "VmRSS_steady_median": 26574848,
+     "cgroup": {
+      "memory.current": 10985472,
+      "memory.max": "max",
+      "memory.peak": 86142976
+     },
+     "curve_s_rss_anon_file": {
+      "omitted_list_length": 60
+     },
+     "label": "after-restart",
+     "pid_namespace": "host",
+     "settled_under_budget_at_s": 160.0,
+     "steady_window_s": 60,
+     "window_s": 300
+    }
+   ],
+   "image": {
+    "archive_sha256": "ae555c3f91a40c325fa360f3e5558df4272f095e83d3dc5ae35be5240b672309",
+    "budget": {
+     "MB": 60.0,
+     "MiB": 57.22,
+     "bytes": 60000000
+    },
+    "compressed": {
+     "MB": 12.31,
+     "MiB": 11.74,
+     "bytes": 12308635
+    },
+    "layers": {
+     "omitted_list_length": 15
+    },
+    "method": "ESTIMATE: this daemon's buildx driver cannot export OCI, so every layer of `docker save` of the image under test is gzip-compressed (level 6, the default of docker push) and summed with the config and manifest; a registry's own compressor can differ by a few percent"
+   },
+   "latency": {
+    "allowed_accounted": {
+     "mean_ms": 52.36,
+     "n": 150,
+     "p50_ms": 48.718,
+     "p95_ms": 71.143,
+     "p99_ms": 137.262
+    },
+    "denied_accounted": {
+     "mean_ms": 90.968,
+     "n": 150,
+     "p50_ms": 47.035,
+     "p95_ms": 58.964,
+     "p99_ms": 471.087
+    },
+    "note": "denied_accounted - unauth_401 = authorization + one synchronous durable usage write, measured through the TLS proxy on the isolated host; not a microbenchmark of the write alone",
+    "unauth_401": {
+     "mean_ms": 43.057,
+     "n": 150,
+     "p50_ms": 42.999,
+     "p95_ms": 43.488,
+     "p99_ms": 44.101
+    },
+    "usage_write_cost_estimate_p50_ms": 4.036
+   },
+   "load": {
+    "VmHWM_after": 40108032,
+    "VmRSS_after": 37785600,
+    "VmRSS_before": 35016704,
+    "VmRSS_peak_sampled": 39731200,
+    "attempts": {
+     "omitted_list_length": 4935
+    },
+    "cgroup": {
+     "memory.current": 25411584,
+     "memory.max": "max",
+     "memory.peak": 173998080
+    },
+    "clients": {
+     "follow_streams": 5,
+     "mcp_sessions": 10,
+     "rest_pollers": 10
+    },
+    "correlation": {
+     "attempts": 4935,
+     "daemon_probe_failures": 0,
+     "daemon_probe_ms": {
+      "mean_ms": 2.602,
+      "n": 152,
+      "p50_ms": 0.86,
+      "p95_ms": 7.53,
+      "p99_ms": 10.05
+     },
+     "drop_context": [],
+     "drops": 0,
+     "drops_by_reason_step_cause": {},
+     "ok": 4935,
+     "outage_ms": null,
+     "outages_unrestored": 0,
+     "refusal_classes": {},
+     "refusals": 0,
+     "refusals_inside_a_recorded_outage": 0,
+     "refusals_not_explained_by_a_recorded_drop": 0,
+     "unexplained_samples": []
+    },
+    "daemon_probe": {
+     "omitted_list_length": 152
+    },
+    "host_cpu": {
+     "omitted_list_length": 60
+    },
+    "mcp": {
+     "by_op": {
+      "container_logs": 1338,
+      "container_status": 1339
+     },
+     "calls": 2677,
+     "errors": 0,
+     "ok": 2677,
+     "p50_ms": 9.639,
+     "p95_ms": 91.589,
+     "p99_ms": 227.009,
+     "seconds": 60.18424349,
+     "workers": 10
+    },
+    "mcp_error": null,
+    "peak_reset_before_window": true,
+    "rest": {
+     "errors": 0,
+     "logs": 1129,
+     "status": 1129
+    },
+    "rest_error_classes": {},
+    "rest_latency": {
+     "mean_ms": 66.954,
+     "n": 2258,
+     "p50_ms": 50.651,
+     "p95_ms": 147.038,
+     "p99_ms": 299.644
+    },
+    "rss_samples": 61,
+    "seconds": 61.0,
+    "service_log_safety_lines": [
+     "mandatary-1  | {\"time\":\"2026-11-17T02:36:38.811263345Z\",\"level\":\"INFO\",\"msg\":\"docker backend verified\"}"
+    ],
+    "service_safety_events": [
+     [
+      "verified",
+      1794882998811,
+      {}
+     ]
+    ],
+    "streams": {
+     "failed": 0,
+     "frames": 315,
+     "load1": 3,
+     "load2": 2,
+     "opened": 5
+    }
+   },
+   "oci_export_error": "ild: OCI exporter is not supported for the docker driver.\nSwitch to a different driver, or turn on the containerd image store, and try again.\nLearn more at https://docs.docker.com/go/build-exporters/\n"
+  },
+  "image": {
+   "architecture": "amd64",
+   "docker_size_bytes": 25701718,
+   "id": "sha256:076c3b1838594078abc169a28c558a8a91c80da7639df999a4cb3b6b28ade04c",
+   "os": "linux",
+   "repo_digests": [],
+   "revision_label": "0d6b022fc1d1b180092ac87fd2409a0c85422b3e",
+   "rootfs_layers": {
+    "omitted_list_length": 15
+   }
+  },
+  "lifecycle": {},
+  "logging": {
+   "debug": {
+    "INFO": 2,
+    "WARN": 1
+   },
+   "error": {},
+   "info": {
+    "INFO": 2,
+    "WARN": 1
+   },
+   "warn": {
+    "WARN": 1
+   }
+  },
+  "matrix": {
+   "cases": 94,
+   "daemon_events_on_protected_or_ungranted": {
+    "B": [],
+    "peer": [],
+    "self": []
+   },
+   "raw": {
+    "omitted_list_length": 29
+   },
+   "table": {
+    "omitted_list_length": 94
+   },
+   "tools": [
+    "container_config",
+    "container_logs",
+    "container_restart",
+    "container_start",
+    "container_status",
+    "container_stop"
+   ]
+  },
+  "migration": {
+   "diffs": [],
+   "from": 13,
+   "integrity": "ok",
+   "to": 14,
+   "usage_cells": 60
+  },
+  "persistence": {
+   "crash": {
+    "restart_count": 1,
+    "seconds_to_ready": 0.6,
+    "started_at_changed": true
+   },
+   "rules_after_restart": 35
+  },
+  "restore": {
+   "original_scope": {
+    "agents": {
+     "omitted_list_length": 14
+    },
+    "groups": [
+     "rel-g",
+     "rel-g2"
+    ],
+    "rules": {
+     "omitted_list_length": 35
+    },
+    "users": [
+     "rel-admin",
+     "rel-owner"
+    ]
+   },
+   "r1": {
+    "inactive_credentials": {
+     "agent_credentials": 12,
+     "authenticators": 4
+    },
+    "manifest_kinds_imported_local": {
+     "address": [
+      2,
+      1
+     ],
+     "agent": [
+      14,
+      0
+     ],
+     "agent_membership": [
+      1,
+      0
+     ],
+     "endpoint": [
+      1,
+      0
+     ],
+     "group": [
+      2,
+      0
+     ],
+     "policy": [
+      35,
+      0
+     ],
+     "role": [
+      1,
+      1
+     ],
+     "user": [
+      2,
+      1
+     ]
+    },
+    "mode": "full",
+    "not_approvable": [
+     "address:needs_reverification",
+     "role:single_administrator"
+    ],
+    "report": {
+     "backup_id": "c1fbcb77-bfaa-4ac1-98c4-a59ca6ef13c6",
+     "credentials_stripped": false,
+     "excluded": [
+      "sessions",
+      "rate_limit_state",
+      "usage_statistics",
+      "setup_and_recovery_state",
+      "security_notices",
+      "control_generations_and_quarantine",
+      "master_key_and_installation_binding"
+     ],
+     "imported": {
+      "address": 2,
+      "agent": 14,
+      "agent_membership": 1,
+      "endpoint": 1,
+      "group": 2,
+      "policy": 35,
+      "role": 1,
+      "user": 2
+     },
+     "inactive_credentials": {
+      "agent_credentials": 12,
+      "authenticators": 2
+     },
+     "initiator": "admin",
+     "mode": "full",
+     "next_step": "host_recovery_required",
+     "provenance": "authenticated",
+     "restore_generation": 2,
+     "retained_local": {
+      "address": 1,
+      "role": 1,
+      "user": 1
+     },
+     "state": "restore_quarantine"
+    },
+    "same_key": true,
+    "scope": {
+     "effective_after_approval": {
+      "agents": 14,
+      "groups": 2,
+      "rules": 34,
+      "users": 4
+     },
+     "original": {
+      "agents": 14,
+      "groups": 2,
+      "rules": 35,
+      "users": 2
+     },
+     "unexpected_rules": [],
+     "withheld_rules": [
+      "agent:rel-ro|ALLOW|container:inspect_status|p120ee95-a"
+     ]
+    }
+   },
+   "r2": {
+    "inactive_credentials": {
+     "agent_credentials": 0,
+     "authenticators": 2
+    },
+    "manifest_kinds_imported_local": {
+     "address": [
+      2,
+      1
+     ],
+     "agent": [
+      14,
+      0
+     ],
+     "agent_membership": [
+      1,
+      0
+     ],
+     "endpoint": [
+      1,
+      0
+     ],
+     "group": [
+      2,
+      0
+     ],
+     "policy": [
+      35,
+      0
+     ],
+     "role": [
+      1,
+      1
+     ],
+     "user": [
+      2,
+      1
+     ]
+    },
+    "mode": "clean",
+    "not_approvable": [
+     "address:needs_reverification",
+     "role:single_administrator"
+    ],
+    "report": {
+     "backup_id": "09c807eb-2d32-4162-a915-21ce1339dd56",
+     "credentials_stripped": true,
+     "excluded": [
+      "sessions",
+      "rate_limit_state",
+      "usage_statistics",
+      "setup_and_recovery_state",
+      "security_notices",
+      "control_generations_and_quarantine",
+      "master_key_and_installation_binding"
+     ],
+     "imported": {
+      "address": 2,
+      "agent": 14,
+      "agent_membership": 1,
+      "endpoint": 1,
+      "group": 2,
+      "policy": 35,
+      "role": 1,
+      "user": 2
+     },
+     "inactive_credentials": {},
+     "initiator": "admin",
+     "mode": "clean",
+     "next_step": "host_recovery_required",
+     "provenance": "unauthenticated",
+     "restore_generation": 2,
+     "retained_local": {
+      "address": 1,
+      "role": 1,
+      "user": 1
+     },
+     "state": "restore_quarantine"
+    },
+    "same_key": false,
+    "scope": {
+     "effective_after_approval": {
+      "agents": 14,
+      "groups": 2,
+      "rules": 34,
+      "users": 4
+     },
+     "original": {
+      "agents": 14,
+      "groups": 2,
+      "rules": 35,
+      "users": 2
+     },
+     "unexpected_rules": [],
+     "withheld_rules": [
+      "agent:rel-ro|ALLOW|container:inspect_status|p120ee95-a"
+     ]
+    }
+   }
+  },
+  "stage_seconds": {
+   "DEPLOY": 6.3,
+   "DEVFLOW": 0.9,
+   "DOCS": 0.0,
+   "IDENTITIES": 2.7,
+   "IDLE-CONFIGURED": 300.0,
+   "IDLE-FRESH": 300.0,
+   "IMG": 1.3,
+   "LATENCY": 28.0,
+   "LIFECYCLE": 20.1,
+   "LOAD": 61.5,
+   "LOGLEVEL": 31.6,
+   "LOGS": 0.5,
+   "MATRIX": 60.7,
+   "MIGRATION": 8.0,
+   "PERSISTENCE": 306.7,
+   "RESTORE": 125.1,
+   "SETUP": 16.3
+  },
+  "usage": {
+   "AFTER-CRASH": {
+    "daily_cells": 60,
+    "diffs": [],
+    "expected_cells": 60,
+    "expected_events": 5406,
+    "graceful_exit": 0,
+    "hourly_diffs": [],
+    "recent_events": 1000
+   },
+   "AFTER-WORKLOAD": {
+    "daily_cells": 60,
+    "diffs": [],
+    "expected_cells": 60,
+    "expected_events": 5396,
+    "graceful_exit": 0,
+    "hourly_diffs": [],
+    "recent_events": 1000
+   }
+  }
+ },
+ "image": "mandatary-ci:amd64",
+ "not_pass": 3,
+ "pass": 152,
+ "platform": "linux/amd64",
+ "results": [
+  {
+   "detail": "",
+   "id": "ISO-00",
+   "status": "PASS"
+  },
+  {
+   "detail": "0d6b022fc1d1b180092ac87fd2409a0c85422b3e linux/amd64",
+   "id": "REL-IMG-01",
+   "status": "PASS"
+  },
+  {
+   "detail": "12.31 MB (11.74 MiB), budget 60 MB, 15 layers",
+   "id": "REL-FOOT-IMG",
+   "status": "PASS"
+  },
+  {
+   "detail": "",
+   "id": "REL-FOOT-SAME",
+   "status": "PASS"
+  },
+  {
+   "detail": "",
+   "id": "REL-DEP-01",
+   "status": "PASS"
+  },
+  {
+   "detail": "steady max 28.16 MB (median 28.02 MB, anon 10.94 MB, file 17.22 MB); peak in window 99.41 MB; settled under 50 MB at 140.0 s; process VmHWM 99.21 MB",
+   "id": "REL-FOOT-IDLE-fresh",
+   "status": "PASS"
+  },
+  {
+   "detail": "start-up peak in the 300 s window 99.41 MB; time to stabilization 140.0 s; steady-state maximum 28.16 MB",
+   "id": "REL-FOOT-SETTLE-fresh",
+   "status": "PASS"
+  },
+  {
+   "detail": "exit 0",
+   "id": "REL-SETUP-setup-reveal",
+   "status": "PASS"
+  },
+  {
+   "detail": "200",
+   "id": "REL-SETUP-setup-exchange",
+   "status": "PASS"
+  },
+  {
+   "detail": "200",
+   "id": "REL-SETUP-setup-account",
+   "status": "PASS"
+  },
+  {
+   "detail": "204",
+   "id": "REL-SETUP-setup-proof",
+   "status": "PASS"
+  },
+  {
+   "detail": "204",
+   "id": "REL-SETUP-setup-confirm",
+   "status": "PASS"
+  },
+  {
+   "detail": "200 204",
+   "id": "REL-SETUP-setup-totp",
+   "status": "PASS"
+  },
+  {
+   "detail": "200",
+   "id": "REL-SETUP-setup-complete",
+   "status": "PASS"
+  },
+  {
+   "detail": "200",
+   "id": "REL-SETUP-login",
+   "status": "PASS"
+  },
+  {
+   "detail": "{'owner': '1fdf181a-8223-40e5-85b2-8857dbc964af'}{'g': '8789b0b8-4f5f-4990-9fb0-c4163e106ba3', 'g2': '4c74484a-96b5-4ed1-b8f8-fd04b7acf32b'}",
+   "id": "REL-ID-01",
+   "status": "PASS"
+  },
+  {
+   "detail": "14",
+   "id": "REL-ID-02",
+   "status": "PASS"
+  },
+  {
+   "detail": "204",
+   "id": "REL-ID-03",
+   "status": "PASS"
+  },
+  {
+   "detail": "[True, True, True, True, True, True, True, True, True, True, True, True, True, True]",
+   "id": "REL-ID-04",
+   "status": "PASS"
+  },
+  {
+   "detail": "",
+   "id": "REL-ID-05",
+   "status": "PASS"
+  },
+  {
+   "detail": "['p120ee95-a', 'p120ee95-b', 'p120ee95-c', 'p120ee95mstk-proxy-1', 'p120ee95mstk-smtp-1']",
+   "id": "REL-ID-06",
+   "status": "PASS"
+  },
+  {
+   "detail": "[('X-dn-stop-A', 200//, (502, '', ''))]",
+   "id": "REL-MATRIX-REST",
+   "status": "FAIL"
+  },
+  {
+   "detail": "[]",
+   "id": "REL-MATRIX-MCP",
+   "status": "PASS"
+  },
+  {
+   "detail": "[('X-dn-stop-A', (502, '', ''), (200, '', ''))]",
+   "id": "REL-MATRIX-PARITY",
+   "status": "FAIL"
+  },
+  {
+   "detail": "",
+   "id": "REL-MATRIX-POS",
+   "status": "FAIL"
+  },
+  {
+   "detail": "[]",
+   "id": "REL-MATRIX-RAW",
+   "status": "PASS"
+  },
+  {
+   "detail": "['container_config', 'container_logs', 'container_restart', 'container_start', 'container_status', 'container_stop']",
+   "id": "REL-MCP-CATALOG",
+   "status": "PASS"
+  },
+  {
+   "detail": "[]",
+   "id": "REL-MCP-UNSUPPORTED",
+   "status": "PASS"
+  },
+  {
+   "detail": "[{'id': 'L-none', 'connected': False, 'http_status': 401, 'http_code': 'unauthenticated', 'elapsed_ms': 0}, {'id': 'L-garbage', 'connected': False, 'http_status': 401, 'http_code': 'unauthenticated', ",
+   "id": "REL-MCP-NOAUTH",
+   "status": "PASS"
+  },
+  {
+   "detail": "{'B': [], 'self': [], 'peer': []}",
+   "id": "REL-MATRIX-EFFECT",
+   "status": "PASS"
+  },
+  {
+   "detail": "",
+   "id": "REL-MATRIX-STATE",
+   "status": "PASS"
+  },
+  {
+   "detail": "201",
+   "id": "REL-LIFE-EXP-0",
+   "status": "PASS"
+  },
+  {
+   "detail": "((200, '', ''), (200, '', ''))",
+   "id": "REL-LIFE-EXP-1",
+   "status": "PASS"
+  },
+  {
+   "detail": "((401, 'unauthenticated', ''), (401, 'unauthenticated', ''))",
+   "id": "REL-LIFE-EXP-2",
+   "status": "PASS"
+  },
+  {
+   "detail": "((200, '', ''), (200, '', ''))",
+   "id": "REL-LIFE-REV-1",
+   "status": "PASS"
+  },
+  {
+   "detail": "204",
+   "id": "REL-LIFE-REV-2",
+   "status": "PASS"
+  },
+  {
+   "detail": "((401, 'unauthenticated', ''), (401, 'unauthenticated', ''))",
+   "id": "REL-LIFE-REV-3",
+   "status": "PASS"
+  },
+  {
+   "detail": "(200, '', '') (401, 'unauthenticated', '')",
+   "id": "REL-LIFE-SESSION",
+   "status": "PASS"
+  },
+  {
+   "detail": "((200, '', ''), (200, '', '')) ((401, 'unauthenticated', ''), (401, 'unauthenticated', '')) 204",
+   "id": "REL-LIFE-DIS",
+   "status": "PASS"
+  },
+  {
+   "detail": "201 ((200, '', ''), (200, '', '')) ((200, '', ''), (200, '', ''))",
+   "id": "REL-LIFE-ROT-1",
+   "status": "PASS"
+  },
+  {
+   "detail": "((401, 'unauthenticated', ''), (401, 'unauthenticated', ''), (200, '', ''), (200, '', ''))",
+   "id": "REL-LIFE-ROT-2",
+   "status": "PASS"
+  },
+  {
+   "detail": "((200, '', ''), (200, '', '')) ((403, 'forbidden', 'default_deny'), (403, 'forbidden', 'default_deny')) 204",
+   "id": "REL-LIFE-GROUP",
+   "status": "PASS"
+  },
+  {
+   "detail": "((200, '', ''), (200, '', '')) 200 2",
+   "id": "REL-LIFE-POL-1",
+   "status": "PASS"
+  },
+  {
+   "detail": "disable [204, 204] ended=True 0.2s last=b'{\"error\":{\"code\":\"forbidden\",\"status\":403,\"reason\":\"authorization_ended\",\"messag'",
+   "id": "REL-LIFE-POL-2",
+   "status": "PASS"
+  },
+  {
+   "detail": "((403, 'forbidden', 'default_deny'), (403, 'forbidden', 'default_deny'))",
+   "id": "REL-LIFE-POL-3",
+   "status": "PASS"
+  },
+  {
+   "detail": "[204, 204] ((200, '', ''), (200, '', ''))",
+   "id": "REL-LIFE-POL-4",
+   "status": "PASS"
+  },
+  {
+   "detail": "[204, 204] ((403, 'forbidden', 'default_deny'), (403, 'forbidden', 'default_deny'))",
+   "id": "REL-LIFE-POL-5",
+   "status": "PASS"
+  },
+  {
+   "detail": "p50 ms: 401 43.00, denied+accounted 47.03, allowed+accounted 48.72; p99 ms: 44.10 / 471.09 / 137.26",
+   "id": "REL-LAT",
+   "status": "PASS"
+  },
+  {
+   "detail": "steady max 35.14 MB (median 35.02 MB, anon 16.57 MB, file 18.45 MB); peak in window 35.23 MB; settled under 50 MB at 0.0 s; process VmHWM 183.35 MB",
+   "id": "REL-FOOT-IDLE-configured",
+   "status": "PASS"
+  },
+  {
+   "detail": "start-up peak in the 300 s window 35.23 MB; time to stabilization 0.0 s; steady-state maximum 35.14 MB",
+   "id": "REL-FOOT-SETTLE-configured",
+   "status": "PASS"
+  },
+  {
+   "detail": "rest ok 2258, mcp ok 2677, streams {'load1': 3, 'load2': 2, 'opened': 5, 'failed': 0, 'frames': 315} ",
+   "id": "REL-LOAD-RUN",
+   "status": "PASS"
+  },
+  {
+   "detail": "rest errors 0 {}; mcp {'calls': 2677, 'ok': 2677, 'errors': 0, 'by_error': None}; service log lines: mandatary-1  | {\"time\":\"2026-11-17T02:36:38.811263345Z\",\"level\":\"INFO\",\"msg\":\"docker backend verified\"}",
+   "id": "REL-LOAD-STABLE",
+   "status": "PASS"
+  },
+  {
+   "detail": "budget 150 MB; 61 RSS samples at 1 Hz; rss before 35.02 MB after 37.79 MB",
+   "id": "REL-FOOT-LOAD",
+   "status": "PASS"
+  },
+  {
+   "detail": "graceful exit 0; ",
+   "id": "REL-USAGE-AFTER-WORKLOAD",
+   "status": "PASS"
+  },
+  {
+   "detail": "recent=1000 integrity=ok fk=0 cols=['agent_id', 'endpoint_id', 'id', 'occurred_at', 'operation', 'outcome', 'retain_until', 'selector_id', 'user_id']",
+   "id": "REL-USAGE-RING-AFTER-WORKLOAD",
+   "status": "PASS"
+  },
+  {
+   "detail": "steady max 26.64 MB (median 26.57 MB, anon 9.37 MB, file 17.08 MB); peak in window 97.66 MB; settled under 50 MB at 160.0 s; process VmHWM 97.44 MB",
+   "id": "REL-FOOT-IDLE-after-restart",
+   "status": "PASS"
+  },
+  {
+   "detail": "start-up peak in the 300 s window 97.66 MB; time to stabilization 160.0 s; steady-state maximum 26.64 MB",
+   "id": "REL-FOOT-SETTLE-after-restart",
+   "status": "PASS"
+  },
+  {
+   "detail": "(200, '', '') (403, 'forbidden', 'default_deny')",
+   "id": "REL-RESTART-1",
+   "status": "PASS"
+  },
+  {
+   "detail": "(200, '', '')",
+   "id": "REL-RESTART-2",
+   "status": "PASS"
+  },
+  {
+   "detail": "rules=35",
+   "id": "REL-RESTART-3",
+   "status": "PASS"
+  },
+  {
+   "detail": "404",
+   "id": "REL-RESTART-4",
+   "status": "PASS"
+  },
+  {
+   "detail": "{'restart_count': 1, 'started_at_changed': True}",
+   "id": "REL-CRASH-1",
+   "status": "PASS"
+  },
+  {
+   "detail": "(200, '', '')",
+   "id": "REL-CRASH-2",
+   "status": "PASS"
+  },
+  {
+   "detail": "graceful exit 0; ",
+   "id": "REL-USAGE-AFTER-CRASH",
+   "status": "PASS"
+  },
+  {
+   "detail": "recent=1000 integrity=ok fk=0 cols=['agent_id', 'endpoint_id', 'id', 'occurred_at', 'operation', 'outcome', 'retain_until', 'selector_id', 'user_id']",
+   "id": "REL-USAGE-RING-AFTER-CRASH",
+   "status": "PASS"
+  },
+  {
+   "detail": "200 clean=True",
+   "id": "REL-BACKUP-EXPORT-full",
+   "status": "PASS"
+  },
+  {
+   "detail": "exit 0",
+   "id": "REL-R1-SETUP-setup-reveal",
+   "status": "PASS"
+  },
+  {
+   "detail": "200",
+   "id": "REL-R1-SETUP-setup-exchange",
+   "status": "PASS"
+  },
+  {
+   "detail": "200",
+   "id": "REL-R1-SETUP-setup-account",
+   "status": "PASS"
+  },
+  {
+   "detail": "204",
+   "id": "REL-R1-SETUP-setup-proof",
+   "status": "PASS"
+  },
+  {
+   "detail": "204",
+   "id": "REL-R1-SETUP-setup-confirm",
+   "status": "PASS"
+  },
+  {
+   "detail": "200 204",
+   "id": "REL-R1-SETUP-setup-totp",
+   "status": "PASS"
+  },
+  {
+   "detail": "200",
+   "id": "REL-R1-SETUP-setup-complete",
+   "status": "PASS"
+  },
+  {
+   "detail": "401",
+   "id": "REL-RESTORE-R1-ANON",
+   "status": "PASS"
+  },
+  {
+   "detail": "400",
+   "id": "REL-RESTORE-R1-PHRASE",
+   "status": "PASS"
+  },
+  {
+   "detail": "422 {'error': 'archive_integrity_failed'}",
+   "id": "REL-RESTORE-R1-TAMPER",
+   "status": "PASS"
+  },
+  {
+   "detail": "200",
+   "id": "REL-RESTORE-R1-NOQUAR",
+   "status": "PASS"
+  },
+  {
+   "detail": "200 {'backup_id': 'c1fbcb77-bfaa-4ac1-98c4-a59ca6ef13c6', 'mode': 'full', 'provenance': 'authenticated', 'initiator': 'admin', 'restore_generation': 2, 'state': 'restore_quarantine', 'next_step': 'host_re",
+   "id": "REL-RESTORE-R1-DO",
+   "status": "PASS"
+  },
+  {
+   "detail": "401",
+   "id": "REL-RESTORE-R1-SIGNEDOUT",
+   "status": "PASS"
+  },
+  {
+   "detail": "(403, 'forbidden', 'restore_quarantined')",
+   "id": "REL-RESTORE-R1-OLDTOKEN",
+   "status": "PASS"
+  },
+  {
+   "detail": "exit 0: restore-administrator recovery generation 2 issued, absolute expiry 2026-11-17T03:25:31Z. No secret was printed; run the matching reveal command on this host terminal.\r\n",
+   "id": "REL-R1-RECOVERY-recovery-issue",
+   "status": "PASS"
+  },
+  {
+   "detail": "exit 0",
+   "id": "REL-R1-RECOVERY-recovery-reveal",
+   "status": "PASS"
+  },
+  {
+   "detail": "200",
+   "id": "REL-R1-RECOVERY-setup-exchange",
+   "status": "PASS"
+  },
+  {
+   "detail": "200",
+   "id": "REL-R1-RECOVERY-setup-account",
+   "status": "PASS"
+  },
+  {
+   "detail": "204",
+   "id": "REL-R1-RECOVERY-setup-proof",
+   "status": "PASS"
+  },
+  {
+   "detail": "204",
+   "id": "REL-R1-RECOVERY-setup-confirm",
+   "status": "PASS"
+  },
+  {
+   "detail": "200 204",
+   "id": "REL-R1-RECOVERY-setup-totp",
+   "status": "PASS"
+  },
+  {
+   "detail": "200",
+   "id": "REL-R1-RECOVERY-setup-complete",
+   "status": "PASS"
+  },
+  {
+   "detail": "200 kinds={'address': [2, 1], 'agent': [14, 0], 'agent_membership': [1, 0], 'endpoint': [1, 0], 'group': [2, 0], 'policy': [35, 0], 'role': [1, 1], 'user': [2, 1]} cred={'agent_credentials': 12, 'authenticators': 4}",
+   "id": "REL-RESTORE-R1-MANIFEST",
+   "status": "PASS"
+  },
+  {
+   "detail": "active rules before approval: 0",
+   "id": "REL-RESTORE-R1-INACTIVE",
+   "status": "PASS"
+  },
+  {
+   "detail": "200 {'approved': [{'kind': 'endpoint', 'id': '30f5b753-623c-49e0-8734-6fcd13638ecb', 'result': 'approved'}, {'kind': 'user', 'id': '1fdf181a-8223-40e5-85b2-8857dbc964af', 'result': 'approved'}, {'kind': '",
+   "id": "REL-RESTORE-R1-APPROVE",
+   "status": "PASS"
+  },
+  {
+   "detail": "['address:needs_reverification', 'role:single_administrator']",
+   "id": "REL-RESTORE-R1-NOAPPROVE",
+   "status": "PASS"
+  },
+  {
+   "detail": "409",
+   "id": "REL-RESTORE-R1-CRAFTED",
+   "status": "PASS"
+  },
+  {
+   "detail": "[True, True, True, True]",
+   "id": "REL-RESTORE-R1-REISSUE",
+   "status": "PASS"
+  },
+  {
+   "detail": "[]",
+   "id": "REL-RESTORE-R1-AUTHZ",
+   "status": "PASS"
+  },
+  {
+   "detail": "(401, 'unauthenticated', '')",
+   "id": "REL-RESTORE-R1-OLDTOKEN2",
+   "status": "PASS"
+  },
+  {
+   "detail": "gone=['agent:rel-ro|ALLOW|container:inspect_status|p120ee95-a'] extra=[]",
+   "id": "REL-RESTORE-R1-SCOPE",
+   "status": "PASS"
+  },
+  {
+   "detail": "",
+   "id": "REL-RESTORE-R1-USAGE",
+   "status": "PASS"
+  },
+  {
+   "detail": "200 clean=True",
+   "id": "REL-BACKUP-EXPORT-clean",
+   "status": "PASS"
+  },
+  {
+   "detail": "exit 0",
+   "id": "REL-R2-SETUP-setup-reveal",
+   "status": "PASS"
+  },
+  {
+   "detail": "200",
+   "id": "REL-R2-SETUP-setup-exchange",
+   "status": "PASS"
+  },
+  {
+   "detail": "200",
+   "id": "REL-R2-SETUP-setup-account",
+   "status": "PASS"
+  },
+  {
+   "detail": "204",
+   "id": "REL-R2-SETUP-setup-proof",
+   "status": "PASS"
+  },
+  {
+   "detail": "204",
+   "id": "REL-R2-SETUP-setup-confirm",
+   "status": "PASS"
+  },
+  {
+   "detail": "200 204",
+   "id": "REL-R2-SETUP-setup-totp",
+   "status": "PASS"
+  },
+  {
+   "detail": "200",
+   "id": "REL-R2-SETUP-setup-complete",
+   "status": "PASS"
+  },
+  {
+   "detail": "401",
+   "id": "REL-RESTORE-R2-ANON",
+   "status": "PASS"
+  },
+  {
+   "detail": "400",
+   "id": "REL-RESTORE-R2-PHRASE",
+   "status": "PASS"
+  },
+  {
+   "detail": "422 {'error': 'archive_integrity_failed'}",
+   "id": "REL-RESTORE-R2-TAMPER",
+   "status": "PASS"
+  },
+  {
+   "detail": "200",
+   "id": "REL-RESTORE-R2-NOQUAR",
+   "status": "PASS"
+  },
+  {
+   "detail": "409 {'error': 'provenance_unverified'}",
+   "id": "REL-RESTORE-R2-PROVENANCE",
+   "status": "PASS"
+  },
+  {
+   "detail": "200 {'backup_id': '09c807eb-2d32-4162-a915-21ce1339dd56', 'mode': 'clean', 'provenance': 'unauthenticated', 'initiator': 'admin', 'restore_generation': 2, 'state': 'restore_quarantine', 'next_step': 'host",
+   "id": "REL-RESTORE-R2-DO",
+   "status": "PASS"
+  },
+  {
+   "detail": "401",
+   "id": "REL-RESTORE-R2-SIGNEDOUT",
+   "status": "PASS"
+  },
+  {
+   "detail": "(403, 'forbidden', 'restore_quarantined')",
+   "id": "REL-RESTORE-R2-OLDTOKEN",
+   "status": "PASS"
+  },
+  {
+   "detail": "exit 0: restore-administrator recovery generation 2 issued, absolute expiry 2026-11-17T03:26:31Z. No secret was printed; run the matching reveal command on this host terminal.\r\n",
+   "id": "REL-R2-RECOVERY-recovery-issue",
+   "status": "PASS"
+  },
+  {
+   "detail": "exit 0",
+   "id": "REL-R2-RECOVERY-recovery-reveal",
+   "status": "PASS"
+  },
+  {
+   "detail": "200",
+   "id": "REL-R2-RECOVERY-setup-exchange",
+   "status": "PASS"
+  },
+  {
+   "detail": "200",
+   "id": "REL-R2-RECOVERY-setup-account",
+   "status": "PASS"
+  },
+  {
+   "detail": "204",
+   "id": "REL-R2-RECOVERY-setup-proof",
+   "status": "PASS"
+  },
+  {
+   "detail": "204",
+   "id": "REL-R2-RECOVERY-setup-confirm",
+   "status": "PASS"
+  },
+  {
+   "detail": "200 204",
+   "id": "REL-R2-RECOVERY-setup-totp",
+   "status": "PASS"
+  },
+  {
+   "detail": "200",
+   "id": "REL-R2-RECOVERY-setup-complete",
+   "status": "PASS"
+  },
+  {
+   "detail": "200 kinds={'address': [2, 1], 'agent': [14, 0], 'agent_membership': [1, 0], 'endpoint': [1, 0], 'group': [2, 0], 'policy': [35, 0], 'role': [1, 1], 'user': [2, 1]} cred={'agent_credentials': 0, 'authenticators': 2}",
+   "id": "REL-RESTORE-R2-MANIFEST",
+   "status": "PASS"
+  },
+  {
+   "detail": "active rules before approval: 0",
+   "id": "REL-RESTORE-R2-INACTIVE",
+   "status": "PASS"
+  },
+  {
+   "detail": "200 {'approved': [{'kind': 'endpoint', 'id': 'ba2d7650-39ec-4d7d-86f1-6af826481769', 'result': 'approved'}, {'kind': 'user', 'id': '1fdf181a-8223-40e5-85b2-8857dbc964af', 'result': 'approved'}, {'kind': '",
+   "id": "REL-RESTORE-R2-APPROVE",
+   "status": "PASS"
+  },
+  {
+   "detail": "['address:needs_reverification', 'role:single_administrator']",
+   "id": "REL-RESTORE-R2-NOAPPROVE",
+   "status": "PASS"
+  },
+  {
+   "detail": "409",
+   "id": "REL-RESTORE-R2-CRAFTED",
+   "status": "PASS"
+  },
+  {
+   "detail": "[True, True, True, True]",
+   "id": "REL-RESTORE-R2-REISSUE",
+   "status": "PASS"
+  },
+  {
+   "detail": "[]",
+   "id": "REL-RESTORE-R2-AUTHZ",
+   "status": "PASS"
+  },
+  {
+   "detail": "(401, 'unauthenticated', '')",
+   "id": "REL-RESTORE-R2-OLDTOKEN2",
+   "status": "PASS"
+  },
+  {
+   "detail": "gone=['agent:rel-ro|ALLOW|container:inspect_status|p120ee95-a'] extra=[]",
+   "id": "REL-RESTORE-R2-SCOPE",
+   "status": "PASS"
+  },
+  {
+   "detail": "",
+   "id": "REL-RESTORE-R2-USAGE",
+   "status": "PASS"
+  },
+  {
+   "detail": "rc=1 schema now 13 (started at 14) migfixture: downgrade refused: partial migration error (type:sql,version:13): constraint failed: NOT",
+   "id": "REL-MIGRATE-REFUSE",
+   "status": "PASS"
+  },
+  {
+   "detail": "13",
+   "id": "REL-MIGRATE-PRIOR",
+   "status": "PASS"
+  },
+  {
+   "detail": "(200, '', '') (403, 'forbidden', 'default_deny') (200, '', '')  ready=True login=True",
+   "id": "REL-MIGRATE-AUTHZ",
+   "status": "PASS"
+  },
+  {
+   "detail": "schema=14 diffs=[] integrity=ok fk=0 tables=2",
+   "id": "REL-MIGRATE-FORWARD",
+   "status": "PASS"
+  },
+  {
+   "detail": "exit 1",
+   "id": "REL-MIGRATE-NEWER",
+   "status": "PASS"
+  },
+  {
+   "detail": "readyz=200 healthcheck=0 healthcheck --ready=0",
+   "id": "REL-DEV-01",
+   "status": "PASS"
+  },
+  {
+   "detail": "index=200 api=401 unknown=404",
+   "id": "REL-DEV-02",
+   "status": "PASS"
+  },
+  {
+   "detail": "",
+   "id": "REL-DEV-03",
+   "status": "PASS"
+  },
+  {
+   "detail": "exit=1",
+   "id": "REL-DEV-04",
+   "status": "PASS"
+  },
+  {
+   "detail": "",
+   "id": "REL-DOCS-LINKS",
+   "status": "PASS"
+  },
+  {
+   "detail": "[]",
+   "id": "REL-DOCS-DEPLOY",
+   "status": "PASS"
+  },
+  {
+   "detail": "[]",
+   "id": "REL-DOCS-LIMITS",
+   "status": "PASS"
+  },
+  {
+   "detail": "",
+   "id": "REL-DOCS-UNAVAILABLE",
+   "status": "PASS"
+  },
+  {
+   "detail": "",
+   "id": "REL-DOCS-README-LIMITS",
+   "status": "PASS"
+  },
+  {
+   "detail": "",
+   "id": "REL-LOGLEVEL-KEY-debug",
+   "status": "PASS"
+  },
+  {
+   "detail": "",
+   "id": "REL-LOGLEVEL-KEY-info",
+   "status": "PASS"
+  },
+  {
+   "detail": "",
+   "id": "REL-LOGLEVEL-KEY-warn",
+   "status": "PASS"
+  },
+  {
+   "detail": "",
+   "id": "REL-LOGLEVEL-KEY-error",
+   "status": "PASS"
+  },
+  {
+   "detail": "{'debug': {'WARN': 1, 'INFO': 2}, 'info': {'WARN': 1, 'INFO': 2}, 'warn': {'WARN': 1}, 'error': {}}",
+   "id": "REL-LOGLEVEL",
+   "status": "PASS"
+  },
+  {
+   "detail": "{'debug': {'WARN': 1, 'INFO': 2}, 'info': {'WARN': 1, 'INFO': 2}, 'warn': {'WARN': 1}, 'error': {}}",
+   "id": "REL-LOGLEVEL-POS",
+   "status": "PASS"
+  },
+  {
+   "detail": "1",
+   "id": "REL-LOGLEVEL-INVALID",
+   "status": "PASS"
+  },
+  {
+   "detail": "",
+   "id": "REL-LOGS",
+   "status": "PASS"
+  },
+  {
+   "detail": "",
+   "id": "ISO-01",
+   "status": "PASS"
+  }
+ ],
+ "revision": "0d6b022fc1d1b180092ac87fd2409a0c85422b3e",
+ "schema": "mandatary-p120-evidence-summary/1",
+ "seconds": 1283,
+ "source": {
+  "bytes": 585432,
+  "member": "adverse-ci-e5e1856/image-evidence-amd64/release-amd64.json",
+  "sha256": "6196ef843ecb4d9d687a3153d801510183646263fc9c8c9aabbff61814a788c8"
+ }
+}

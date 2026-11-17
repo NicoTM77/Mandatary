@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1050 270" role="img" aria-labelledby="title desc">
+  <title id="title">Mandatary — Authority by design</title>
+  <desc id="desc">Mandatary architectural gateway icon, wordmark and tagline.</desc>
+  <g transform="translate(7 4) scale(.5)">
+    <path fill="#5DE0C5" d="M256 42 454 146V365l-49-27V176L256 100 107 176v162l-49 27V146Z"/>
+    <path fill="#87A9FF" d="m58 383 49-27v91l-49 23Z"/>
+    <path fill="#87A9FF" d="m405 356 49 27v87l-49-23Z"/>
+    <path fill="#F5F8FC" d="m137 206 119 84 119-84v227l-49-25V301l-70 49-70-49v107l-49 25Z"/>
+  </g>
+  <text x="275" y="141" font-family="Manrope, Inter, Arial, sans-serif" font-size="92" font-weight="800" letter-spacing="-3" fill="#F5F8FC">mandatary</text>
+  <text x="281" y="200" font-family="Manrope, Inter, Arial, sans-serif" font-size="38" font-weight="650" fill="#5DE0C5">Authority by design.</text>
+</svg>

@@ -56,7 +56,12 @@ type fakeDaemonTransport struct {
 	failOp      error
 	lastTail    string
 	lastTimeout string
+	// delay, when set, runs at the start of every round trip (before any answer) so a test can model a slow
+	// or hung daemon. It sees the request context, so cancellation and deadlines behave as on a real socket.
+	delay func(req *http.Request)
 }
+
+var errSynthetic = errors.New("synthetic disconnect")
 
 func newFakeDaemonTransport() *fakeDaemonTransport {
 	return &fakeDaemonTransport{
@@ -109,7 +114,14 @@ func (f *fakeDaemonTransport) RoundTrip(req *http.Request) (*http.Response, erro
 	failList := f.failList
 	failInspect := f.failInspect
 	failOp := f.failOp
+	delay := f.delay
 	f.mu.Unlock()
+	if delay != nil {
+		delay(req)
+		if err := req.Context().Err(); err != nil {
+			return nil, err
+		}
+	}
 
 	header := make(http.Header)
 	if apiVer != "" {

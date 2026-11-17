@@ -30,10 +30,45 @@ const (
 	DockerVerified   = "docker backend verified"
 	DockerUnverified = "docker backend unverified"
 	DockerMockActive = "mock docker backend active"
+	// Safety-proof transitions (P1.20, R2). A drop names its fixed reason, the step that was running, the
+	// class of the error that ended it, how long that step ran, and how many daemon calls and streams were
+	// live. A restoration names how long the proof was missing. Nothing else is admitted.
+	DockerSafetyDropped  = "docker safety proof dropped"
+	DockerSafetyRestored = "docker safety proof restored"
+	// Daemon request counters (P1.20, R2): how many requests of each closed kind this process has sent to the
+	// Docker daemon since it started. Counts only; see dockerRequestKeys.
+	DockerRequests = "docker daemon requests"
 )
 
+// dockerRequestKeys are the only admitted attributes of DockerRequests: one non-negative count per request kind.
+var dockerRequestKeys = map[string]bool{
+	"req_ping": true, "req_info": true, "req_list": true, "req_inspect": true, "req_logs": true,
+	"req_start": true, "req_stop": true, "req_restart": true, "req_other": true,
+}
+
 // dockerReasons are the only admitted reasons of the Docker-backend events; no path, error text or ID.
-var dockerReasons = map[string]bool{"unreachable": true, "unsupported_api": true, "identity": true}
+var dockerReasons = map[string]bool{
+	"unreachable": true, "unsupported_api": true, "identity": true,
+	// proof-drop reasons (internal/docker DropReason)
+	"daemon_unreachable": true, "check_deadline": true, "operation_fault": true, "stream_fault": true,
+	"reverify": true, "external": true, "closed": true,
+}
+
+// dropSteps and dropCauses are the closed vocabularies of the proof-drop event (internal/docker DropStep, DropCause).
+var dropSteps = map[string]bool{
+	"ping": true, "info": true, "inventory": true, "inspect_self": true, "inspect_target": true,
+	"verify": true, "continuity": true, "operation": true, "stream": true, "none": true,
+}
+var dropCauses = map[string]bool{
+	"deadline": true, "canceled": true, "eof": true, "conn_reset": true, "dial": true, "net_timeout": true,
+	"connect": true, "transport": true, "daemon_error": true, "none": true,
+}
+
+// dialClasses is the closed vocabulary of the last failed connect to the Docker socket (cmd/mandatary dialMonitor).
+var dialClasses = map[string]bool{"would_block": true, "refused": true, "timeout": true, "no_descriptors": true, "reset": true, "eof": true, "other": true}
+
+// maxCount bounds the numeric diagnostics of the proof events (a count or a millisecond duration).
+const maxCount = int64(1) << 40
 
 // SetupReasons are the only admitted values of the "reason" attribute.
 var setupReasons = map[string]bool{"origin_not_configured": true, "rotation_required": true, "storage": true, "clock": true}
@@ -89,7 +124,7 @@ func (h *handler) Enabled(ctx context.Context, level slog.Level) bool {
 func (h *handler) Handle(ctx context.Context, r slog.Record) error {
 	message := redacted
 	switch r.Message {
-	case RequestCompleted, RequestPanicked, ServerStarted, StartupFailed, ServerFailed, StorageCloseFailed, SetupAvailable, SetupUnavailable, SetupNoMail, DockerVerified, DockerUnverified, DockerMockActive:
+	case RequestCompleted, RequestPanicked, ServerStarted, StartupFailed, ServerFailed, StorageCloseFailed, SetupAvailable, SetupUnavailable, SetupNoMail, DockerVerified, DockerUnverified, DockerMockActive, DockerSafetyDropped, DockerSafetyRestored, DockerRequests:
 		message = r.Message
 	}
 	level := r.Level
@@ -167,6 +202,26 @@ func sanitize(a slog.Attr, deny bool) slog.Attr {
 		}
 	case "reason":
 		if a.Value.Kind() == slog.KindString && (setupReasons[a.Value.String()] || dockerReasons[a.Value.String()]) {
+			return a
+		}
+	case "step":
+		if a.Value.Kind() == slog.KindString && dropSteps[a.Value.String()] {
+			return a
+		}
+	case "cause":
+		if a.Value.Kind() == slog.KindString && dropCauses[a.Value.String()] {
+			return a
+		}
+	case "dial_last":
+		if a.Value.Kind() == slog.KindString && dialClasses[a.Value.String()] {
+			return a
+		}
+	case "elapsed_ms", "outage_ms", "inflight", "streams", "dial_faults":
+		if a.Value.Kind() == slog.KindInt64 && a.Value.Int64() >= 0 && a.Value.Int64() <= maxCount {
+			return a
+		}
+	case "req_ping", "req_info", "req_list", "req_inspect", "req_logs", "req_start", "req_stop", "req_restart", "req_other":
+		if dockerRequestKeys[a.Key] && a.Value.Kind() == slog.KindInt64 && a.Value.Int64() >= 0 && a.Value.Int64() <= maxCount {
 			return a
 		}
 	case "generation":

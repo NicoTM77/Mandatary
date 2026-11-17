@@ -3,10 +3,13 @@ package main
 import (
 	"context"
 	"errors"
+	"io"
 	"log/slog"
 	"net"
 	"net/http"
 	"sync"
+	"sync/atomic"
+	"syscall"
 	"time"
 
 	"github.com/NicoTM77/Mandatary/internal/api"
@@ -40,6 +43,12 @@ var verifyInterval = 5 * time.Second
 // verifyTimeout bounds one VerifySelf attempt (a hung daemon leaves the backend unverified, never half-ready).
 const verifyTimeout = 15 * time.Second
 
+// continuityTTL is how long one successful continuity check (daemon ID, own container, all-state inventory)
+// may cover other read admissions and stream deliveries (P1.20, R2; docs/docker-backend.md, "Bounded continuity
+// freshness"). It is a fixed constant: no environment variable, setting or request can lengthen it, and the
+// adapter refuses any value above one second.
+const continuityTTL = time.Second
+
 // productOptions are test seams; production passes the zero value.
 type productOptions struct {
 	// evidence replaces the /proc/self/cgroup reader.
@@ -56,6 +65,7 @@ type product struct {
 	targets     auth.TargetSource
 	safetyReset func()
 	stop        func()
+	backend     docker.DockerBackend
 }
 
 // composeProduct returns (nil, true) when no backend is configured, (nil, false) for an invalid
@@ -75,6 +85,7 @@ func composeProduct(ctx context.Context, logger *slog.Logger, c config.Config, r
 		return nil, false
 	}
 	var backend docker.DockerBackend
+	var counts *requestCounts // set only for a real daemon: the mock sends no request
 	if c.MockDocker {
 		// SELF-13: the mock identifies a synthetic protected fixture and applies the identical state
 		// machine. There is no real socket in this branch and no fallback to one.
@@ -87,14 +98,18 @@ func composeProduct(ctx context.Context, logger *slog.Logger, c config.Config, r
 		logger.Warn(logging.DockerMockActive)
 	} else {
 		evidence := mandatoryEvidence(opts.evidence)
+		dials := &dialMonitor{}
+		counts = &requestCounts{}
 		adapter, err := docker.NewSDKAdapter(docker.SDKOptions{
-			EndpointID: local,
-			Transport:  unixTransport(c.DockerSocket),
+			EndpointID:    local,
+			Transport:     observeRoundTrips(unixTransport(c.DockerSocket), dials, counts),
+			ContinuityTTL: continuityTTL,
 			Identity: docker.SelfIdentityConfig{
 				EndpointID:          local,
 				ExplicitContainerID: c.SelfContainerID,
 				InstanceUUID:        c.SelfInstanceUUID,
 				EvidenceReader:      evidence,
+				Observer:            transitionLogger(logger, dials),
 			},
 		})
 		if err != nil {
@@ -126,7 +141,7 @@ func composeProduct(ctx context.Context, logger *slog.Logger, c config.Config, r
 		_ = az.Close()
 		return nil, false
 	}
-	p := &product{targets: auth.AuthorizerTargets{A: az}, notify: svc.NotifyAuthorityChange, safetyReset: az.InvalidateSelfProtection}
+	p := &product{targets: auth.AuthorizerTargets{A: az}, notify: svc.NotifyAuthorityChange, safetyReset: az.InvalidateSelfProtection, backend: backend}
 	// Readiness (SELF-01/02, rest.go Config.Ready) is the endpoint's safety proof: the backend is ready
 	// AND its self-protection state is VERIFIED. A missing socket, unproven identity, unsupported API,
 	// an unreachable daemon or a dropped proof (restore, reapproval, lost continuity) is false. It is
@@ -151,12 +166,17 @@ func composeProduct(ctx context.Context, logger *slog.Logger, c config.Config, r
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() { defer wg.Done(); v.run(background) }()
+	if counts != nil {
+		wg.Add(1)
+		go func() { defer wg.Done(); counts.run(background, logger, requestLogInterval) }()
+	}
 	var once sync.Once
 	p.stop = func() {
 		once.Do(func() {
 			cancel()
 			wg.Wait()
 			_ = az.Close() // cancels every active stream and closes the backends
+			counts.log(logger)
 		})
 	}
 	return p, true
@@ -196,7 +216,9 @@ func (v *verifier) attempt(ctx context.Context) {
 		// proof in the adapter itself, so readiness reports the daemon being gone or the identity having
 		// changed within one interval instead of waiting for the next request to discover it
 		// (P112-event-reconnect-contract: discontinuity is detected here, recovery is only a fresh VerifySelf).
-		check, cancel := context.WithTimeout(ctx, verifyTimeout)
+		// The deadline is one of ours (ErrSafetyCheckDeadline): a heartbeat that has to wait for another caller's
+		// check past it revokes the proof, as the stream watchdog's own deadline does.
+		check, cancel := heartbeatContext(ctx, verifyTimeout)
 		_, err := v.backend.ListContainers(check)
 		cancel()
 		if err != nil && ctx.Err() == nil {
@@ -223,6 +245,11 @@ func (v *verifier) attempt(ctx context.Context) {
 	}
 }
 
+// heartbeatContext bounds one readiness heartbeat. Its deadline is one of ours (ErrSafetyCheckDeadline).
+func heartbeatContext(parent context.Context, d time.Duration) (context.Context, context.CancelFunc) {
+	return context.WithTimeoutCause(parent, d, docker.ErrSafetyCheckDeadline)
+}
+
 // run retries on every tick until ctx ends.
 func (v *verifier) run(ctx context.Context) {
 	ticker := time.NewTicker(verifyInterval)
@@ -235,6 +262,90 @@ func (v *verifier) run(ctx context.Context) {
 			v.attempt(ctx)
 		}
 	}
+}
+
+// transitionLogger reports every loss and restoration of the endpoint's safety proof (P1.20, R2). Without it
+// a proof lost during a request and re-established by the next verification tick left no trace at all, so an
+// operator saw authorized calls refused with safety_unverified and nothing in the log. Only members of the
+// closed vocabularies in internal/docker/transition.go and counts or durations are logged; the logging
+// boundary admits nothing else, so no error text, path, ID, token or payload can reach the line.
+func transitionLogger(logger *slog.Logger, dials *dialMonitor) docker.TransitionObserver {
+	return func(tr docker.Transition) {
+		if tr.Verified {
+			logger.Info(logging.DockerSafetyRestored, "outage_ms", tr.Outage.Milliseconds())
+			return
+		}
+		attrs := []any{
+			"reason", string(tr.Drop.Reason), "step", string(tr.Drop.Step), "cause", string(tr.Drop.Cause),
+			"elapsed_ms", tr.Drop.Elapsed.Milliseconds(), "inflight", tr.Inflight, "streams", int64(tr.Streams),
+		}
+		// The Docker SDK discards the error behind a connection failure, so the failed connects since the last
+		// report are counted at the dialer, with the class of the last one.
+		if n, last := dials.take(); n > 0 {
+			attrs = append(attrs, "dial_faults", n, "dial_last", last)
+		}
+		logger.Warn(logging.DockerSafetyDropped, attrs...)
+	}
+}
+
+// dialMonitor counts the transport failures of the calls to the Docker socket by a closed class (diagnostics only).
+// The Docker SDK replaces the error behind a connection failure with a fixed text, so the class is taken here, below it.
+type dialMonitor struct {
+	faults atomic.Int64
+	last   atomic.Value // string
+}
+
+// observedTransport records the class of every failed round trip, then returns the error unchanged.
+type observedTransport struct {
+	base   http.RoundTripper
+	mon    *dialMonitor
+	counts *requestCounts
+}
+
+func observeRoundTrips(base http.RoundTripper, mon *dialMonitor, counts *requestCounts) http.RoundTripper {
+	return &observedTransport{base: base, mon: mon, counts: counts}
+}
+
+func (t *observedTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	t.counts.record(req)
+	resp, err := t.base.RoundTrip(req)
+	t.mon.record(err)
+	return resp, err
+}
+
+func (m *dialMonitor) record(err error) {
+	// A caller's own cancellation or deadline is not a transport fault.
+	if m == nil || err == nil || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return
+	}
+	class := "other"
+	var ne net.Error
+	switch {
+	case errors.Is(err, syscall.EAGAIN):
+		class = "would_block"
+	case errors.Is(err, syscall.ECONNREFUSED):
+		class = "refused"
+	case errors.Is(err, syscall.EMFILE), errors.Is(err, syscall.ENFILE):
+		class = "no_descriptors"
+	case errors.Is(err, syscall.ECONNRESET), errors.Is(err, syscall.EPIPE):
+		class = "reset"
+	case errors.Is(err, io.EOF), errors.Is(err, io.ErrUnexpectedEOF):
+		class = "eof"
+	case errors.Is(err, syscall.ETIMEDOUT), errors.As(err, &ne) && ne.Timeout():
+		class = "timeout"
+	}
+	m.last.Store(class)
+	m.faults.Add(1)
+}
+
+// take returns the failed round trips since the previous call and the class of the last one.
+func (m *dialMonitor) take() (int64, string) {
+	if m == nil {
+		return 0, ""
+	}
+	n := m.faults.Swap(0)
+	last, _ := m.last.Load().(string)
+	return n, last
 }
 
 func dockerReason(err error) string {

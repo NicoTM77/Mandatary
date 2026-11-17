@@ -60,6 +60,13 @@ exception exists. The current schema admits:
 - `method`: exact standard HTTP method enumeration, not arbitrary client input.
 - `status`: integer 100–599; `duration`: nonnegative `slog.Duration`.
 - `stage`: exactly `configuration`, `storage` or `listener`.
+- Docker-backend events (P1.19, P1.20): `docker backend verified` / `unverified` (a closed `reason`),
+  `docker safety proof dropped` / `restored` (closed `reason`, `step`, `cause`, bounded counts and millisecond
+  durations; never an error text, path or ID) and `docker daemon requests`: one non-negative count per closed request
+  kind (`req_ping`, `req_info`, `req_list`, `req_inspect`, `req_logs`, `req_start`, `req_stop`, `req_restart`,
+  `req_other`), the totals since the process started, logged once a minute and when the service stops. The kind is derived
+  from the method and the shape of the path and is never copied from it; the counters measure how much work one admitted
+  call puts on the daemon (`docs/docker-backend.md`, "Bounded continuity freshness").
 - Groups named `http`, `server`, `config`, or an inline group; their children
   pass through the same validation. Unknown groups also deny their descendants.
 

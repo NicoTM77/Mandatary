@@ -1,5 +1,6 @@
 export { AdminShell, CenteredFrame, type AccountSummary, type AdminShellProps, type NavItem } from './AdminShell';
 export { Alert, Badge, SyntheticBadge, type AlertProps, type BadgeTone, type Tone } from './Alert';
+export { BrandIcon, BrandLockup, type BrandSize } from './BrandMark';
 export { Button, type ButtonProps, type ButtonVariant } from './Button';
 export { CheckboxField, RadioGroup, SelectField, type CheckboxFieldProps, type RadioGroupProps, type RadioOption, type SelectFieldProps, type SelectGroup, type SelectOption } from './Choice';
 export { ConfirmPanel, type ConfirmPanelProps } from './ConfirmPanel';

@@ -53,6 +53,24 @@ bodies). Only `stop`/`restart` accept a body (`application/json`, ≤ 4 KiB;
 can only come from the path. Docker options (`all`, `force`, `signal`, `v`,
 `size`, `filters`, `path`, `host`, …) are unknown fields.
 
+### Stop and restart outlive the 10 s server write bound
+
+The HTTP server bounds every response write to 10 s (`serverFor`, `WriteTimeout`; reads and headers are bounded too), but an
+admitted `stop` or `restart` may run `timeout_seconds` plus the 15 s `StopGrace` (25 s by default, up to 315 s): a container whose
+PID 1 ignores SIGTERM is killed only after the full timeout. So that the client still receives the result of an operation the
+daemon executed (and that was counted `allowed`), the service tells the transport its dispatch bound **after authorization and
+immediately before the backend call** (`ops.DispatchObserver`), and the REST and MCP handlers then move **that one response's**
+write deadline to the bound plus 5 s (`api.WithAdmissionDeadline`; the deadline only moves forward). Consequences, pinned by tests
+through the real `serverFor` (`TestAdmittedStopAndRestartDeliverTheirResultPastTheServerWriteBound`,
+`TestUnadmittedRequestsKeepTheServerWriteBound`, `internal/ops/dispatch_observer_test.go`):
+
+* only an admitted stop/restart gets more time; an unauthenticated, invalid, denied, unverified or not-found request keeps the
+  10 s bound, so does every other operation and route (start and the reads stay far below it; a log read has its own bound);
+* the announcement carries a duration only: no identity, target or error text;
+* it changes no authorization, identity, invalidation, cancellation, fault classification, lease or freshness semantics, and
+  `server.WriteTimeout`, `ReadTimeout` and `ReadHeaderTimeout` are unchanged;
+* an operation that runs past even its own bound is cut by the dispatch deadline (a timeout answer), never silently kept open.
+
 ### Follow-mode logs (REST only)
 
 `GET …/logs?follow=true` streams `application/x-ndjson`: one metadata line,

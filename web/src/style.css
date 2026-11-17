@@ -25,20 +25,25 @@
   --fg: #0f1e1f;
   --muted: #44585a;
   --subtle: #586c6e;
-  --accent: #0b6e78;
-  --accent-hover: #095a63;
+  --accent: #00766a;
+  --accent-hover: #005f55;
   --accent-fg: #ffffff;
-  --accent-soft: #dcf0f2;
-  --accent-text: #095a63;
+  --accent-soft: #d9f3ee;
+  --accent-text: #005f55;
   --danger: #b42318;
   --danger-soft: #fdecea;
   --warn: #7a4a00;
   --warn-soft: #fff0d1;
   --success: #17623a;
   --success-soft: #dff3e6;
-  --focus: #0b6e78;
+  --focus: #00766a;
   --scrim: rgb(15 30 31 / 0.45);
   --shadow: 0 1px 2px rgb(15 30 31 / 0.06), 0 6px 20px rgb(15 30 31 / 0.06);
+  /* Approved logo colours (web/brand/THEME.md). Identity only: never used for text, controls or status. */
+  --brand-mark: #101b2a;
+  --brand-gateway: #5de0c5;
+  --brand-pillar: #87a9ff;
+  --brand-wordmark: #101b2a;
 }
 
 [data-theme='dark'] {
@@ -51,20 +56,24 @@
   --fg: #e8f0f0;
   --muted: #a9babc;
   --subtle: #93a6a8;
-  --accent: #4fc3ce;
-  --accent-hover: #7ad6de;
-  --accent-fg: #041416;
-  --accent-soft: #123a3f;
-  --accent-text: #7ad6de;
+  --accent: #5de0c5;
+  --accent-hover: #8aebd7;
+  --accent-fg: #04201b;
+  --accent-soft: #10352f;
+  --accent-text: #8aebd7;
   --danger: #ff9a90;
   --danger-soft: #3a1714;
   --warn: #f2b45a;
   --warn-soft: #3a2a0d;
   --success: #74d894;
   --success-soft: #12301d;
-  --focus: #4fc3ce;
+  --focus: #5de0c5;
   --scrim: rgb(0 0 0 / 0.6);
   --shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px rgb(0 0 0 / 0.35);
+  --brand-mark: #f5f8fc;
+  --brand-gateway: #5de0c5;
+  --brand-pillar: #87a9ff;
+  --brand-wordmark: #f5f8fc;
 }
 
 @theme inline {
@@ -89,6 +98,10 @@
   --color-success-soft: var(--success-soft);
   --color-focus: var(--focus);
   --color-scrim: var(--scrim);
+  --color-brand-mark: var(--brand-mark);
+  --color-brand-gateway: var(--brand-gateway);
+  --color-brand-pillar: var(--brand-pillar);
+  --color-brand-wordmark: var(--brand-wordmark);
   --shadow-panel: var(--shadow);
   --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI Variable Text', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   --font-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;

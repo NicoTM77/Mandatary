@@ -115,7 +115,9 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		api.WriteProblem(w, prob)
 		return
 	}
-	h.sdk.ServeHTTP(w, r)
+	// An admitted stop/restart may outlive the server's 10 s write bound; the shared service says so
+	// only after authorization (api.WithAdmissionDeadline). Nothing else is affected.
+	h.sdk.ServeHTTP(w, api.WithAdmissionDeadline(w, r))
 }
 
 func (h *Handler) authProblem(r *http.Request) *api.Problem {

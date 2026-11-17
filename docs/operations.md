@@ -108,6 +108,10 @@ call's context; an inspect result that completes after that is **withheld**.
   (default 30 s) otherwise. An already-expired bound dispatches nothing. The Logs
   open is bounded by `OperationTimeout` too; only the handed-off stream is exempt (its
   context is the lease).
+* The HTTP server's own 10 s write bound would cut off a stop/restart that runs longer than that (default 25 s). Just before the
+  backend call, and only for an admitted stop/restart, `Execute` tells the transport the dispatch bound
+  (`ops.DispatchObserver`) so the REST and MCP handlers can extend **that response's** write deadline to the bound plus 5 s
+  (docs/api-mcp.md, "Stop and restart outlive the 10 s server write bound"). A refused request never gets the extension.
 * Configuration is validated fail-closed (`RevalidateInterval` 10 ms-30 s default
   1 s, `RevalidateTimeout` default 10 s, `AcquireTimeout` 1 ms-1 min default 10 s,
   `OperationTimeout` up to 10 min, `StopGrace` up to 5 min).

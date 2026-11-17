@@ -7,7 +7,10 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: ci-${{ github.ref }}
+  # Pull requests and other refs keep one run per ref (a new push cancels the old run). Every push to main gets its OWN group (per commit): a
+  # later main push must not cancel the verification, or the publication, of an earlier main commit (the publication order is enforced by the
+  # publish job's own serialization and freshness guard, not by cancelling required verification).
+  group: ci-${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && format('main-{0}', github.sha) || github.ref }}
   cancel-in-progress: true
 jobs:
   baseline:
@@ -128,10 +131,16 @@ jobs:
   # the real daemon and the full Compose + TLS proxy + TLS SMTP fixture + setup flow. Trivy (pinned by digest, run as an
   # unprivileged container over an image tarball, never given the Docker socket) is the TD 2.3 image gate: any HIGH or
   # CRITICAL finding, or a scanner/DB failure, fails the job.
+  #
+  # P1.20 adds the release acceptance (tests/release/release.py) to the same job, on the same disposable daemon and both CPUs: a clean
+  # Compose deployment with containers A/B, the authorization matrix over REST and over the official go-sdk MCP client, credential and
+  # policy lifecycle, exact usage counts, restart and SIGKILL durability, restore into fresh instances, forward migration and the measured
+  # footprint (technical-decisions.md 10.2). 75, not 40: observed hosted durations of the two acceptance runs are added to the build,
+  # scan and a 5-minute first-start RSS curve (scripts/ci-budget.test.mjs pins this budget).
   image:
     name: Image (${{ matrix.platform }})
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 40
+    timeout-minutes: 75
     strategy:
       fail-fast: false
       matrix:
@@ -160,6 +169,29 @@ jobs:
           printf 'FIXTURE_DOCKER_HOST=unix:///var/run/docker.sock\nFIXTURE_DAEMON_ID=%s\n' "$id" >> "$GITHUB_ENV"
       - name: Isolation guard tests (hermetic, fake docker)
         run: python3 tests/image/test_isolation.py
+      - name: Release harness tests and report consistency (hermetic - budgets, outcome classes, usage tally, OCI size, evidence archive handling, the dev-image publication logic and its workflow contract; the committed report must match its compact evidence)
+        # COMPACT-summary verification only: the committed catalog, ARCHIVE.sha256 and summaries are consistent with each other and the report is what
+        # they produce. It reads no archive and needs no credential, so a fresh clone and a fork pull request run it unchanged. The FULL raw-archive
+        # audit is a separate maintainer/reviewer step that needs read access to the archive (docs/release-acceptance.md); it is not run here.
+        run: |
+          set -euo pipefail
+          python3 tests/release/test_release.py
+          python3 tests/release/test_evidence.py
+          python3 tests/publish/test_publish.py
+          python3 tests/publish/test_workflow.py
+          python3 tests/release/report.py --evidence docs/release/evidence --criteria tests/release/criteria.json --out docs/release/phase1-release-acceptance.md --check
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version: '1.27.4'
+          cache: false
+      - name: Build the real MCP client and the migration fixture tool for this CPU (test tools, never shipped)
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/out"
+          export GOTOOLCHAIN=local GOFLAGS=-mod=readonly
+          CGO_ENABLED=0 go build -trimpath -o "$RUNNER_TEMP/out/mcpclient" ./tests/release/mcpclient
+          CGO_ENABLED=0 go build -trimpath -o "$RUNNER_TEMP/out/migfixture" ./tests/release/migfixture
+          sha256sum "$RUNNER_TEMP/out/mcpclient" "$RUNNER_TEMP/out/migfixture"
       - name: Build the image and the host-helper artifact
         run: |
           set -euo pipefail
@@ -190,6 +222,15 @@ jobs:
             --docker-host "$FIXTURE_DOCKER_HOST" --expect-daemon-id "$FIXTURE_DAEMON_ID" \
             --work "$work" --host-binary "$RUNNER_TEMP/out/mandatary" --sha "$(git rev-parse HEAD)" \
             --results "$RUNNER_TEMP/evidence/results-${{ matrix.arch }}.json"
+      - name: Release acceptance (Compose A/B, real MCP client, matrix, usage, restart/crash, restore, migration, footprint)
+        run: |
+          set -euo pipefail
+          work=$(mktemp -d "$HOME/mandatary-release.XXXXXXXX")
+          mkdir -p "$RUNNER_TEMP/evidence"
+          python3 tests/release/release.py --image mandatary-ci:${{ matrix.arch }} --platform ${{ matrix.platform }} --repo . \
+            --docker-host "$FIXTURE_DOCKER_HOST" --expect-daemon-id "$FIXTURE_DAEMON_ID" \
+            --work "$work" --host-binary "$RUNNER_TEMP/out/mandatary" --mcp-client "$RUNNER_TEMP/out/mcpclient" --mig-tool "$RUNNER_TEMP/out/migfixture" \
+            --sha "$(git rev-parse HEAD)" --results "$RUNNER_TEMP/evidence/release-${{ matrix.arch }}.json"
       - name: SBOM and Trivy HIGH/CRITICAL gate
         run: |
           set -euo pipefail
@@ -208,6 +249,21 @@ jobs:
           path: ${{ runner.temp }}/evidence
           if-no-files-found: warn
           retention-days: 30
+      # Dev-image promotion (docs/ci-image-publication.md). Only after every step above (the whole acceptance, the scan) succeeded, the image that
+      # just passed is saved with its recorded config digest on EVERY run, so a pull request proves the save/record path on both CPUs; it holds no
+      # registry credential and has no package permission. It is uploaded for the publish job ONLY for a push to main.
+      - name: Record the tested image (every run; handed to the publish job only for a push to main)
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/promote"
+          python3 scripts/publish_dev_image.py record --image mandatary-ci:${{ matrix.arch }} --arch ${{ matrix.arch }} --out "$RUNNER_TEMP/promote"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+        with:
+          name: tested-image-${{ matrix.arch }}
+          path: ${{ runner.temp }}/promote
+          if-no-files-found: error
+          retention-days: 1
   security:
     name: Security
     # Fail-closed aggregation: the Security check (already required) can only pass
@@ -244,3 +300,45 @@ jobs:
           cache: npm
           cache-dependency-path: web/package-lock.json
       - run: make install build tools security GOFLAGS="-mod=readonly -p=4" GOMAXPROCS=4 GOMEMLIMIT=12GiB GOGC=100
+  # Dev image publication (docs/ci-image-publication.md): ghcr.io/nicotm77/mandatary:dev, ONE OCI index of linux/amd64 and linux/arm64, promoted
+  # from the exact images the Image jobs just tested. This is the ONLY job with a package permission and the only one that authenticates to a
+  # registry. It runs for a push to refs/heads/main of NicoTM77/Mandatary and for nothing else (never a pull request - same-repository or fork -,
+  # never a branch or tag push, never a manual run), and only when EVERY required job of that exact commit succeeded: a failed, cancelled, skipped
+  # or missing result keeps it from running. scripts/publish_dev_image.py repeats the checks, verifies the tested archives before the first
+  # registry write, stages both platforms, and writes the dev tag once, last, only if this commit is not older than the current dev revision.
+  # tests/publish/test_workflow.py pins this job's condition, needs, permissions and steps.
+  publish:
+    name: Publish dev image (main only)
+    needs: [baseline, negative-control, storage-arm64, image, security]
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && github.repository == 'NicoTM77/Mandatary' && needs.baseline.result == 'success' && needs.negative-control.result == 'success' && needs.storage-arm64.result == 'success' && needs.image.result == 'success' && needs.security.result == 'success' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+    # Publication-only serialization. Verification is never cancelled for it (each main commit has its own CI group); a running publication
+    # is never cancelled half-way. GitHub keeps ONE pending job per group and cancels the earlier-QUEUED pending one whatever its commit, so an
+    # older main commit whose CI finishes later can cancel the newest commit's pending publication: dev then stays one commit behind until the
+    # next main push. That is never unsafe: the freshness guard in publish_dev_image.py (not this group) is what stops an older commit from
+    # overwriting a newer dev.
+    concurrency:
+      group: publish-dev-image
+      cancel-in-progress: false
+    env:
+      NEEDS_RESULTS: ${{ toJSON(needs) }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Re-check the publication gate (event, branch, repository and every needed result)
+        run: python3 scripts/publish_dev_image.py gate
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: tested-image-*
+          path: ${{ runner.temp }}/promote
+          merge-multiple: false
+      - name: Promote the tested images to ghcr.io/nicotm77/mandatary:dev
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python3 scripts/publish_dev_image.py publish --tested "$RUNNER_TEMP/promote"

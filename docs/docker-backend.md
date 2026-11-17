@@ -47,16 +47,22 @@ configuration changes, closure and newer verification attempts supersede older
 work; stale work cannot publish proof or carry target metadata across generations.
 Closing a backend is terminal. A fresh backend is required after closure.
 
-Every ordinary admission rechecks daemon/self continuity and a complete all-state
-inventory, including uniqueness of any instance-UUID binding. Unknown/malformed
+Every ordinary admission is covered by a successful daemon/self continuity check
+(daemon ID, own container, complete all-state inventory including uniqueness of any
+instance-UUID binding) that started less than one second earlier in the current
+safety epoch or after the caller began waiting (**bounded continuity freshness**,
+below); package default and the in-memory mock: every caller makes its own check.
+Every resolution still reads a fresh all-state inventory and checks it as a whole,
+every dispatch still inspects the target, and every start/stop/restart needs a
+continuity check that started after the call began. Unknown/malformed
 inventory and connection/I/O failures invalidate proof and cancel all streams.
 Known logical missing-target/invalid-argument denials do not by themselves imply
 a disconnected daemon. Removing an overlap or reconnecting does not restore
 readiness: explicit fresh `VerifySelf` is required.
 
-Active streams recheck continuity before and after each delivery (including
-buffered `Read` bytes); idle streams also have a one-second safety watcher with a
-two-second check deadline. Explicit `InvalidateSafety` cancels immediately, without
+Active streams are covered by a continuity check, with the same bounded freshness,
+before and after each delivery (including buffered `Read` bytes); idle streams also
+have a one-second safety watcher with a two-second check deadline. Explicit `InvalidateSafety` cancels immediately, without
 waiting for the watcher. Integration owners must signal event continuity loss,
 reconnect and endpoint changes through that method; this package does not expose
 an event subscription or claim real-Docker integration evidence. `Close` and a
@@ -78,6 +84,85 @@ including pre/post-delivery checks and the idle watcher. Independent transport
 errors, malformed/uncertain metadata, explicit invalidation and the internal
 two-second watchdog still revoke global proof and cancel peers. A consumer
 cancellation cannot mask an independently returned transport fault.
+
+## Bounded continuity freshness (P1.20, R2)
+
+**Why.** One admitted status call used to cost 12 daemon reads and a tail-logs call 33, nine of the twelve being the
+same continuity check (`/info`, inspect of the own container, all-state list), and every live stream repeated it
+around each delivery and once a second. Under the approved workload the daemon was the bottleneck (the RCA in
+[release-acceptance.md](release-acceptance.md)) and a single failed read dropped the endpoint-wide proof for
+everybody. The check may therefore be shared for a short, fixed time.
+
+**What is cached, and only this.** The *result of the continuity check*: the daemon `/info` ID equals the proven
+daemon ID; the own container has the same ID, exact self label, `Created` and `StartedAt`; the all-state inventory
+passes `VerifyInventory` (own container present, binding unique, IDs well formed and unique). No authorization
+decision, policy, credential, session, lease, target resolution, name mapping or target inspect is cached anywhere;
+authorization reads its own store on every request and the snapshot never answers an authorization question. Docker
+labels are static for the lifetime of a container and a rename keeps its ID
+([labels](https://docs.docker.com/engine/manage-resources/labels/)), so protection stays a property of the immutable
+ID, kept by the monitor's sticky protected set, never by a name.
+
+**Lifetime: 1 s** (`cmd/mandatary` constant `continuityTTL`; no environment variable or request can change it;
+`SDKOptions.ContinuityTTL` accepts 0 to 1 s and refuses anything else with `ErrInvalidConfig`; the package default 0
+means every caller makes its own check). Why one second: it is inside the freshness the product already accepts
+(an idle stream detects a silent change at its next one-second watcher tick plus up to a two-second check deadline;
+the readiness heartbeat runs every five seconds), it removes the dominant cost, and a longer value would save little
+more because every call still reads a fresh list and the target. What a one-second bound defers is only the daemon-ID
+equality and the own container's `StartedAt`: a daemon swap that keeps the own container's ID in the inventory needs a
+cloned daemon, and a restarted own container restarts this process into `UNVERIFIED` (`SELF-09`). Host or daemon
+compromise is outside the protection boundary (§S1.1).
+
+**Freshness rule.** Age is measured on the monotonic clock from the *start* of the refresh (before its first read), so
+the refresh's own duration counts against it. A snapshot covers a caller only while `0 <= age < TTL`; at exactly TTL it
+is expired, and an expired or failed check is never a fallback. A snapshot also covers a caller whose call began
+*before* a refresh that started *after* it arrived, however long that refresh took. Memory is O(1) per adapter; there
+is no background goroutine, timer or event that can extend freshness.
+
+**Single flight.** At most one refresh runs at a time, led by the caller that found none, on that caller's own context
+and with that caller's own error classification, so a single caller behaves exactly as without the cache. Other callers
+wait for it. Nobody waits for more than two refreshes, and the daemon sees one check per refresh however many callers
+wait. A refresh has a 15 s ceiling (its own safety deadline).
+
+| Caller | Event | Result |
+| --- | --- | --- |
+| Leader (admission) | any error, including its own cancellation or deadline | the proof is dropped (unchanged semantics) |
+| Leader (stream) | pure consumer cancellation | local: no revocation; a waiter leads the next refresh |
+| Leader (stream) | independent fault, also when its own cancellation coincides | revoked **before** it returns; waiters fail closed |
+| Waiter | its own cancellation or caller deadline | local (it observed no daemon evidence) |
+| Waiter | a deadline this process set on the check (`ErrSafetyCheckDeadline`: stream watchdog, readiness heartbeat) | revoked (`check_deadline`, step `continuity`) |
+| Anyone | the proof was dropped or the epoch changed meanwhile | `ErrUnverified`; nothing is dispatched |
+
+**Publication and invalidation** happen under the same lock that revokes the proof (`SafetyMonitor.mu`): every drop
+(`InvalidateSafety`, restore, endpoint reapproval, configuration change, a verification attempt, closure, an
+operation, stream or body fault, a continuity mismatch) clears the snapshot and moves the epoch; a refresh that began
+in an older epoch publishes nothing and never moves the snapshot's start backwards. Only a fresh `VerifySelf` restores
+the proof, and it does not seed the snapshot.
+
+**Which calls use it.**
+
+| Path | Continuity | Always fresh |
+| --- | --- | --- |
+| `ResolveTarget`, `ListContainers` | snapshot allowed | the all-state list, checked as a whole (`VerifyInventory`) before any name is matched |
+| `InspectStatus`, `InspectConfig`, `Logs` | snapshot allowed | the target inspect, its labels and the epoch at dispatch |
+| `Start`, `Stop`, `Restart` | a check that started after the call began | the target inspect |
+| stream deliveries and the idle watcher | snapshot allowed | none |
+
+**Bounded detection delay.** A daemon-ID-only change is detected within one TTL plus one refresh for reads and
+streams, and at once for mutations. Self disappearance, recreation under a new ID, a new reserved-namespace peer, a
+name taken over by a protected container and a binding overlap are detected by the fresh list of the next resolution
+and the fresh target inspect of the next dispatch, with no delay. Loss of the proof (`SELF-07`) cancels streams at
+once and a post-delivery check fails on epoch mismatch even inside the TTL. This replaces the earlier wording "every
+admission rechecks continuity" and "streams recheck before and after each delivery"; nothing else of §S1 changes.
+
+**Tests.** `continuity_cache_test.go` (expiry boundary, refresh duration, concurrent sharing, saturation, publication,
+options, read counts, idle streams, goroutines), `continuity_cache_security_test.go` (invalidation during refresh at
+each read for six invalidators, leader and waiter cancellation, fault with cancel, internal deadlines, refresh ceiling,
+mutations, daemon-ID bound, name reuse and recreation, reserved peers, binding overlap, active streams, restore and
+rebind), `internal/authz/continuity_independence_test.go` (revocation, quarantine, default deny while a snapshot is
+fresh) and `cmd/mandatary/daemon_requests_test.go` (the production constant and the heartbeat's deadline cause). Every
+existing test runs unchanged at the package default (TTL 0), and `MANDATARY_CONTINUITY_TWIN=1 go test ./internal/docker`
+replays the whole existing suite, with no line changed, through the cached code path
+(`continuity_twin_test.go`: TTL 1 s and a clock that has always expired the snapshot).
 
 ## Sanitizer and parameter bounds (TD §§1.1–1.2, 10.2)
 
@@ -135,6 +220,8 @@ cancellation cannot mask an independently returned transport fault.
 | `SELF-11` Private cgroup namespace + instance-UUID binding | `TestSELF11_PrivateCgroupInstanceUUIDBindingAndOverlap`, `TestParseCgroupContainerID` | P1.19 (container packaging) |
 | `SELF-12` All-state protected peers (`created`..`dead`) | `TestSELF12_AllStateProtectedPeersDeniedAndHidden` | P1.13, P1.14 |
 | `SELF-13` Mock isolation & no native real-socket exemption | `TestSELF13_MockIsolationAndNoImplicitSocketAccess`; composed binary: `TestSELFNativeEvidenceWithARealSocketNeverVerifies` (native cgroup v1, native cgroup v2 and an absent `/proc/self/cgroup` stay unready even with a matching binding), `TestSELFContainerEvidenceWithARealSocketStillVerifies` (positive controls) | P1.14, P1.19 |
+| P1.20 R2 Bounded continuity freshness: expiry at exactly TTL, refresh duration counted, one shared check, saturation, late/regressing publication, options | `TestContinuityExpiryBoundary`, `TestContinuityRefreshDurationCountsAgainstFreshness`, `TestContinuityWaiterServedByRefreshStartedAfterArrival`, `TestContinuityConcurrentStaleAdmissionsShareOneCheck`, `TestContinuitySaturationAtMostTwoRefreshes`, `TestContinuityPublicationNeverRegressesOrCrossesEpochs`, `TestContinuityLateRefreshOfAnOlderEpochIsDiscarded`, `TestContinuityOptionsAreValidated`, `TestContinuityReadCountsWithAFreshSnapshot`, `TestContinuityIdleFollowStreamsShareTheCheck`, `TestContinuityDoesNotLeakGoroutines` | P1.20 |
+| P1.20 R2 Cancellation vs. independent fault, invalidation, identity and protection inside the bound | `TestContinuityInvalidationDuringRefresh`, `TestContinuityEveryRevocationClearsTheSnapshotItself`, `TestContinuityLeaderStreamPureCancelIsLocal`, `TestContinuityLeaderFaultWithCancelRevokesBeforeReturn`, `TestContinuityWaiterPureCancelIsLocal`, `TestContinuityWaiterInternalDeadlineRevokes`, `TestContinuityRefreshCeilingBoundsAHungDaemon`, `TestContinuityAdmissionLeaderCancelStillDrops`, `TestContinuityMutationsNeedAFreshCheck`, `TestContinuityDaemonIDChangeBound`, `TestContinuityNameReuseAndRecreationWithinTheBound`, `TestContinuityNewProtectedPeerWithinTheBound`, `TestContinuityBindingOverlapWithinTheBound`, `TestContinuityActiveStreams`, `TestContinuityRestoreAndRebind`; authorization independence: `TestContinuitySnapshotNeverAnswersAnAuthorizationQuestion`, `TestContinuitySnapshotServesAnAuthorizedCallWithoutDaemonChecks` (`internal/authz`); composition: `TestComposedAdapterContinuityIsOneSecond`, `TestHeartbeatDeadlineCarriesTheSafetyCheckCause` (`cmd/mandatary`) | P1.20 |
 | `SUP-03` Engine API `>= 1.44` negotiation | `TestEngineAPINegotiationAndMinimum144` | P1.19 (live Engine matrix) |
 | TD §§1.1–1.2 Inspect allowlists, secret/entropy redaction, error redaction | `TestInspectStatusAllowlistAndUnknownFields`, `TestInspectConfigEnvCommandMountAndResourceSanitization`, `TestTransportAndSDKErrorsRedacted` | P1.13, P1.14, P1.16 |
 | TD §§1.2, 5, 10.4 Operation catalog, parameter bounds, SDK & mock parity | `TestOperationParameterBounds`, `TestSDKAdapterAllowedOperationsAndBounds`, `TestMockBackendFullLifecycleAndFaultInjection` | P1.13, P1.14 |

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">Mandatary — Architectural Gateway</title>
+  <desc id="desc">A mint geometric protective gateway surrounding a white M with periwinkle lower pillars.</desc>
+  <!-- Outer gateway: the open base is intentional, evoking controlled passage. -->
+  <path fill="#5DE0C5" d="M256 42 454 146V365l-49-27V176L256 100 107 176v162l-49 27V146Z"/>
+  <!-- Lower gateway pillars -->
+  <path fill="#87A9FF" d="m58 383 49-27v91l-49 23Z"/>
+  <path fill="#87A9FF" d="m405 356 49 27v87l-49-23Z"/>
+  <!-- White M is shaped as an entrance, with strong negative space. -->
+  <path fill="#F5F8FC" d="m137 206 119 84 119-84v227l-49-25V301l-70 49-70-49v107l-49 25Z"/>
+</svg>
