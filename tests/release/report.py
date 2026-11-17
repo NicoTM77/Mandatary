@@ -41,7 +41,7 @@ sha256_file = evidence.sha256_file
 
 
 # How an adverse group stops counting, and the text that must say why. "dispositioned": the owner decided (a policy decision, not a
-# pass). "remediated": the defect was fixed in the product, a regression test pins the fix and fresh evidence of the criterion passes
+# pass). "remediated": the defect was fixed (in the product or the test harness), a regression test pins the fix and fresh evidence of the criterion passes
 # (a technical closure, not an owner decision). A group in either state WITHOUT its text keeps counting: the closure is never silent.
 CLOSING_TEXT = {"dispositioned": "disposition", "remediated": "remediation"}
 
@@ -309,7 +309,7 @@ def render(catalog, rows, digests, meta, results, evdir):
                     w("* **%s:** %s" % (label, d[k]))
             w("")
     if remediations:
-        w("A remediation is **not** an owner decision: a defect found by review was fixed in the product, a regression test pins the fix, and fresh evidence of the affected criteria passes. The adverse run is not rewritten (it stays FAIL in the archive and in the criteria that list it); only its effect on the criteria changes, and only because the criterion's own fresh checks pass. Each remediation states what it does not establish.")
+        w("A remediation is **not** an owner decision: a defect found by review was fixed (in the product, or, where the entry says so, in the test harness), a regression test pins the fix, and fresh evidence of the affected criteria passes. The adverse run is not rewritten (it stays FAIL in the archive and in the criteria that list it); only its effect on the criteria changes, and only because the criterion's own fresh checks pass. Each remediation states what it does not establish.")
         w("")
         for d in remediations:
             w("### %s - %s" % (d["id"], d["title"]))

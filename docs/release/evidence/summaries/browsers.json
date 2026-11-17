@@ -2,32 +2,32 @@
  "artifact": "browsers",
  "results": [
   {
-   "detail": "go test -tags=webauthnbrowser (chromium-desktop): exit 0 in 130 s; 32 scenario/scheme subtests passed on ['chromium']; schemes ['dark', 'light']; failed/skipped 0",
+   "detail": "go test -tags=webauthnbrowser (chromium-desktop): exit 0 in 127 s; 32 scenario/scheme subtests passed on ['chromium']; schemes ['dark', 'light']; failed/skipped 0",
    "id": "GATE-BROWSER-chromium-desktop",
    "status": "PASS"
   },
   {
-   "detail": "go test -tags=webauthnbrowser (chromium-phone): exit 0 in 114 s; 30 scenario/scheme subtests passed on ['chromium']; schemes ['dark', 'light']; failed/skipped 0",
+   "detail": "go test -tags=webauthnbrowser (chromium-phone): exit 0 in 108 s; 30 scenario/scheme subtests passed on ['chromium']; schemes ['dark', 'light']; failed/skipped 0",
    "id": "GATE-BROWSER-chromium-phone",
    "status": "PASS"
   },
   {
-   "detail": "go test -tags=webauthnbrowser (firefox-desktop): exit 0 in 180 s; 28 scenario/scheme subtests passed on ['firefox']; schemes ['dark', 'light']; failed/skipped 0",
+   "detail": "go test -tags=webauthnbrowser (firefox-desktop): exit 0 in 182 s; 28 scenario/scheme subtests passed on ['firefox']; schemes ['dark', 'light']; failed/skipped 0",
    "id": "GATE-BROWSER-firefox-desktop",
    "status": "PASS"
   },
   {
-   "detail": "go test -tags=webauthnbrowser (firefox-phone): exit 0 in 185 s; 28 scenario/scheme subtests passed on ['firefox']; schemes ['dark', 'light']; failed/skipped 0",
+   "detail": "go test -tags=webauthnbrowser (firefox-phone): exit 0 in 180 s; 28 scenario/scheme subtests passed on ['firefox']; schemes ['dark', 'light']; failed/skipped 0",
    "id": "GATE-BROWSER-firefox-phone",
    "status": "PASS"
   },
   {
-   "detail": "go test -tags=webauthnbrowser (webkit-desktop): exit 0 in 145 s; 28 scenario/scheme subtests passed on ['webkit']; schemes ['dark', 'light']; failed/skipped 0",
+   "detail": "go test -tags=webauthnbrowser (webkit-desktop): exit 0 in 143 s; 28 scenario/scheme subtests passed on ['webkit']; schemes ['dark', 'light']; failed/skipped 0",
    "id": "GATE-BROWSER-webkit-desktop",
    "status": "PASS"
   },
   {
-   "detail": "go test -tags=webauthnbrowser (webkit-phone): exit 0 in 135 s; 28 scenario/scheme subtests passed on ['webkit']; schemes ['dark', 'light']; failed/skipped 0",
+   "detail": "go test -tags=webauthnbrowser (webkit-phone): exit 0 in 134 s; 28 scenario/scheme subtests passed on ['webkit']; schemes ['dark', 'light']; failed/skipped 0",
    "id": "GATE-BROWSER-webkit-phone",
    "status": "PASS"
   }
@@ -36,7 +36,7 @@
  "schema": "mandatary-p120-evidence-summary/1",
  "source": {
   "bytes": 1490,
-  "member": "round-3-2ac064f/browsers/results.json",
-  "sha256": "bc119975f67e4b0a9d97a13000104ae87f855ed6b8a4948720d1f9f827e17292"
+  "member": "round-4-fd69639/browsers/results.json",
+  "sha256": "d5dc5beeb57a1e29d0dcb32234cfff41f81e5d5c52873cf09d0cbf8e0a1e798b"
  }
 }

@@ -22,56 +22,58 @@
   }
  ],
  "archive": {
-  "id": "p120-evidence-v2",
+  "id": "p120-evidence-v3",
   "location": {
    "assets": {
-    "p120-evidence-v2-9fee61b1dd29.tar.gz": {
-     "id": 758611551,
-     "sha256": "9fee61b1dd29fdf6eeff7c0d3920492076565b717d8f23788c424aa269c0d3d9",
-     "size": 2504455
+    "p120-evidence-v3-0f36aafb2c53.tar.gz": {
+     "id": 758957970,
+     "sha256": "0f36aafb2c535e9ee3a2bec6e0d6b28abca430ce42769fbb6eb1fd2c7d213bce",
+     "size": 3004909
     },
-    "p120-evidence-v2.ARCHIVE.sha256": {
-     "id": 758611610,
-     "sha256": "02cfc8db74cd415e681054dccf7ae0db5c8d9b5f900b97051352818d09c0a6b2",
-     "size": 26467
+    "p120-evidence-v3.ARCHIVE.sha256": {
+     "id": 758958056,
+     "sha256": "c39013492a1659530e8da15f88f0e6293e1813bd4183e41b8be91a0dd858731d",
+     "size": 33903
     }
    },
-   "description": "an evidence-only DRAFT pre-release of NicoTM77/Mandatary (tag name `p120-evidence-v2`, no tag exists until a draft is published and it must never be published): not a product release and not a C5 release. A draft is visible to repository writers only; it is read through the GitHub API with `gh` (see docs/release-acceptance.md). The older draft `p120-evidence-v1` is left unchanged.",
+   "description": "an evidence-only DRAFT pre-release of NicoTM77/Mandatary (tag name `p120-evidence-v3`, no tag exists until a draft is published and it must never be published): not a product release and not a C5 release. A draft is visible to repository writers only; it is read through the GitHub API with `gh` (see docs/release-acceptance.md). The older drafts `p120-evidence-v1` and `p120-evidence-v2` are left unchanged.",
    "draft": true,
    "kind": "github-release",
    "prerelease": true,
-   "release_id": 448468895,
+   "release_id": 448593643,
    "repo": "NicoTM77/Mandatary",
-   "tag": "p120-evidence-v2"
+   "tag": "p120-evidence-v3"
   },
   "manifest": "ARCHIVE.sha256",
-  "manifest_sha256": "02cfc8db74cd415e681054dccf7ae0db5c8d9b5f900b97051352818d09c0a6b2",
-  "members": 219,
+  "manifest_sha256": "c39013492a1659530e8da15f88f0e6293e1813bd4183e41b8be91a0dd858731d",
+  "members": 289,
   "notes": [
    "Git history limit: the raw evidence files were committed at f306a2a and fbb8193 of this pull request and are removed at the branch tip by additive commits. Their Git objects stay in the repository's history (the pull request's commits remain reachable through refs/pull/25/head) and are NOT purged; no history was rewritten. If the pull request is squash-merged they are not in main's history; the archive, not Git history, is the durable record.",
    "An evidence-only draft release is durable for as long as the repository and the draft exist; an administrator can edit or delete it. The member manifest and the tarball digest committed here make any change detectable by the full audit; they cannot prevent deletion.",
-   "Version 2 supersedes version 1 without changing it: its manifest contains every one of the 131 members of `p120-evidence-v1` with the identical SHA-256 (`ARCHIVE.p120-evidence-v1.sha256` is the committed v1 manifest, so `report.py --check` proves this from the two manifests without reading either archive). v1 stays available in its own draft release."
+   "Version 2 supersedes version 1 without changing it: its manifest contains every one of the 131 members of `p120-evidence-v1` with the identical SHA-256 (`ARCHIVE.p120-evidence-v1.sha256` is the committed v1 manifest, so `report.py --check` proves this from the two manifests without reading either archive). v1 stays available in its own draft release.",
+   "Version 3 supersedes version 2 without changing it: its manifest contains every one of the 219 members of `p120-evidence-v2` (and therefore the 131 of v1) with the identical SHA-256 (`ARCHIVE.p120-evidence-v2.sha256` is the committed v2 manifest, so `report.py --check` proves this from the two manifests without reading either archive). v1 and v2 stay available in their own draft releases. Version 2 holds one description that review 520 found wrong (the README of `round-3-2ac064f/diagnostics/run-41ae8d5/` says the restart, crash and usage checks of that run did not execute); immutable archives are not edited, so the corrected description is the new member `round-4-fd69639/diagnostics/run-41ae8d5-corrected-README.md`."
   ],
-  "read_back": "read back from the draft-release asset through the GitHub API with `tests/release/evidence.py stage --from-release` (the caller's own `gh`): tarball size 2504455 bytes and SHA-256 9fee61b1dd29fdf6eeff7c0d3920492076565b717d8f23788c424aa269c0d3d9 equal the catalog and the digest GitHub reports for the asset, 219 members extracted with every member digest equal to ARCHIVE.sha256, no member missing or extra; `report.py --check --audit-archive` regenerated all 11 summaries from the raw members byte for byte and the committed v1 manifest is contained in it (all 131 v1 members, identical SHA-256)",
+  "read_back": "read back from the draft-release asset through the GitHub API with `tests/release/evidence.py stage --from-release` (the caller's own `gh`): tarball size 3004909 bytes and SHA-256 0f36aafb2c535e9ee3a2bec6e0d6b28abca430ce42769fbb6eb1fd2c7d213bce equal the catalog and the digest GitHub reports for the asset, 289 members extracted with every member digest equal to ARCHIVE.sha256, no member missing or extra; `report.py --check --audit-archive` regenerated all 12 summaries from the raw members byte for byte; every one of the 219 members of p120-evidence-v2 is present with the identical SHA-256",
   "roots": {
    "adverse-ci-e5e1856": "hosted run 44003552068 at e5e1856 (review 519 F1): job logs, jobs/run documents and the image-evidence release JSON of both architectures",
-   "records": "scratch-space reports (secret-free); v2 adds the review-519 report",
+   "records": "scratch-space reports (secret-free); v3 adds the review-520 report and the F5 analysis",
    "round-1-f306a2a": "git archive f306a2a docs/release",
    "round-2-fbb8193": "git archive fbb8193 docs/release (code commit under test 1528ef0)",
-   "round-3-2ac064f": "the integrated evidence of code commit 2ac064f (VM run, hosted run 44059883746, local gates, browsers, scans) and, under diagnostics/run-41ae8d5/, the first runs of the F2 fix at 41ae8d5"
+   "round-3-2ac064f": "the integrated evidence of code commit 2ac064f (VM run, hosted run 44059883746, local gates, browsers, scans) and, under diagnostics/run-41ae8d5/, the first runs of the F2 fix at 41ae8d5",
+   "round-4-fd69639": "the integrated evidence of code commit fd69639 (VM run, hosted run 44074980728, local gates, browsers, scans) and the corrected description of the run at 41ae8d5"
   },
   "supersedes": {
-   "id": "p120-evidence-v1",
-   "manifest": "ARCHIVE.p120-evidence-v1.sha256",
-   "manifest_sha256": "8f348bcd2cb1f8deff3a2f6d582e2f2e00420b2d2e1762cad6925134b86f2e5e",
-   "members": 131,
-   "tarball": "p120-evidence-v1-3ae690165ca4.tar.gz",
-   "tarball_bytes": 1589779,
-   "tarball_sha256": "3ae690165ca43eaacbedec62ce622f598aedfe17da20e1b7b92f7b73031e898c"
+   "id": "p120-evidence-v2",
+   "manifest": "ARCHIVE.p120-evidence-v2.sha256",
+   "manifest_sha256": "02cfc8db74cd415e681054dccf7ae0db5c8d9b5f900b97051352818d09c0a6b2",
+   "members": 219,
+   "tarball": "p120-evidence-v2-9fee61b1dd29.tar.gz",
+   "tarball_bytes": 2504455,
+   "tarball_sha256": "9fee61b1dd29fdf6eeff7c0d3920492076565b717d8f23788c424aa269c0d3d9"
   },
-  "tarball": "p120-evidence-v2-9fee61b1dd29.tar.gz",
-  "tarball_bytes": 2504455,
-  "tarball_sha256": "9fee61b1dd29fdf6eeff7c0d3920492076565b717d8f23788c424aa269c0d3d9"
+  "tarball": "p120-evidence-v3-0f36aafb2c53.tar.gz",
+  "tarball_bytes": 3004909,
+  "tarball_sha256": "0f36aafb2c535e9ee3a2bec6e0d6b28abca430ce42769fbb6eb1fd2c7d213bce"
  },
  "artifacts": {
   "adverse-ci-e5e1856": {
@@ -82,6 +84,15 @@
    "revision_basis": "raw document records its revision (source_sha); the hosted pull_request run 44003552068 checks out GitHub's merge commit of head e5e1856 and the base",
    "role": "adverse",
    "source": "adverse run (review 519 F1): the hosted `Image (linux/amd64)` job of run 44003552068 at e5e1856, whose product was identical to the one under test: REL-MATRIX-REST, REL-MATRIX-PARITY and REL-MATRIX-POS FAIL (X-dn-stop-A: REST 502 with an empty body, MCP 200). Kept because it contradicts the PASS of the criteria that cite those checks"
+  },
+  "adverse-vm-41ae8d5": {
+   "file": "summaries/adverse-vm-41ae8d5.json",
+   "kind": "results",
+   "member": "round-3-2ac064f/diagnostics/run-41ae8d5/vm-amd64/release.json",
+   "revision": "41ae8d51262750285b9e383393603d656cf6fc7f",
+   "revision_basis": "raw document records its revision (source_sha)",
+   "role": "adverse",
+   "source": "adverse run (review 520 F5): the VM run at 41ae8d5, whose product was identical to the product of the later code commits: 155 PASS / 2 not PASS. REL-STOP-LONG FAIL (a defect of the test client, F-9) and PERSISTENCE-ERROR `login step 2: 403`: the administrator's final re-sign-in after the SIGKILL stage was refused, although REL-RESTART-1..4, REL-CRASH-1/2 and REL-USAGE(-RING)-AFTER-CRASH all PASSED in that run. Kept because it contradicts the PASS of the criteria that rest on the persistence stage and on administrator TOTP sign-in"
   },
   "adverse-vm-diag-loop-1": {
    "file": "summaries/adverse-vm-diag-loop-1.json",
@@ -104,64 +115,64 @@
   "browsers": {
    "file": "summaries/browsers.json",
    "kind": "results",
-   "member": "round-3-2ac064f/browsers/results.json",
-   "revision": "2ac064f85dba438909e2754118c361c733a24c88",
+   "member": "round-4-fd69639/browsers/results.json",
+   "revision": "fd69639b41490e4c2c225f952d826d9a38f8e834",
    "revision_basis": "stated by this catalog; the raw document records no revision (the same clean worktree at the code commit)",
    "source": "`collect.py browsers` over `go test -tags=webauthnbrowser` runs (Chromium, Firefox, WebKit; desktop and 390x844)"
   },
   "ci-amd64": {
    "file": "summaries/ci-amd64.json",
    "kind": "results",
-   "member": "round-3-2ac064f/ci-amd64/release.json",
-   "revision": "aac29fd6bedb2b29e63af2704768322657e47e44",
-   "revision_basis": "raw document records its revision (source_sha); the hosted pull_request run 44059883746 checks out GitHub's merge commit of head 2ac064f85dba438909e2754118c361c733a24c88 and the base",
+   "member": "round-4-fd69639/ci-amd64/release.json",
+   "revision": "9e838400239dd4a524c446ce7b000cb049c1d18b",
+   "revision_basis": "raw document records its revision (source_sha); the hosted pull_request run 44074980728 checks out GitHub's merge commit of head fd69639b41490e4c2c225f952d826d9a38f8e834 and the base",
    "source": "the same harness in the hosted `Image (linux/amd64)` job at the CI-run commit (artifact `image-evidence-amd64`)"
   },
   "ci-arm64": {
    "file": "summaries/ci-arm64.json",
    "kind": "results",
-   "member": "round-3-2ac064f/ci-arm64/release.json",
-   "revision": "aac29fd6bedb2b29e63af2704768322657e47e44",
+   "member": "round-4-fd69639/ci-arm64/release.json",
+   "revision": "9e838400239dd4a524c446ce7b000cb049c1d18b",
    "revision_basis": "raw document records its revision (source_sha); the same hosted merge commit",
    "source": "the same harness in the hosted `Image (linux/arm64)` job (native arm64 runner; artifact `image-evidence-arm64`)"
   },
   "gates": {
    "file": "summaries/gates.json",
    "kind": "results",
-   "member": "round-3-2ac064f/gates/results.json",
-   "revision": "2ac064f85dba438909e2754118c361c733a24c88",
-   "revision_basis": "stated by this catalog; the raw document records no revision (gates/tree-before.txt and tree-after.txt record head 2ac064f85dba438909e2754118c361c733a24c88 with 0 modified files)",
+   "member": "round-4-fd69639/gates/results.json",
+   "revision": "fd69639b41490e4c2c225f952d826d9a38f8e834",
+   "revision_basis": "stated by this catalog; the raw document records no revision (gates/tree-before.txt and tree-after.txt record head fd69639b41490e4c2c225f952d826d9a38f8e834 with 0 modified files)",
    "source": "`collect.py gates` over the exit codes and logs of gofmt, vet, mod verify, golangci-lint, gosec, govulncheck, go test, node script tests, tsc, eslint, vitest, npm audit"
   },
   "hosted-ci": {
    "file": "summaries/hosted-ci.json",
    "kind": "results",
-   "member": "round-3-2ac064f/hosted-ci/results.json",
-   "revision": "2ac064f85dba438909e2754118c361c733a24c88",
-   "revision_basis": "stated by this catalog; the raw document records no revision (hosted-ci/jobs.json: workflow run 44059883746, head_sha 2ac064f85dba438909e2754118c361c733a24c88)",
+   "member": "round-4-fd69639/hosted-ci/results.json",
+   "revision": "fd69639b41490e4c2c225f952d826d9a38f8e834",
+   "revision_basis": "stated by this catalog; the raw document records no revision (hosted-ci/jobs.json: workflow run 44074980728, head_sha fd69639b41490e4c2c225f952d826d9a38f8e834)",
    "source": "`collect.py jobs` over the GitHub Actions jobs document of the CI run"
   },
   "scan-amd64": {
    "file": "summaries/scan-amd64.json",
    "kind": "results",
-   "member": "round-3-2ac064f/scan-amd64/results.json",
-   "revision": "2ac064f85dba438909e2754118c361c733a24c88",
+   "member": "round-4-fd69639/scan-amd64/results.json",
+   "revision": "fd69639b41490e4c2c225f952d826d9a38f8e834",
    "revision_basis": "stated by this catalog; the raw document records no revision (Trivy and SBOM of the image the VM built from the git archive of the code commit)",
    "source": "`collect.py scan` over the Trivy HIGH/CRITICAL json and the CycloneDX SBOM of the VM image"
   },
   "scan-arm64": {
    "file": "summaries/scan-arm64.json",
    "kind": "results",
-   "member": "round-3-2ac064f/scan-arm64/results.json",
-   "revision": "aac29fd6bedb2b29e63af2704768322657e47e44",
+   "member": "round-4-fd69639/scan-arm64/results.json",
+   "revision": "9e838400239dd4a524c446ce7b000cb049c1d18b",
    "revision_basis": "stated by this catalog; the raw document records no revision (Trivy and SBOM of the hosted arm64 image of the same run)",
    "source": "`collect.py scan` over the hosted arm64 Trivy and SBOM files"
   },
   "vm-amd64": {
    "file": "summaries/vm-amd64.json",
    "kind": "results",
-   "member": "round-3-2ac064f/vm-amd64/release.json",
-   "revision": "2ac064f85dba438909e2754118c361c733a24c88",
+   "member": "round-4-fd69639/vm-amd64/release.json",
+   "revision": "fd69639b41490e4c2c225f952d826d9a38f8e834",
    "revision_basis": "raw document records its revision (source_sha)",
    "source": "`tests/release/release.py` on the isolated VM daemon (linux/amd64), source = `git archive` of the code commit"
   }
@@ -181,9 +192,9 @@
   },
   "records": {
    "disposition": "records that were previously only in scratch space, now durable",
-   "members": 6,
+   "members": 8,
    "members_prefix": "records/",
-   "what": "the R2 root-cause report and per-run table, the interim caching design of reviewer run 516, the review reports of runs 513, 518 and 519"
+   "what": "the R2 root-cause report and per-run table, the interim caching design of reviewer run 516, the review reports of runs 513, 518, 519 and 520, and the analysis of the F5 sign-in refusal"
   },
   "round-1-f306a2a": {
    "disposition": "historical; superseded by round 2 after the P1.20.1 layout fix (F-1). Not rewritten.",
@@ -192,16 +203,22 @@
    "what": "docs/release of PR head f306a2a: the first acceptance evidence and its report (NOT ACCEPTED, 20 PASS / 2 FAIL: Firefox recovery-reveal-phone, SH-9a / P1-E3), including its clean runs and the diagnostics of that round"
   },
   "round-3-2ac064f": {
-   "disposition": "the criterion evidence of this report (summaries) is derived from here",
+   "disposition": "historical, kept: the criterion evidence of the previous round (superseded as criterion evidence by round-4-fd69639 after review 520 F5; its README of run-41ae8d5 is corrected by a member of round 4)",
    "members": 74,
    "members_prefix": "round-3-2ac064f/",
    "what": "the integrated evidence of code commit 2ac064f: raw harness JSON and logs of the VM run and of both hosted CPUs, scan outputs and SBOMs, local gate and browser logs, and the diagnostics of the first F2 runs"
   },
+  "round-4-fd69639": {
+   "disposition": "the criterion evidence of this report (summaries) is derived from here",
+   "members": 68,
+   "members_prefix": "round-4-fd69639/",
+   "what": "the integrated evidence of code commit fd69639: raw harness JSON and logs of the VM run and of both hosted CPUs, scan outputs and SBOMs, local gate and browser logs, and the corrected description of the run at 41ae8d5"
+  },
   "run-41ae8d5": {
-   "disposition": "historical, kept: not the evidence of the final code commit; the harness defect is fixed in 2ac064f and the 403 is disclosed as finding F-8",
+   "disposition": "adverse run, kept: an adverse ref of SH-7a, P1-E3 and P1-E4 (summary `adverse-vm-41ae8d5`), closed as a harness defect fixed at fd69639 (section 6); the README inside the member is superseded by `round-4-fd69639/diagnostics/run-41ae8d5-corrected-README.md`",
    "members": 10,
    "members_prefix": "round-3-2ac064f/diagnostics/run-41ae8d5/",
-   "what": "the first runs of the F2 fix (code commit 41ae8d5): the VM run (155 PASS, REL-STOP-LONG FAIL because of a harness defect, one unexplained PERSISTENCE `login step 2: 403`) and hosted run 44055078430 (both Image jobs: 155 PASS, REL-STOP-LONG FAIL, same harness defect)"
+   "what": "the first runs of the F2 fix (code commit 41ae8d5): the VM run (155 PASS, REL-STOP-LONG FAIL because of a harness defect, one PERSISTENCE-ERROR `login step 2: 403` at the final administrator re-sign-in) and hosted run 44055078430 (both Image jobs: 155 PASS, REL-STOP-LONG FAIL, same harness defect)"
   },
   "vm-run-0d8b431": {
    "disposition": "historical clean run, kept; the same product content as the adverse runs",
@@ -274,9 +291,9 @@
    "title": "Raw run output is archived, not committed; Git history is not rewritten"
   },
   {
-   "detail": "In the first VM run of the F2 fix (code commit 41ae8d5, archive `round-3-2ac064f/diagnostics/run-41ae8d5/vm-amd64/`) the persistence stage's re-login got a 403 on the TOTP step (`PERSISTENCE-ERROR`, 155 PASS / 2 not PASS with the REL-STOP-LONG harness defect), so the restart, SIGKILL and usage-after-crash checks of that run did not execute. The same stage passed in the next VM run at 2ac064f (156 PASS) and on both hosted CPUs. The cause is NOT established (the bare status carried no code or reason; candidates such as a TOTP step or replay-window race in the harness's re-login were not tested); the harness now records the refusal's closed code and reason and the TOTP period of the failing step (`tests/release/stackdeploy.py`, diagnostics only). A recurrence would be investigated as a possible product or harness defect.",
+   "detail": "In the first VM run of the F2 fix (code commit 41ae8d5, archive `round-3-2ac064f/diagnostics/run-41ae8d5/vm-amd64/`) `PERSISTENCE-ERROR: DeployError: login step 2: 403` ended the persistence stage. What ran before it PASSED in that run: REL-RESTART-1..4, REL-CRASH-1, REL-CRASH-2, REL-USAGE-AFTER-CRASH and REL-USAGE-RING-AFTER-CRASH (an earlier text of this finding and the README of that archive member said they did not execute; that was wrong, see `round-4-fd69639/diagnostics/run-41ae8d5-corrected-README.md`). Only the final administrator re-sign-in after the SIGKILL stage failed. The mechanism is a defect of the harness's period bookkeeping, reproduced RED to GREEN and fixed at fd69639, closed as a stated remediation (section 6, F5 of review 520) and kept as an adverse ref of SH-7a, P1-E3 and P1-E4. Not established: that the boundary straddle happened in that very run (no timestamps were archived); a recurrence with the corrected harness would be investigated as a possible product defect. The same stage passed in the VM runs at 2ac064f and fd69639 and on every hosted run of that product.",
    "id": "F-8",
-   "title": "One unexplained `login step 2: 403` in the persistence stage of one VM run"
+   "title": "One `login step 2: 403` at the administrator's final re-sign-in of one VM run: a harness defect (TOTP period read before the verifier spends its own)"
   },
   {
    "detail": "The first run of the new `REL-STOP-LONG` check passed its product assertion (REST stop answered 200 after 12.2 s on the VM and on both hosted CPUs, before the fix the same shape is an EOF/502) and failed only because `tests/release/mcpclient` reported `elapsed_ms` 0 for every step (a deferred assignment on an unnamed result). The check is deliberately fail-closed on an unmeasured MCP answer; the client was fixed (named result) and the check re-run at 2ac064f. Both runs are archived (`round-3-2ac064f/diagnostics/run-41ae8d5/`).",
@@ -293,20 +310,20 @@
   "status": "**Registry publication: NOT EXECUTED.** Nothing was pushed to a registry, and a pull request run cannot publish: the CI workflow publishes `ghcr.io/nicotm77/mandatary:dev` only from a successful `push` to `refs/heads/main` of `NicoTM77/Mandatary`, after every required gate of that exact commit (both architecture jobs included) succeeded. This card does not merge, deploy or run the publishing job."
  },
  "release_candidate": {
-  "OCI archive sha256 (VM, gzip layers)": "f7a3d1e1a9ab807eb786bee177d219e17bb5f6ac56fd86cea995cf96468334f5",
+  "OCI archive sha256 (VM, gzip layers)": "0efc03a28db7fcd28a3dd14395bca5d6321ad6c2c82a5544cf3de77b6f2bc72a",
   "VM host": "Ubuntu 26.04.1 LTS, kernel 7.0.0-43-generic, 4 CPUs, storage driver overlayfs",
   "base (main, P1.19 merged)": "8c1a55a301b4737edd307c6784f54dbf3abf985b",
-  "code commit under test": "2ac064f85dba438909e2754118c361c733a24c88 (the image carries it as its revision label; REL-IMG-01)",
+  "code commit under test": "fd69639b41490e4c2c225f952d826d9a38f8e834 (the image carries it as its revision label; REL-IMG-01)",
   "docker server / API / compose": "29.9.3 / 1.56 / 5.7.1",
-  "evidence and report commits after the code commit": "additive commits only: this evidence (version 2 archive, compact summaries, report). `git diff 2ac064f HEAD -- cmd internal web ':(exclude)*_test.go'` is empty: the product tree the evidence judged is the product tree of the head (the commits before the code commit of this round added the F2 fix 41ae8d5, its harness fixes 2ac064f, the X2 test, the evidence hygiene and the main-only GHCR publication job)",
+  "evidence and report commits after the code commit": "additive commits only: this evidence (version 3 archive, compact summaries, report). `git diff fd69639 HEAD -- cmd internal web ':(exclude)*_test.go'` is empty: the product tree the evidence judged is the product tree of the head (the commits before the code commit of this round added the F2 fix 41ae8d5, its harness fixes 2ac064f, the X2 test, the evidence hygiene and the main-only GHCR publication job)",
   "evidence date": "2026-11-17",
-  "host helper binary sha256 (linux/amd64, built from the same archive)": "aa6e6dbb9695273b6ee2b5e90c8bc4605b629e5d93fda7877e1470730659499e",
-  "hosted runs": "GitHub Actions CI run 44059883746 at the code commit 2ac064f85dba438909e2754118c361c733a24c88 (pull_request run; merge commit aac29fd6bedb2b29e63af2704768322657e47e44): all jobs success, `Publish dev image (main only)` skipped as designed; its two jobs `Image (linux/amd64)` and `Image (linux/arm64)` executed the harness on native runners (156 PASS / 0 not PASS each; summaries `ci-amd64`, `ci-arm64`, `hosted-ci`). Adverse hosted run 44003552068 at e5e1856 (summary `adverse-ci-e5e1856`) and the first runs of the F2 fix (hosted run 44055078430 at 41ae8d5) are archived. Hosted CI of the final head is gate G-CI, not part of this evidence",
-  "image id (amd64, VM)": "sha256:95729df18f833fc0dd13e10f379b74ec12f3618f1a6866c1349b5b5b7001cfde",
-  "isolated daemon": "the declared fixture daemon ID ec06eb10-04b6-4f1b-bbb6-d336994db8ae (verified before the first resource and before cleanup, ISO-00/ISO-01); the VM daemon's container, network and volume snapshot is identical before and after the run (archive members `vm-amd64/pre-snap.txt`, `vm-amd64/snapshot-after.txt`) except that the card's own `p120-trivy-cache` volume, left by the earlier run at 41ae8d5, existed before and was removed by this run's cleanup; the image list is identical",
-  "product tree": "the product differs from the merged baseline by the P1.20.1 brand/layout change (web/), the R2 changes (internal/docker, internal/logging, cmd/mandatary) and the F2 change (internal/ops, internal/api, internal/mcp, cmd/mandatary); the local gates and the browser suites ran on a clean worktree at exactly the code commit (`gates/tree-before.txt`, `gates/tree-after.txt`: head, 0 modified files), so GATE-PRODUCT-TREE compares what they judged with what the VM archive built",
+  "host helper binary sha256 (linux/amd64, built from the same archive)": "fa4933c5e10f46cb6a55c70440a12a04358734ccbf8b76648932dd76c22421c9",
+  "hosted runs": "GitHub Actions CI run 44074980728 at the code commit fd69639b41490e4c2c225f952d826d9a38f8e834 (pull_request run; merge commit 9e838400239dd4a524c446ce7b000cb049c1d18b): all jobs success, `Publish dev image (main only)` skipped as designed; its two jobs `Image (linux/amd64)` and `Image (linux/arm64)` executed the harness on native runners (156 PASS / 0 not PASS each; summaries `ci-amd64`, `ci-arm64`, `hosted-ci`). Adverse hosted run 44003552068 at e5e1856 (summary `adverse-ci-e5e1856`), the adverse VM run at 41ae8d5 (summary `adverse-vm-41ae8d5`) and the first runs of the F2 fix (hosted run 44055078430 at 41ae8d5) are archived. Hosted CI of the final head is gate G-CI, not part of this evidence",
+  "image id (amd64, VM)": "sha256:228fd303cfa554f56d43b47de30dec017d217cbb79575bcb6eececc2d2af0f0e",
+  "isolated daemon": "the declared fixture daemon ID ec06eb10-04b6-4f1b-bbb6-d336994db8ae (verified before the first resource and before cleanup, ISO-00/ISO-01); the VM daemon's container, network and volume snapshot and its image list are identical before and after the run (archive members `vm-amd64/pre-snap.txt`, `vm-amd64/snapshot-after.txt`, `vm-amd64/images-before.txt`, `vm-amd64/images-after.txt`)",
+  "product tree": "the product differs from the merged baseline by the P1.20.1 brand/layout change (web/), the R2 changes (internal/docker, internal/logging, cmd/mandatary) and the F2 change (internal/ops, internal/api, internal/mcp, cmd/mandatary); the local gates and the browser suites ran on a clean worktree at exactly the code commit (`gates/tree-before.txt`, `gates/tree-after.txt`: head, 0 modified files), so GATE-PRODUCT-TREE compares what they judged with what the VM archive built. The code commit fd69639 changes no product file against 2ac064f: it fixes the harness's TOTP period bookkeeping and adds two test files' worth of tests (tests/release/test_release.py, internal/auth/totp_straddle_test.go)",
   "release": "Mandatary Phase 1 release candidate (acceptance run of PR #25, round R2: P1.20.1 UX contribution, R3 documentation, R2 bounded continuity cache)",
-  "test tools sha256 (never shipped)": "mcpclient 626fa964efd0e920de5cd23e12023dab5f25897b6b65b6c0f473689309df7764; migfixture 606e383ad4e39204c859c7971dd20eb375af0242d245534ac7d7e5e458eb4315"
+  "test tools sha256 (never shipped)": "mcpclient 4c09fc9f997ad687a47c80137c6d038eb8cc54eafd9c19fa6bb98ba358794b6a; migfixture 9aaa7e83c2f09eb5505d51124010de1f89a4b99a9e56f9e8140b74fa24fab129 (built with `go build -trimpath` from the committed tree on the controller, so they carry its VCS stamp)"
  },
  "remediations": [
   {
@@ -319,6 +336,17 @@
    "reference": "review 519 (`records/review519-report.md`, https://github.com/NicoTM77/Mandatary/pull/25#pullrequestreview-5935593688); docs/api-mcp.md (Stop and restart outlive the 10 s server write bound); archive `adverse-ci-e5e1856/`, `round-3-2ac064f/diagnostics/run-41ae8d5/`",
    "tests": "RED-to-GREEN through the real `serverFor`, REST and a real MCP client against a slow executor (`cmd/mandatary/stop_write_deadline_test.go`: an admitted stop and restart deliver their result past the 10 s bound; unadmitted requests keep it), the ops observer tests (`internal/ops/dispatch_observer_test.go`: announced only after authorization and only for stop/restart), the transport unit test (`internal/api/admission_deadline_test.go`), and hand/script mutation checks of the wiring. The release harness gained per-call REST/MCP timing in the matrix stage and the `REL-STOP-LONG` check (container A ignores SIGTERM, `timeout_seconds` 12: REST stop, start and the MCP restart must still answer 200 although they outlast the 10 s bound, and A must run again; an unmeasured or fast answer is a failure); its fail-closed behaviour has positive and eight negative unit twins (`tests/release/test_release.py`).",
    "title": "Hosted run 44003552068 at e5e1856: REST 502 on X-dn-stop-A, and the server write bound that cut off long stop/restart calls"
+  },
+  {
+   "adverse_run": "the VM run at 41ae8d5 (archive `round-3-2ac064f/diagnostics/run-41ae8d5/vm-amd64/`, summary `adverse-vm-41ae8d5`): `PERSISTENCE-ERROR: DeployError: login step 2: 403`. The product of that run was identical to the product of the later code commits. The same stage passed in the next VM run (2ac064f) and on every hosted run of that product. REL-RESTART-1..4, REL-CRASH-1/2, REL-USAGE-AFTER-CRASH and REL-USAGE-RING-AFTER-CRASH all PASSED in the failing run; only the final administrator re-sign-in after the SIGKILL stage (`tests/release/ops.py`, the last statement of `persistence()`) was refused. It is an adverse ref of SH-7a, P1-E3 and P1-E4 (the criteria that rest on the persistence stage and on administrator TOTP sign-in); the earlier text that the restart, crash and usage checks of that run did not execute was wrong and is corrected (finding F-8).",
+   "finding": "A defect of the test harness, not of the product. `Admin.login` (`tests/release/stackdeploy.py`) remembered the TOTP period from BEFORE it posted step 2, but the service records an accepted code under its OWN verifier period, taken when it verifies, and refuses any later acceptance in or before a recorded period (`internal/auth/lifecycle.go` VerifyTOTP, `HasTOTPReplay`: `verifier_period >= period`; `docs/authenticator-lifecycle.md`). A step 2 in flight across a 30 s boundary (code computed in period P, verified in P+1) therefore spent P+1 while the harness believed P was spent; the next sign-in, already in P+1 and started within 30 s, was correctly refused as a replay. The same ordering existed once more in `complete_setup` (period read before the confirm request). The sign-in that failed is the one that follows REL-RESTART-3's sign-in by less than 30 s (restart, crash and usage reads in between), the only place of the stage where two sign-ins are that close.",
+   "fix": "Test code only (`fd69639`): the period is read after the step-2 answer, which follows the verification, and advances even when step 2 is refused; the setup path reads its period after the confirm answer. No product file changed (the product diff against 2ac064f is empty outside test files; the only product-side addition is the regression test below, which pins the rule the harness relies on).",
+   "fresh_evidence": "At the code commit fd69639 (round 4): the VM run 156 PASS / 0 not PASS including the persistence stage and its final re-sign-in, and both hosted CPUs (hosted run 44074980728) 156 PASS / 0 not PASS. Every check of SH-7a, P1-E3 and P1-E4 passes on all of them.",
+   "id": "F5 of review 520",
+   "not_established": "that the boundary straddle actually happened in the failing run: the archived run carries no timestamps of its two sign-ins, so the straddle is inferred from the failure signature and from the deterministic reproduction, not observed. The mechanism is evidenced (reproduced against a stand-in of a rule that the real product test pins), the failure of the run is consistent with it, and no other cause was found; it is a harness defect for which a recurrence with the corrected harness, which now also records the refusal's closed code/reason and the TOTP period, would reopen the question as a possible product defect. A rare straddle probability (a window of milliseconds in 30 s) is plausible for one run in a few, not proven for this one.",
+   "reference": "review 520 (`records/review520-report.md`, https://github.com/NicoTM77/Mandatary/pull/25#pullrequestreview-5937568080); `records/F5-login-403-analysis.md`; `round-4-fd69639/diagnostics/run-41ae8d5-corrected-README.md`",
+   "tests": "RED to GREEN with a fake clock and a stand-in for the service's rule (`tests/release/test_release.py` AdminLoginPeriod): a step 2 that crosses a boundary makes the next sign-in fail with `login step 2: 403` on the previous harness (RED, the exact signature of the run) and succeed on the fixed one (GREEN, it waits for the period after the verifier's); a non-straddling sign-in still waits only for the next period; the stand-in itself refuses a second acceptance in one period (negative control); a refused step 2 still advances the remembered period. The service rule is pinned against the real product by `internal/auth` `TestTOTPPreviousStepCodeSpendsTheVerifierPeriod` (a code of the previous step accepted in period P spends P; a second acceptance in P is refused; the next period accepts; killed by a mutant that records the code's step instead of the verifier period) and by the existing `TestTOTPConcurrentReplayAndPeriodLimit`.",
+   "title": "VM run at 41ae8d5: `login step 2: 403` at the administrator's final re-sign-in (a harness defect)"
   }
  ],
  "schema": "mandatary-p120-evidence-catalog/1",

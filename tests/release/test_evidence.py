@@ -658,7 +658,8 @@ class CommittedVersion2(unittest.TestCase):
     def test_the_new_archive_version_supersedes_the_older_one_and_the_older_manifest_is_tracked(self):
         cat = evidence.load_catalog(self.ev)
         sup = cat["archive"]["supersedes"]
-        self.assertEqual((cat["archive"]["id"], sup["id"]), ("p120-evidence-v2", "p120-evidence-v1"))
+        self.assertEqual((cat["archive"]["id"], sup["id"]), ("p120-evidence-v3", "p120-evidence-v2"))
+        self.assertTrue(os.path.isfile(os.path.join(self.ev, "ARCHIVE.p120-evidence-v1.sha256")))  # the older manifest stays tracked too
         self.assertTrue(os.path.isfile(os.path.join(self.ev, sup["manifest"])))
         if shutil.which("git") and os.path.exists(os.path.join(self.root, ".git")):  # a directory, or the file of a worktree
             for rel in sorted(os.listdir(self.ev)):
@@ -671,6 +672,52 @@ class CommittedVersion2(unittest.TestCase):
         self.assertNotIn("cause established", text)
         self.assertNotIn("the cause is established", text)
         self.assertIn("mechanism is evidenced", text)
+
+
+class CommittedVersion3(unittest.TestCase):
+    """Review 520 F5 against the repository's own evidence: the VM run at 41ae8d5 that failed an administrator sign-in is an adverse run of the
+    criteria that rest on the persistence stage and on TOTP sign-in (never silent), F-8 states what really passed, and the closure is a stated
+    remediation that says what is not established."""
+
+    root = Committed.root
+    ev = Committed.ev
+    crit = os.path.join(HERE, "criteria.json")
+
+    def test_the_adverse_vm_run_is_recorded_and_bears_on_the_persistence_and_totp_criteria(self):
+        cat = evidence.load_catalog(self.ev)
+        a = cat["artifacts"]["adverse-vm-41ae8d5"]
+        self.assertEqual(a["role"], "adverse")
+        self.assertTrue(a["member"].startswith("round-3-2ac064f/diagnostics/run-41ae8d5/vm-amd64/"))
+        by_id = {r["id"]: r["status"] for r in json.load(open(os.path.join(self.ev, a["file"])))["results"]}
+        self.assertEqual(by_id["PERSISTENCE-ERROR"], "FAIL")  # the historical result is not rewritten
+        for check in ("REL-RESTART-1", "REL-RESTART-2", "REL-RESTART-3", "REL-RESTART-4", "REL-CRASH-1", "REL-CRASH-2", "REL-USAGE-AFTER-CRASH", "REL-USAGE-RING-AFTER-CRASH"):
+            self.assertEqual(by_id[check], "PASS", check)  # what the earlier text said had not executed did execute and passed
+        crit = {c["id"]: c for c in json.load(open(self.crit))["criteria"]}
+        for cid in ("SH-7a", "P1-E3", "P1-E4"):
+            groups = report.adverse_groups(crit[cid])
+            self.assertTrue(any("PERSISTENCE-ERROR@adverse-vm-41ae8d5" in g["refs"] for g in groups), cid)
+            self.assertTrue(all(report.group_closed(g) and g["state"] == "remediated" for g in groups), cid)
+
+    def test_f8_states_what_passed_and_the_remediation_states_what_is_not_established(self):
+        cat = evidence.load_catalog(self.ev)
+        f8 = [f for f in cat["findings"] if f["id"] == "F-8"][0]
+        for needle in ("REL-RESTART-1..4", "REL-CRASH-1", "REL-USAGE-AFTER-CRASH", "PASSED in that run", "harness", "Not established"):
+            self.assertIn(needle, f8["detail"] + f8["title"])
+        self.assertNotIn("so the restart, SIGKILL and usage-after-crash checks of that run did not execute", json.dumps(cat))
+        self.assertNotIn("cause is NOT established", json.dumps(cat["findings"]))
+        rem = [r for r in cat["remediations"] if r["id"] == "F5 of review 520"][0]
+        self.assertIn("harness", rem["finding"])
+        self.assertIn("no timestamps", rem["not_established"])
+        self.assertIn("recurrence", rem["not_established"])
+
+    def test_the_corrected_description_and_the_analysis_are_archive_members(self):
+        with open(os.path.join(self.ev, "ARCHIVE.sha256")) as fh:
+            manifest, problems = evidence.parse_manifest(fh.read())
+        self.assertEqual(problems, [])
+        for member in ("round-4-fd69639/diagnostics/run-41ae8d5-corrected-README.md", "round-4-fd69639/diagnostics/F5-red.log", "round-4-fd69639/diagnostics/F5-green.log",
+                       "round-4-fd69639/diagnostics/F5-product-mutant.log", "records/F5-login-403-analysis.md", "records/review520-report.md",
+                       "round-3-2ac064f/diagnostics/run-41ae8d5/README.md"):  # the superseded text stays (immutable) and is corrected by the new member
+            self.assertIn(member, manifest)
 
 
 if __name__ == "__main__":

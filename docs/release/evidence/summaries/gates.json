@@ -2,17 +2,17 @@
  "artifact": "gates",
  "results": [
   {
-   "detail": "gofmt -l over cmd internal web tests/{security,adapters,release}: exit 0 in 1 s",
+   "detail": "gofmt -l over cmd internal web tests/{security,adapters,release}: exit 0 in 0 s",
    "id": "GATE-GOFMT",
    "status": "PASS"
   },
   {
-   "detail": "go vet ./...: exit 0 in 2 s",
+   "detail": "go vet ./...: exit 0 in 3 s",
    "id": "GATE-GOVET",
    "status": "PASS"
   },
   {
-   "detail": "go mod verify: exit 0 in 8 s",
+   "detail": "go mod verify: exit 0 in 7 s",
    "id": "GATE-GOMOD-VERIFY",
    "status": "PASS"
   },
@@ -22,7 +22,7 @@
    "status": "PASS"
   },
   {
-   "detail": "pinned gosec ./...: exit 0 in 17 s",
+   "detail": "pinned gosec ./...: exit 0 in 21 s",
    "id": "GATE-GOSEC",
    "status": "PASS"
   },
@@ -37,17 +37,17 @@
    "status": "PASS"
   },
   {
-   "detail": "tests/release/test_release.py (hermetic harness tests): exit 0 in 1 s",
+   "detail": "tests/release/test_release.py (hermetic harness tests): exit 0 in 0 s",
    "id": "GATE-RELEASE-HARNESS-TESTS",
    "status": "PASS"
   },
   {
-   "detail": "tests/image/test_isolation.py (isolation guard tests): exit 0 in 3 s",
+   "detail": "tests/image/test_isolation.py (isolation guard tests): exit 0 in 4 s",
    "id": "GATE-ISOLATION-TESTS",
    "status": "PASS"
   },
   {
-   "detail": "node --test scripts/*.test.mjs (CI budgets, toolchain pins, ledger, dependency residuals, generation): exit 0 in 27 s",
+   "detail": "node --test scripts/*.test.mjs (CI budgets, toolchain pins, ledger, dependency residuals, generation): exit 0 in 30 s",
    "id": "GATE-NODE-SCRIPTS",
    "status": "PASS"
   },
@@ -57,7 +57,7 @@
    "status": "PASS"
   },
   {
-   "detail": "eslint --max-warnings 0: exit 0 in 12 s",
+   "detail": "eslint --max-warnings 0: exit 0 in 13 s",
    "id": "GATE-WEB-LINT",
    "status": "PASS"
   },
@@ -72,7 +72,7 @@
    "status": "PASS"
   },
   {
-   "detail": "compared 2ac064f85dba..2ac064f85dba over cmd internal web Dockerfile docker-compose.yml deploy go.mod go.sum sqlc.yaml tools; 0 product file(s) differ",
+   "detail": "compared fd69639b4149..fd69639b4149 over cmd internal web Dockerfile docker-compose.yml deploy go.mod go.sum sqlc.yaml tools; 0 product file(s) differ",
    "id": "GATE-PRODUCT-TREE",
    "status": "PASS"
   }
@@ -81,7 +81,7 @@
  "schema": "mandatary-p120-evidence-summary/1",
  "source": {
   "bytes": 2111,
-  "member": "round-3-2ac064f/gates/results.json",
-  "sha256": "c330cd9862a609359e8173e5210e5b80e2c294c2cb9f60738fad3ca3d235e6ec"
+  "member": "round-4-fd69639/gates/results.json",
+  "sha256": "7075db78eaa959f61a2021a03f6b3e5a13a886738dcdba57ffff16fa9fa47a41"
  }
 }

@@ -132,19 +132,22 @@ check the result (`docs/release/evidence/`, all sealed by `SHA256SUMS`):
 | `ARCHIVE.sha256` | The complete member manifest of the archive (`sha256sum` format, sorted, one line per member) |
 | `summaries/*.json` | A compact, deterministic summary of each raw `results` document: the digest of the raw member it was derived from, its revision, every check result, and the measured values (long traces are cut to their length) |
 
-The archive of this release is `p120-evidence-v2`: `p120-evidence-v2-<12 hex>.tar.gz` plus `p120-evidence-v2.ARCHIVE.sha256`, assets of
-an **evidence-only draft pre-release** of this repository (tag name `p120-evidence-v2`; it is not a product release, not a C5 release,
-and must never be published). It **supersedes** `p120-evidence-v1` without changing it: v1 stays in its own draft release, and the
-v2 manifest contains every one of the v1 members with the identical SHA-256. The committed `ARCHIVE.p120-evidence-v1.sha256` is the v1
-manifest, so `report.py --check` proves that containment from the two committed manifests without reading either archive, and the
-full audit covers the v1 members too (they are in the v2 tarball). The roots are `round-1-f306a2a/` and `round-2-fbb8193/` (the
-earlier rounds, including the R2 A/B raw runs), `records/` (the R2 root-cause report, the review reports, the interim design),
-`round-3-2ac064f/` (the integrated evidence of the final code commit, with the first runs of the F2 fix under `diagnostics/run-41ae8d5/`)
-and `adverse-ci-e5e1856/` (the adverse hosted run of review 519 F1). The authoritative
+The archive of this release is `p120-evidence-v3`: `p120-evidence-v3-<12 hex>.tar.gz` plus `p120-evidence-v3.ARCHIVE.sha256`, assets of
+an **evidence-only draft pre-release** of this repository (tag name `p120-evidence-v3`; it is not a product release, not a C5 release,
+and must never be published). It **supersedes** `p120-evidence-v2` without changing it (and v2 superseded `p120-evidence-v1`): the older
+archives stay in their own draft releases, and the v3 manifest contains every one of the v2 members (so every v1 member too) with the
+identical SHA-256. The committed `ARCHIVE.p120-evidence-v2.sha256` is the v2 manifest (and `ARCHIVE.p120-evidence-v1.sha256` the v1 manifest),
+so `report.py --check` proves that containment from the committed manifests without reading any archive, and the
+full audit covers the older members too (they are in the v3 tarball). The roots are `round-1-f306a2a/` and `round-2-fbb8193/` (the
+earlier rounds, including the R2 A/B raw runs), `records/` (the R2 root-cause report, the review reports, the interim design, the F5
+analysis), `round-3-2ac064f/` (the integrated evidence of the previous code commit, with the first runs of the F2 fix under
+`diagnostics/run-41ae8d5/`), `adverse-ci-e5e1856/` (the adverse hosted run of review 519 F1) and `round-4-fd69639/` (the integrated
+evidence of the final code commit, and the corrected description of the run at 41ae8d5; an immutable archive is never edited, so a
+description found wrong in an older version is corrected by a new member, and the catalog says so). The authoritative
 identifiers, size, tarball digest and member count are in `catalog.json` and the generated report. A draft release is visible to
 repository writers; it is read with the caller's own `gh` (never a credential of this repository). It is durable while the repository and
 the draft exist; an administrator can delete it, which the digests make detectable but cannot prevent. A new evidence round makes a new
-archive id (`p120-evidence-v2`, ...): archives are never rewritten.
+archive id (`p120-evidence-v3`, ...): archives are never rewritten.
 
 **Two verification levels, never confused.**
 
