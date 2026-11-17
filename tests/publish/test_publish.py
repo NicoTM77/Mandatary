@@ -606,6 +606,22 @@ class Publish(Tmp):
         self.assertEqual(fd.dev(), before)
         self.assertNotIn("push", fd.names())
 
+    def test_a_diverged_dev_revision_is_skipped_and_left_untouched_not_refused(self):
+        # review 519 F3: a dev revision that is neither an ancestor of this commit nor the other way round (merge-base exits 1) is a
+        # SKIP (not a failure, dev byte-identical), exactly like an older commit; only an unorderable history refuses.
+        out, fd = self.build_tested()
+        self.seed_dev(fd, NEW)
+        before = fd.dev()
+        with self.assertRaises(pub.Skip):
+            pub.publish(fd, FakeGit(ancestors=[]), out, SHA, env(), log=lambda *_: None)
+        self.assertEqual(fd.dev(), before)
+        self.assertNotIn("push", fd.names())
+        out2, fd2 = self.build_tested()
+        self.seed_dev(fd2, NEW)
+        with self.assertRaises(pub.Refuse):  # the order cannot be evaluated at all: refused, nothing written
+            pub.publish(fd2, FakeGit(unknown=True), out2, SHA, env(), log=lambda *_: None)
+        self.assertNotIn("push", fd2.names())
+
     def test_a_newer_commit_replaces_an_older_dev_revision(self):
         out, fd = self.build_tested()
         self.seed_dev(fd, OLD)

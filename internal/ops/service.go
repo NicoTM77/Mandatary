@@ -487,6 +487,13 @@ func (s *Service) dispatch(ctx context.Context, lease *authz.Lease) (Result, err
 	if err := dctx.Err(); err != nil { // an already-expired bound dispatches nothing: no evidence, no event
 		return Result{}, s.failure(ctx, lease, err)
 	}
+	if dec.Operation == docker.OpStop || dec.Operation == docker.OpRestart {
+		// Admitted, bound known, backend call next: only now may a transport give this one request
+		// as long to deliver its result as the call itself may run (see DispatchObserver).
+		if observe := DispatchObserverFrom(ctx); observe != nil {
+			observe(s.dispatchBound(dec))
+		}
+	}
 	var callErr error
 	switch dec.Operation {
 	case docker.OpInspectStatus:
@@ -585,6 +592,11 @@ func (s *Service) openLogs(lease *authz.Lease, backend docker.DockerBackend, dec
 // dispatchContext bounds one-shot operations and the Logs open call: the daemon's stop timeout plus a
 // fixed grace for stop and restart, the operation timeout otherwise.
 func (s *Service) dispatchContext(parent context.Context, dec authz.Decision) (context.Context, context.CancelFunc) {
+	return s.withTimeout(parent, s.dispatchBound(dec))
+}
+
+// dispatchBound is the length of that deadline.
+func (s *Service) dispatchBound(dec authz.Decision) time.Duration {
 	d := s.operationTimeout
 	if dec.Operation == docker.OpStop || dec.Operation == docker.OpRestart {
 		secs := docker.DefaultStopTimeoutSeconds
@@ -593,7 +605,7 @@ func (s *Service) dispatchContext(parent context.Context, dec authz.Decision) (c
 		}
 		d = time.Duration(secs)*time.Second + s.stopGrace
 	}
-	return s.withTimeout(parent, d)
+	return d
 }
 
 // failure maps an error observed after admission to a secret-free outcome. A

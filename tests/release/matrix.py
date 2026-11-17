@@ -249,6 +249,24 @@ def diff_totals(expected, got, bands=None):
     return out
 
 
+SERVER_WRITE_BOUND_MS = 10000  # cmd/mandatary serverFor WriteTimeout: a response later than this needs the per-request extension
+
+
+def timing_summary(ids, ops, rest_ms, mcp_ms, top=5):
+    """Per-call timing of the executed matrix: the slowest calls, and every call that took as long as the server's own 10 s write bound
+    (such a call is only answered because the admitted stop/restart extends its own write deadline; an unanswered one is the symptom
+    of review 519 F2). Lists have equal length; pure so test_release.py can pin it."""
+    rows = [{"id": i, "op": o, "rest_ms": r, "mcp_ms": m} for i, o, r, m in zip(ids, ops, rest_ms, mcp_ms)]
+    slow = sorted(rows, key=lambda x: (-max(x["rest_ms"], x["mcp_ms"]), x["id"]))[:top]
+    return {
+        "calls": len(rows),
+        "rest_max_ms": max(rest_ms, default=0),
+        "mcp_max_ms": max(mcp_ms, default=0),
+        "slowest": slow,
+        "at_or_over_server_write_bound": sorted(x["id"] for x in rows if x["rest_ms"] >= SERVER_WRITE_BOUND_MS),
+    }
+
+
 def merge_rows(rows):
     """Rows of the usage rollups -> totals keyed like Tally. Zero rows are dropped."""
     out = Counter()

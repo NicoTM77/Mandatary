@@ -316,8 +316,11 @@ jobs:
     permissions:
       contents: read
       packages: write
-    # Publication-only serialization. Verification is never cancelled for it (each main commit has its own CI group); a newer waiting publication
-    # replaces an older waiting one, and a running one is never cancelled half-way.
+    # Publication-only serialization. Verification is never cancelled for it (each main commit has its own CI group); a running publication
+    # is never cancelled half-way. GitHub keeps ONE pending job per group and cancels the earlier-QUEUED pending one whatever its commit, so an
+    # older main commit whose CI finishes later can cancel the newest commit's pending publication: dev then stays one commit behind until the
+    # next main push. That is never unsafe: the freshness guard in publish_dev_image.py (not this group) is what stops an older commit from
+    # overwriting a newer dev.
     concurrency:
       group: publish-dev-image
       cancel-in-progress: false

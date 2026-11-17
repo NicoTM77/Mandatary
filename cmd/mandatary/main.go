@@ -32,8 +32,10 @@ func developmentServerWith(logger *slog.Logger, handler http.Handler) *http.Serv
 	return serverFor(config.DefaultAdminListenAddr, logger, handler)
 }
 
-// serverFor builds the one HTTP server with bounded I/O. Long-lived follow and MCP streams extend
-// their own per-write deadline; the server-wide bounds stay small.
+// serverFor builds the one HTTP server with bounded I/O. Long-lived follow streams extend their own
+// per-write deadline, and an ADMITTED stop/restart (which may run timeout_seconds + StopGrace, longer
+// than WriteTimeout) extends its own response's write deadline once the service has authorized it
+// (api.WithAdmissionDeadline); the server-wide bounds stay small for everything else.
 func serverFor(addr string, logger *slog.Logger, handler http.Handler) *http.Server {
 	return &http.Server{
 		Addr:              addr,

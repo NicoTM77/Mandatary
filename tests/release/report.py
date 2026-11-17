@@ -40,6 +40,25 @@ ORDER = {"FAIL": 0, "UNVERIFIED": 1, "PASS": 2}
 sha256_file = evidence.sha256_file
 
 
+# How an adverse group stops counting, and the text that must say why. "dispositioned": the owner decided (a policy decision, not a
+# pass). "remediated": the defect was fixed in the product, a regression test pins the fix and fresh evidence of the criterion passes
+# (a technical closure, not an owner decision). A group in either state WITHOUT its text keeps counting: the closure is never silent.
+CLOSING_TEXT = {"dispositioned": "disposition", "remediated": "remediation"}
+
+
+def adverse_groups(criterion):
+    """The criterion's adverse groups: one dict (the original shape) or a list of dicts, as a list."""
+    adv = criterion.get("adverse")
+    if not adv:
+        return []
+    return [adv] if isinstance(adv, dict) else list(adv)
+
+
+def group_closed(group):
+    key = CLOSING_TEXT.get(group.get("state", ""))
+    return bool(key and str(group.get(key, "")).strip())
+
+
 def evaluate(criteria, results, digests, adverse=None):
     """criteria: [{id, text, evidence: ["CHECK@artifact", ...], ...}]; results: {"CHECK@artifact": "PASS"|...}; digests: {artifact: sha256}.
     Returns one row per criterion with its status and the evaluated links."""
@@ -61,15 +80,19 @@ def evaluate(criteria, results, digests, adverse=None):
             links.append({"ref": ref, "result": res or "none", "digest": dig, "link": link})
             if ORDER[link] < ORDER[status]:
                 status = link
-        adv = c.get("adverse") or {}
-        adverse_links = []
-        for ref in adv.get("refs", []):
-            res = (adverse or {}).get(ref)
-            adverse_links.append({"ref": ref, "result": res or "none", "digest": digests.get(ref.rsplit("@", 1)[1] if "@" in ref else "")})
-            if adv.get("state") != "dispositioned" and res != "PASS" and ORDER["FAIL" if res == "FAIL" else "UNVERIFIED"] < ORDER[status]:
-                status = "FAIL" if res == "FAIL" else "UNVERIFIED"
-        # An adverse run that is not PASS and was dispositioned makes the PASS a PASS WITH DISCLOSURES (never a silent one).
-        disclosed = status == "PASS" and adv.get("state") == "dispositioned" and any(a["result"] != "PASS" for a in adverse_links)
+        adverse_links, closed_links = [], []
+        for adv in adverse_groups(c):
+            closed = group_closed(adv)
+            for ref in adv.get("refs", []):
+                res = (adverse or {}).get(ref)
+                link = {"ref": ref, "result": res or "none", "digest": digests.get(ref.rsplit("@", 1)[1] if "@" in ref else ""), "state": adv.get("state", "open")}
+                adverse_links.append(link)
+                if closed:
+                    closed_links.append(link)
+                elif res != "PASS" and ORDER["FAIL" if res == "FAIL" else "UNVERIFIED"] < ORDER[status]:
+                    status = "FAIL" if res == "FAIL" else "UNVERIFIED"
+        # An adverse run that is not PASS and was closed (dispositioned or remediated) makes the PASS a PASS WITH DISCLOSURES (never a silent one).
+        disclosed = status == "PASS" and any(a["result"] != "PASS" for a in closed_links)
         rows.append(dict(c, status=status, links=links, adverse_links=adverse_links, disclosed=disclosed))
     return rows
 
@@ -255,17 +278,20 @@ def render(catalog, rows, digests, meta, results, evdir):
         for r in [x for x in rows if x["group"] == g]:
             links = "<br>".join("%s `%s` %s" % ("✔" if l["link"] == "PASS" else ("✘" if l["link"] == "FAIL" else "?"), l["ref"].split("@")[0] + "@" + l["ref"].split("@")[1], (l["digest"] or "no digest")[:12]) for l in r["links"]) or "none"
             lim = (r.get("limits") or "")
-            adv = r.get("adverse") or {}
-            if adv:
+            by_ref = {a["ref"]: a for a in r["adverse_links"]}
+            for adv in adverse_groups(r):
                 lim += (" " if lim else "") + "Adverse runs (%s): %s. %s" % (
-                    adv.get("state", "open"), ", ".join("%s %s (%s)" % (a["ref"], a["result"], (a["digest"] or "no digest")[:12]) for a in r["adverse_links"]), adv.get("disposition", ""))
+                    adv.get("state", "open"), ", ".join("%s %s (%s)" % (a["ref"], a["result"], (a["digest"] or "no digest")[:12]) for a in (by_ref[x] for x in adv.get("refs", []))),
+                    adv.get(CLOSING_TEXT.get(adv.get("state", ""), "disposition"), ""))
             status = "PASS WITH DISCLOSURES" if r.get("disclosed") else r["status"]
             w("| %s | %s | **%s** | %s | %s |" % (r["id"], r["text"].replace("|", "\\|"), status, links, lim.replace("|", "\\|")))
         w("")
     dispositions = catalog.get("dispositions", [])
-    if dispositions:
-        w("## 6. Owner-approved dispositions")
+    remediations = catalog.get("remediations", [])
+    if dispositions or remediations:
+        w("## 6. Owner-approved dispositions" + (" and remediated adverse results" if remediations else ""))
         w("")
+    if dispositions:
         w("A disposition changes how an adverse result is **classified**; it does not rewrite the result. The historical adverse runs stay FAIL in the archive and above. Each disposition states what it does not claim.")
         w("")
         for d in dispositions:
@@ -275,6 +301,21 @@ def render(catalog, rows, digests, meta, results, evdir):
             w("* **Approved by:** " + d["approved_by"])
             w("* **Reference:** " + d["reference"])
             for k, label in (("kept_visible", "Kept visible"), ("not_claimed", "Not claimed"), ("residual_risk", "Residual risk")):
+                if d.get(k):
+                    w("* **%s:** %s" % (label, d[k]))
+            w("")
+    if remediations:
+        w("A remediation is **not** an owner decision: a defect found by review was fixed in the product, a regression test pins the fix, and fresh evidence of the affected criteria passes. The adverse run is not rewritten (it stays FAIL in the archive and in the criteria that list it); only its effect on the criteria changes, and only because the criterion's own fresh checks pass. Each remediation states what it does not establish.")
+        w("")
+        for d in remediations:
+            w("### %s - %s" % (d["id"], d["title"]))
+            w("")
+            w("* **Adverse run:** " + d["adverse_run"])
+            w("* **Finding and cause:** " + d["finding"])
+            w("* **Fix:** " + d["fix"])
+            w("* **Regression tests:** " + d["tests"])
+            w("* **Fresh evidence:** " + d["fresh_evidence"])
+            for k, label in (("not_established", "Not established"), ("reference", "Reference")):
                 if d.get(k):
                     w("* **%s:** %s" % (label, d[k]))
             w("")

@@ -182,6 +182,66 @@ class SealedAdverseRuns(unittest.TestCase):
         self.assertEqual(rows[0]["status"], "PASS")
 
 
+class AdverseGroupsAndRemediation(unittest.TestCase):
+    """Review 519 F1: several adverse groups per criterion, and a REMEDIATED state that is a technical closure (never silent, never owner-less
+    by accident): it needs its own text, it leaves the PASS visibly WITH DISCLOSURES, and any open group still fails the criterion."""
+
+    DIGESTS = {"r": "00", "d1": "11", "d2": "22"}
+
+    def crit(self, *groups):
+        return [{"id": "C", "group": "G", "text": "", "evidence": ["A@r"], "adverse": list(groups) if len(groups) != 1 else groups[0]}]
+
+    def grp(self, state, ref, text=True):
+        g = {"state": state, "refs": [ref]}
+        if text:
+            g["remediation" if state == "remediated" else "disposition"] = "why"
+        return g
+
+    def status(self, crit, adverse):
+        import report
+        return report.evaluate(crit, {"A@r": "PASS"}, self.DIGESTS, adverse)[0]
+
+    def test_a_remediated_group_with_its_text_no_longer_counts_but_the_pass_is_with_disclosures(self):
+        row = self.status(self.crit(self.grp("remediated", "X@d1")), {"X@d1": "FAIL"})
+        self.assertEqual((row["status"], row["disclosed"]), ("PASS", True))
+        self.assertEqual(row["adverse_links"][0]["result"], "FAIL")  # the adverse run is still listed as the FAIL it was
+        self.assertEqual(row["adverse_links"][0]["state"], "remediated")
+
+    def test_a_closed_state_without_its_text_keeps_counting_not_silent(self):
+        for state in ("remediated", "dispositioned"):
+            row = self.status(self.crit(self.grp(state, "X@d1", text=False)), {"X@d1": "FAIL"})
+            self.assertEqual(row["status"], "FAIL", state)
+        self.assertEqual(self.status(self.crit({"state": "remediated", "refs": ["X@d1"], "disposition": "wrong key"}), {"X@d1": "FAIL"})["status"], "FAIL")  # a remediation needs a REMEDIATION text
+        self.assertEqual(self.status(self.crit({"state": "remediated", "refs": ["X@d1"], "remediation": "   "}), {"X@d1": "FAIL"})["status"], "FAIL")
+
+    def test_one_open_group_fails_even_when_another_group_is_closed(self):
+        crit = self.crit(self.grp("remediated", "X@d1"), self.grp("open", "Y@d2"))
+        self.assertEqual(self.status(crit, {"X@d1": "FAIL", "Y@d2": "FAIL"})["status"], "FAIL")
+        self.assertEqual(self.status(crit, {"X@d1": "FAIL"})["status"], "UNVERIFIED")  # the open group's run cannot be read: never a pass
+        self.assertEqual(self.status(crit, {"X@d1": "FAIL", "Y@d2": "PASS"})["disclosed"], True)
+
+    def test_a_remediated_run_that_could_not_be_read_does_not_hide_a_failing_fresh_result(self):
+        import report
+        row = report.evaluate(self.crit(self.grp("remediated", "X@d1")), {"A@r": "FAIL"}, self.DIGESTS, {"X@d1": "FAIL"})[0]
+        self.assertEqual(row["status"], "FAIL")  # closing the adverse run is never a substitute for the criterion's own fresh evidence
+
+    def test_the_remediation_section_is_rendered_only_when_the_catalog_has_one_and_never_changes_the_old_heading(self):
+        import report
+        base = {"release_candidate": {}, "archive": {"id": "a", "tarball": "t", "tarball_bytes": 1, "tarball_sha256": "0", "members": 1, "manifest_sha256": "0", "location": {}}, "artifacts": {}}
+        rows = report.evaluate(self.crit(self.grp("remediated", "X@d1")), {"A@r": "PASS"}, self.DIGESTS, {"X@d1": "FAIL"})
+        plain = report.render(dict(base), rows, self.DIGESTS, {}, {}, "/nonexistent")
+        self.assertNotIn("Remediated", plain)
+        rem = {"id": "F1 / SH-5", "title": "t", "adverse_run": "run 1", "finding": "f", "fix": "x", "tests": "tt", "fresh_evidence": "ff", "not_established": "ne"}
+        withrem = report.render(dict(base, remediations=[rem]), rows, self.DIGESTS, {}, {}, "/nonexistent")
+        self.assertIn("## 6. Owner-approved dispositions and remediated adverse results", withrem)
+        self.assertIn("is **not** an owner decision", withrem)
+        self.assertIn("**Not established:** ne", withrem)
+        both = report.render(dict(base, remediations=[rem], dispositions=[{"id": "R", "title": "d", "decision": "x", "approved_by": "o", "reference": "r"}]), rows, self.DIGESTS, {}, {}, "/nonexistent")
+        self.assertLess(both.index("### R - d"), both.index("### F1 / SH-5 - t"))
+        only_disp = report.render(dict(base, dispositions=[{"id": "R", "title": "d", "decision": "x", "approved_by": "o", "reference": "r"}]), rows, self.DIGESTS, {}, {}, "/nonexistent")
+        self.assertIn("## 6. Owner-approved dispositions\n", only_disp)
+
+
 class HostSampling(unittest.TestCase):
     @unittest.skipUnless(os.path.exists("/proc/stat"), "needs a Linux /proc")
     def test_the_sampler_reads_the_host_and_the_named_processes_from_proc_only(self):

@@ -24,7 +24,7 @@ re-checks the event, ref, repository, absence of a pull-request ref and every ne
 | Permissions | The workflow default stays `contents: read`. Only the `publish` job adds `packages: write` (and `contents: read`). The Image jobs, which produce the artifact, have no package permission. |
 | Credential | The workflow's own `GITHUB_TOKEN`. No new PAT, no repository or organisation setting changed. It reaches `docker login --password-stdin` on stdin only, in a private temporary Docker config (mode 0700) that is logged out and removed at the end; it is never on a command line or in a log. |
 | Actions | All pinned by commit (`actions/download-artifact` v4.3.0 is the one added here). The logic uses the runner's `docker` and `python3`, no third-party action. |
-| Concurrency | Publication only: group `publish-dev-image`, `cancel-in-progress: false` (a running publication is never cancelled half-way, a newer waiting one replaces an older waiting one). Verification is **not** cancelled to serialize it: every push to `main` has its own CI group (per commit), pull requests keep one run per ref. |
+| Concurrency | Publication only: group `publish-dev-image`, `cancel-in-progress: false` (a running publication is never cancelled half-way). GitHub keeps only **one pending** job per group and cancels the **earlier-queued** pending one **whatever its commit**: an older main commit whose CI finishes later can therefore cancel the newest commit's pending publication, and `dev` then stays one commit behind until the next push to `main` (or until that run is re-run by a maintainer). This costs freshness only; it can never put an older image on `dev`, because the freshness guard below, not the concurrency group, decides what may be written. Verification is **not** cancelled to serialize it: every push to `main` has its own CI group (per commit), pull requests keep one run per ref. |
 | Budget | `timeout-minutes: 20`. |
 
 ## What is promoted, and how the tested image is bound to the published one
@@ -55,10 +55,13 @@ a package version needs a permission this workflow does not have and must not be
 ### Freshness: a stale run never overwrites a newer `dev`
 
 `dev` carries the revision it was built from (index annotation `org.opencontainers.image.revision`). A run publishes only if that revision is
-an ancestor of (or equal to) its own commit (`git merge-base --is-ancestor`, full history is fetched). A run whose commit is older, or on a
-history that cannot be ordered, does not overwrite it (older: skipped as not a failure; unorderable or no revision annotation: refused so a
-human decides). A repeat run of the same commit only verifies and stops. `dev` is read again right before it is written. Publication jobs are
-serialized by the concurrency group above, so two publications do not interleave.
+an ancestor of (or equal to) its own commit (`git merge-base --is-ancestor`, full history is fetched). The outcomes are exactly these:
+`dev` revision is an ancestor of this commit: publish. `dev` is not an ancestor of this commit, which covers both an **older** commit and
+a **diverged** history (a revision that is neither older nor newer): the run is **skipped** (reported as skipped, not as a failure) and
+`dev` is left byte-identical; nothing asks a human to decide. The run is **refused** (no write, the job fails) only when the order cannot
+be evaluated at all (`merge-base` fails for another reason, for example an unknown commit or missing history) or `dev` carries no
+revision annotation or an unreadable one. A repeat run of the same commit only verifies and stops. `dev` is read again right before it is
+written. Publication jobs are serialized by the concurrency group above, so two publications do not interleave.
 
 ## Verification that exists
 

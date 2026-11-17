@@ -256,15 +256,21 @@ def run_matrix(c: Ctx):
     cases = matrix.build_cases(ctxn)
     raw_cases = matrix.rest_only_cases(ctxn)
     t_start = time.time()
-    rest_res = [c.rest.run(k) for k in cases]
+    rest_res, rest_ms = [], []
+    for k in cases:  # per-call timing: a one-shot stop/restart that outlives a server bound must be visible (review 519 F2)
+        t0 = time.time()
+        rest_res.append(c.rest.run(k))
+        rest_ms.append(round((time.time() - t0) * 1000))
     mcp_res, mcp_raw = c.mcp.run_cases(cases)
+    mcp_ms = [round(r.get("elapsed_ms") or 0) for r in mcp_raw]
     bad_rest = [(k.id, k.expect, r) for k, r in zip(cases, rest_res) if not k.expect.matches(r)]
     bad_mcp = [(k.id, k.expect, r) for k, r in zip(cases, mcp_res) if not k.expect.matches(r)]
     diverge = [(k.id, r1, r2) for k, r1, r2 in zip(cases, rest_res, mcp_res) if r1 != r2]
     n_ok = sum(1 for k in cases if k.expect is matrix.OK)
     n_deny = sum(1 for k in cases if k.expect is matrix.DENY)
     c.ev["matrix"]["cases"] = len(cases)
-    c.ev["matrix"]["table"] = [{"id": k.id, "who": k.who, "op": k.op, "expect": repr(k.expect), "rest": r1, "mcp": r2} for k, r1, r2 in zip(cases, rest_res, mcp_res)]
+    c.ev["matrix"]["table"] = [{"id": k.id, "who": k.who, "op": k.op, "expect": repr(k.expect), "rest": r1, "mcp": r2, "rest_ms": t1, "mcp_ms": t2} for k, r1, r2, t1, t2 in zip(cases, rest_res, mcp_res, rest_ms, mcp_ms)]
+    c.ev["matrix"]["timing"] = matrix.timing_summary([k.id for k in cases], [k.op for k in cases], rest_ms, mcp_ms)
     if bad_rest or bad_mcp or diverge:
         # Diagnostic only: an unexpected answer (for example one stray 502) is otherwise unattributable. Keep the service's own
         # warning/error and safety/backend lines (the service logs carry no secrets, error text or payloads) next to the failed ids.
@@ -413,6 +419,30 @@ def lifecycle(c: Ctx):
     r = both("pol")
     c.tally.add("pol", "status", None, "denied", 2)
     c.check("REL-LIFE-POL-5", "deleting the rules denies again (403) on both transports", all(s in (200, 204) for s in sts) and r == (DEN, DEN), "%s %s" % (sts, r))
+    long_stop(c)
+
+
+def long_stop(c: Ctx):
+    """An admitted stop/restart that runs LONGER than the server's own 10 s write bound still delivers its result (review 519 F2).
+    Container A's PID 1 ignores SIGTERM, so timeout_seconds=12 makes the daemon wait the whole 12 s before it kills it: the answer
+    comes after the server-wide bound, through the proxy, on REST and on the real MCP client. Each call is accounted once (allowed)."""
+    A = c.names["A"]
+    base = "/api/v1/endpoints/local/containers/%s/" % A
+    OKR = (200, "", "")
+    secs = 12
+    stop = c.rest.raw("POST", base + "stop", "a", {"timeout_seconds": secs})
+    c.tally.add("a", "stop", A, "allowed")  # the daemon executed it whatever the client saw
+    start = c.rest.raw("POST", base + "start", "a")
+    c.tally.add("a", "start", A, "allowed")
+    mcp = c.mcp.batch([{"id": "long-restart", "token": "a", "op": "container_restart", "args": {"endpoint": "local", "container": A, "timeout_seconds": secs}}])[0]
+    c.tally.add("a", "restart", A, "allowed")
+    mcp_norm, mcp_ms = matrix.norm_mcp(mcp), round(mcp.get("elapsed_ms") or 0)
+    running = c.e.inspect(A)["State"]["Running"]
+    c.ev["matrix"]["long_stop"] = {"timeout_seconds": secs, "server_write_bound_ms": matrix.SERVER_WRITE_BOUND_MS, "rest_stop": {"result": stop[0], "ms": round(stop[2])},
+                                   "rest_start": {"result": start[0], "ms": round(start[2])}, "mcp_restart": {"result": mcp_norm, "ms": mcp_ms}}
+    c.check("REL-STOP-LONG", "an admitted stop and restart that run longer than the server's 10 s write bound (timeout_seconds %d on a container that ignores SIGTERM) still deliver their 200 result through the proxy, on REST and on the real MCP client, and A runs again" % secs,
+            stop[0] == OKR and start[0] == OKR and mcp_norm == OKR and running and stop[2] >= matrix.SERVER_WRITE_BOUND_MS and mcp_ms >= matrix.SERVER_WRITE_BOUND_MS,
+            "stop %s %.0f ms, start %s, restart %s %d ms, running=%s" % (stop[0], stop[2], start[0], mcp_norm, mcp_ms, running))
 
 
 # ---- logs -----------------------------------------------------------------------------------------------------------

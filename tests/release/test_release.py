@@ -462,6 +462,24 @@ class MatrixMismatchDiagnostics(unittest.TestCase):
         self.assertEqual(core.mismatch_log(None, ["z"]), {"ids": ["z"], "lines": []})
 
 
+class MatrixTiming(unittest.TestCase):
+    """Per-call timing of the matrix (review 519 F2): a stop/restart that takes as long as the server's 10 s write bound must be visible."""
+
+    def test_the_slowest_calls_and_every_call_at_the_write_bound_are_listed_in_a_stable_order(self):
+        ids = ["a", "b", "c", "d"]
+        ops = ["status", "stop", "restart", "stop"]
+        got = matrix.timing_summary(ids, ops, [40, 10000, 9999, 12000], [30, 5200, 20000, 10])
+        self.assertEqual(got["calls"], 4)
+        self.assertEqual((got["rest_max_ms"], got["mcp_max_ms"]), (12000, 20000))
+        self.assertEqual([x["id"] for x in got["slowest"]], ["c", "d", "b", "a"])
+        self.assertEqual(got["at_or_over_server_write_bound"], ["b", "d"])  # the bound itself counts; 9999 ms does not, and MCP time alone never does
+
+    def test_an_empty_matrix_is_an_empty_record_and_the_list_is_capped(self):
+        self.assertEqual(matrix.timing_summary([], [], [], []), {"calls": 0, "rest_max_ms": 0, "mcp_max_ms": 0, "slowest": [], "at_or_over_server_write_bound": []})
+        many = matrix.timing_summary([str(i) for i in range(20)], ["status"] * 20, list(range(20)), list(range(20)), top=3)
+        self.assertEqual([x["id"] for x in many["slowest"]], ["19", "18", "17"])
+
+
 class Report(unittest.TestCase):
     def test_a_criterion_without_a_result_or_digest_is_never_a_pass(self):
         crit = [{"id": "C1", "text": "x", "evidence": []}, {"id": "C2", "text": "y", "evidence": ["REL-A@res"]}]

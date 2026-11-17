@@ -282,6 +282,7 @@ func (h *Handler) serveOperation(w http.ResponseWriter, r *http.Request, rt rout
 		h.serveFollow(w, r, tok, call)
 		return
 	}
+	r = WithAdmissionDeadline(w, r) // used only by an admitted stop/restart, after authorization
 	value, prob := h.gw.Run(r.Context(), tok, call)
 	if prob != nil {
 		WriteProblem(w, prob)
