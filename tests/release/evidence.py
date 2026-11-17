@@ -373,6 +373,36 @@ def verify_compact(evdir):
         n = sum(1 for m in manifest if m.startswith(prefix))
         if not prefix or n != d.get("members"):
             problems.append("diagnostics %s: ARCHIVE.sha256 holds %d members under %r, the catalog says %s" % (name, n, prefix, d.get("members")))
+    if arch.get("supersedes"):
+        problems += verify_supersedes(evdir, arch["supersedes"], manifest)
+    return problems
+
+
+def verify_supersedes(evdir, sup, manifest):
+    """A new evidence version never rewrites an older one: its manifest must contain EVERY member of the superseded archive with the
+    identical SHA-256, which the committed manifest of the older archive makes provable without reading either archive. Returns problems."""
+    problems = []
+    for k in ("id", "manifest", "manifest_sha256", "tarball", "tarball_sha256", "tarball_bytes", "members"):
+        if k not in sup:
+            problems.append("catalog.archive.supersedes lacks " + k)
+    if problems:
+        return problems
+    fname = sup["manifest"]
+    if os.path.basename(fname) != fname or not fname.startswith("ARCHIVE") or not fname.endswith(".sha256") or fname == "ARCHIVE.sha256":
+        return ["the superseded archive's manifest must be a plain ARCHIVE*.sha256 file name other than ARCHIVE.sha256: %r" % fname]
+    path = os.path.join(evdir, fname)
+    if not os.path.exists(path):
+        return ["the superseded archive's manifest %s is missing" % fname]
+    if sha256_file(path) != sup["manifest_sha256"]:
+        problems.append("%s is not the manifest of the superseded archive the catalog names (digest mismatch)" % fname)
+    with open(path) as fh:
+        old, mp = parse_manifest(fh.read())
+    problems += mp
+    if len(old) != sup["members"]:
+        problems.append("%s lists %d members, the catalog says %s" % (fname, len(old), sup["members"]))
+    for name, digest in sorted(old.items()):
+        if manifest.get(name) != digest:
+            problems.append("superseded member %s is %s in the new archive (a new version must keep every older member byte for byte)" % (name, "missing" if name not in manifest else "different"))
     return problems
 
 

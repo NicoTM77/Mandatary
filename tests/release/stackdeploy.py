@@ -23,6 +23,15 @@ class DeployError(Exception):
     pass
 
 
+def refusal(body):
+    """' [code/reason]' of a refusal body (the service's closed vocabulary only, never free text), or ''. Diagnostics: a bare 403 says nothing."""
+    err = body.get("error") if isinstance(body, dict) else None
+    if not isinstance(err, dict):
+        return ""
+    code, reason = str(err.get("code", ""))[:40], str(err.get("reason", ""))[:40]
+    return " [%s/%s]" % (code, reason) if code or reason else ""
+
+
 class Admin:
     """A signed-in administrator session (password + TOTP, AAL2) and the credentials needed to sign in again."""
 
@@ -39,12 +48,12 @@ class Admin:
         cl = stack.Client(self.dep.port, self.dep.caroot)
         st, _, body = cl.req("POST", "/api/v1/login", {"username": self.username, "password": self.password})
         if st != 200 or not isinstance(body, dict) or body.get("step") != "factor":
-            raise DeployError("login step 1: %s" % st)
+            raise DeployError("login step 1: %s%s" % (st, refusal(body)))
         cl.csrf = body.get("csrf_token")
         self.last_period = int(time.time() // 30)
         st, _, body = cl.req("POST", "/api/v1/login/totp", {"code": stack.totp(self.seed)})
         if st != 200 or not isinstance(body, dict) or body.get("step") != "session":
-            raise DeployError("login step 2: %s" % st)
+            raise DeployError("login step 2: %s%s (TOTP period %d, second %.1f of it)" % (st, refusal(body), int(time.time() // 30), time.time() % 30))
         st, _, body = cl.req("GET", "/api/v1/session")
         cl.csrf = (body or {}).get("csrf_token") if isinstance(body, dict) else None
         self.cl, self.signed_in_at = cl, time.time()

@@ -160,9 +160,11 @@ func classifyHTTP(res *result, f recorded) {
 	}
 }
 
-func (e *env) run(ctx context.Context, s step, open map[string]*session) result {
+// run executes one step. The result is NAMED so the deferred elapsed time is part of what the caller receives (with an unnamed result the
+// deferred assignment changed a copy that had already been returned and elapsed_ms was always 0; found by REL-STOP-LONG).
+func (e *env) run(ctx context.Context, s step, open map[string]*session) (res result) {
 	started := time.Now()
-	res := result{ID: s.ID}
+	res = result{ID: s.ID}
 	defer func() { res.Elapsed = float64(time.Since(started).Microseconds()) / 1000 }()
 	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()

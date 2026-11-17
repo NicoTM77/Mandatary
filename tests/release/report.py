@@ -238,6 +238,10 @@ def render(catalog, rows, digests, meta, results, evdir):
     w("| archive id | `%s` |" % arch["id"])
     w("| tarball | `%s`, %s bytes, SHA-256 `%s` |" % (arch["tarball"], arch["tarball_bytes"], arch["tarball_sha256"]))
     w("| members | %s, every one listed with its SHA-256 in `docs/release/evidence/ARCHIVE.sha256` (SHA-256 of that manifest: `%s`) |" % (arch["members"], arch["manifest_sha256"]))
+    sup = arch.get("supersedes")
+    if sup:
+        w("| supersedes | `%s` (tarball `%s`, %s bytes, SHA-256 `%s`, %s members, manifest `%s` with SHA-256 `%s`). The older archive is left unchanged in its own draft release; this archive contains every one of its members with the identical SHA-256, which `--check` proves from the two committed manifests |" % (
+            sup["id"], sup["tarball"], sup["tarball_bytes"], sup["tarball_sha256"], sup["members"], sup["manifest"], sup["manifest_sha256"]))
     w("| durable location | %s |" % loc.get("description", "not recorded"))
     w("| read-back | %s |" % arch.get("read_back", "not recorded"))
     w("")

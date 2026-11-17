@@ -512,6 +512,82 @@ class Verdicts(Tmp):
         self.assertEqual(slurp(os.path.join(out, "m1")), slurp(os.path.join(out, "m2")))
 
 
+class Supersession(Tmp):
+    """Review 519 F1: a new evidence version (v2) is a superset of the older one (v1). v1 stays unchanged in its own draft release, and the
+    committed manifests prove, without reading either archive, that every v1 member is in v2 byte for byte."""
+
+    def make(self):
+        fx = Fx(self.d)
+        old_manifest = slurp(fx.manifest)
+        old = dict(fx.catalog["archive"])
+        write(os.path.join(fx.ev, "ARCHIVE.arch-v1.sha256"), old_manifest)
+        extra = os.path.join(self.d, "raw2")
+        write(os.path.join(extra, "adverse.json"), json.dumps(results_doc("FAIL", REV_B)))
+        tar2, man2 = os.path.join(self.d, "out", "arch-v2.tar.gz"), os.path.join(self.d, "out", "ARCHIVE2.sha256")
+        evidence.pack([("r1", fx.raw), ("r2", extra)], tar2, man2)
+        write(os.path.join(fx.ev, "ARCHIVE.sha256"), slurp(man2))
+        fx.catalog["archive"] = dict(old, id="arch-v2", tarball=os.path.basename(tar2), tarball_sha256=evidence.sha256_file(tar2), tarball_bytes=os.path.getsize(tar2),
+                                     manifest_sha256=evidence.sha256_file(man2), members=len(evidence.parse_manifest(slurp(man2))[0]),
+                                     supersedes={"id": old["id"], "manifest": "ARCHIVE.arch-v1.sha256", "manifest_sha256": evidence.sha256_file(fx.manifest), "tarball": old["tarball"],
+                                                 "tarball_sha256": old["tarball_sha256"], "tarball_bytes": old["tarball_bytes"], "members": old["members"]})
+        fx.save_catalog()
+        return fx
+
+    def test_a_version_that_keeps_every_older_member_is_consistent_and_the_report_says_so(self):
+        fx = self.make()
+        self.assertEqual(evidence.verify_compact(fx.ev), [])
+        self.assertEqual(fx.run_report().returncode, 0)
+        text = slurp(fx.out)
+        self.assertIn("| supersedes | `arch-v1`", text)
+        self.assertIn("contains every one of its members with the identical SHA-256", text)
+        self.assertEqual(fx.run_report("--check").returncode, 0)
+
+    def test_a_new_version_that_lost_or_changed_an_older_member_is_refused(self):
+        fx = self.make()
+        manifest = slurp(os.path.join(fx.ev, "ARCHIVE.sha256")).splitlines()
+        # a member of v1 whose digest differs in v2
+        changed = [("0" * 64 + "  " + ln.split("  ", 1)[1]) if ln.endswith("r1/run1/release.log") else ln for ln in manifest]
+        write(os.path.join(fx.ev, "ARCHIVE.sha256"), "\n".join(changed) + "\n")
+        fx.catalog["archive"]["manifest_sha256"] = evidence.sha256_file(os.path.join(fx.ev, "ARCHIVE.sha256"))
+        fx.save_catalog()
+        self.assertTrue(any("superseded member r1/run1/release.log is different" in p for p in evidence.verify_compact(fx.ev)), evidence.verify_compact(fx.ev))
+        # a member of v1 that v2 no longer lists
+        gone = [ln for ln in manifest if not ln.endswith("r1/run1/release.log")]
+        write(os.path.join(fx.ev, "ARCHIVE.sha256"), "\n".join(gone) + "\n")
+        fx.catalog["archive"]["manifest_sha256"] = evidence.sha256_file(os.path.join(fx.ev, "ARCHIVE.sha256"))
+        fx.catalog["archive"]["members"] = len(gone)
+        fx.save_catalog()
+        problems = evidence.verify_compact(fx.ev)
+        self.assertTrue(any("superseded member r1/run1/release.log is missing" in p for p in problems), problems)
+        self.assertNotEqual(fx.run_report().returncode, 0)
+
+    def test_an_edited_or_missing_older_manifest_or_an_unsafe_name_is_refused(self):
+        fx = self.make()
+        path = os.path.join(fx.ev, "ARCHIVE.arch-v1.sha256")
+        write(path, slurp(path) + "%s  r1/extra.txt\n" % ("d" * 64))
+        evidence.seal(fx.ev)
+        problems = evidence.verify_compact(fx.ev)
+        self.assertTrue(any("not the manifest of the superseded archive" in p for p in problems), problems)
+        os.remove(path)
+        evidence.seal(fx.ev)
+        self.assertTrue(any("superseded archive's manifest ARCHIVE.arch-v1.sha256 is missing" in p for p in evidence.verify_compact(fx.ev)))
+        for bad in ("../ARCHIVE.arch-v1.sha256", "ARCHIVE.sha256", "other.txt", "sub/ARCHIVE.x.sha256"):
+            fx.catalog["archive"]["supersedes"]["manifest"] = bad
+            fx.save_catalog()
+            self.assertTrue(any("plain ARCHIVE*.sha256" in p for p in evidence.verify_compact(fx.ev)), bad)
+        del fx.catalog["archive"]["supersedes"]["members"]
+        fx.save_catalog()
+        self.assertTrue(any("supersedes lacks members" in p for p in evidence.verify_compact(fx.ev)))
+
+    def test_the_full_audit_of_the_new_version_covers_the_older_members_too(self):
+        fx = self.make()
+        problems, staged = fx.stage(tarball=os.path.join(self.d, "out", "arch-v2.tar.gz"))
+        self.assertEqual(problems, [])
+        self.assertTrue(os.path.exists(os.path.join(staged, "r1", "run1", "release.log")))  # a v1 member, served by v2
+        p, counts = evidence.audit_archive(fx.ev, staged)
+        self.assertEqual((p, counts["members_verified"]), ([], 3))  # two v1 members and the new one
+
+
 class Committed(unittest.TestCase):
     """What a fresh clone and pull-request CI can do: the COMPACT verification of the repository's own evidence. It reads no archive."""
 
@@ -536,7 +612,8 @@ class Committed(unittest.TestCase):
                 names.append(os.path.relpath(os.path.join(base, fn), self.ev).replace(os.sep, "/"))
         self.assertLess(total, 400_000, total)
         for n in names:
-            self.assertTrue(n in ("catalog.json", "ARCHIVE.sha256", "SHA256SUMS") or n.startswith("summaries/"), n)
+            # the manifest of the current archive, of any archive it supersedes (ARCHIVE.<id>.sha256), the catalog, the seal and the summaries
+            self.assertTrue(n in ("catalog.json", "ARCHIVE.sha256", "SHA256SUMS") or (n.startswith("ARCHIVE.") and n.endswith(".sha256") and "/" not in n) or n.startswith("summaries/"), n)
 
     def test_the_catalog_keeps_every_adverse_and_historical_run_and_the_disposition_visible(self):
         cat = evidence.load_catalog(self.ev)

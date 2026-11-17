@@ -480,6 +480,57 @@ class MatrixTiming(unittest.TestCase):
         self.assertEqual([x["id"] for x in many["slowest"]], ["19", "18", "17"])
 
 
+class LongStopCheck(unittest.TestCase):
+    """REL-STOP-LONG (review 519 F2) against a fake deployment: it passes only when stop, start and restart answer 200, A runs, and BOTH
+    the REST stop and the MCP restart really took longer than the server's 10 s write bound (a fast answer proves nothing; an unmeasured
+    one, elapsed_ms 0 as the unfixed mcpclient reported, is a failure, never a pass). Every call is accounted once either way."""
+
+    def run_check(self, stop=((200, "", ""), None, 12241.0), start=((200, "", ""), None, 700.0), mcp=None, running=True):
+        import core
+        mcp = {"connected": True, "elapsed_ms": 12400.0} if mcp is None else mcp
+        seen = []
+        c = types.SimpleNamespace(
+            names={"A": "ctr-a"}, ev={"matrix": {}}, tally=matrix.Tally(lambda who: "rel-" + who, lambda who: "rel-owner"),
+            rest=types.SimpleNamespace(raw=lambda method, path, who, body=None: stop if path.endswith("/stop") else start),
+            mcp=types.SimpleNamespace(batch=lambda steps: [mcp]),
+            e=types.SimpleNamespace(inspect=lambda name: {"State": {"Running": running}}),
+            check=lambda rid, name, ok, detail="": seen.append((rid, bool(ok), detail)))
+        core.long_stop(c)
+        return seen, c
+
+    def test_all_three_calls_ok_and_both_slower_than_the_bound_is_a_pass_and_is_recorded(self):
+        seen, c = self.run_check()
+        self.assertEqual([(r, ok) for r, ok, _ in seen], [("REL-STOP-LONG", True)])
+        self.assertEqual(c.ev["matrix"]["long_stop"]["rest_stop"], {"result": (200, "", ""), "ms": 12241})
+        self.assertEqual(c.ev["matrix"]["long_stop"]["mcp_restart"]["ms"], 12400)
+        self.assertEqual(sum(sum(v) for v in c.tally.totals().values()), 3)  # stop, start and restart, each accounted once as allowed
+
+    def test_a_cut_off_a_fast_or_an_unmeasured_answer_or_a_stopped_container_is_a_failure(self):
+        for name, kw in (("REST stop cut off (the defect)", {"stop": ((502, "", ""), None, 10501.0)}),
+                         ("REST stop answered fast: proves nothing", {"stop": ((200, "", ""), None, 5100.0)}),
+                         ("MCP restart fast", {"mcp": {"connected": True, "elapsed_ms": 4000.0}}),
+                         ("MCP elapsed not measured (0)", {"mcp": {"connected": True, "elapsed_ms": 0}}),
+                         ("MCP elapsed absent", {"mcp": {"connected": True}}),
+                         ("MCP error", {"mcp": {"connected": True, "is_error": True, "error_code": "backend_failed", "elapsed_ms": 12000.0}}),
+                         ("start refused", {"start": ((403, "forbidden", "default_deny"), None, 20.0)}),
+                         ("A not running", {"running": False})):
+            with self.subTest(name):
+                seen, c = self.run_check(**kw)
+                self.assertEqual([(r, ok) for r, ok, _ in seen], [("REL-STOP-LONG", False)])
+                self.assertEqual(sum(sum(v) for v in c.tally.totals().values()), 3)  # the daemon executed them: they are accounted whatever the client saw
+
+
+class LoginRefusalDiagnostics(unittest.TestCase):
+    """A bare 'login step 2: 403' could not be attributed (the first VM run of review 519 F2 had one). The refusal's closed code/reason is kept, nothing else."""
+
+    def test_only_the_closed_code_and_reason_are_kept_and_bounded(self):
+        import stackdeploy
+        self.assertEqual(stackdeploy.refusal({"error": {"code": "forbidden", "reason": "default_deny", "message": "free text with mdt_secret"}}), " [forbidden/default_deny]")
+        self.assertEqual(stackdeploy.refusal({"error": {"code": "x" * 100}}), " [%s/]" % ("x" * 40))
+        for none in (None, "html", [], {}, {"error": "text"}, {"error": {}}, {"error": {"code": "", "reason": ""}}):
+            self.assertEqual(stackdeploy.refusal(none), "", none)
+
+
 class Report(unittest.TestCase):
     def test_a_criterion_without_a_result_or_digest_is_never_a_pass(self):
         crit = [{"id": "C1", "text": "x", "evidence": []}, {"id": "C2", "text": "y", "evidence": ["REL-A@res"]}]
