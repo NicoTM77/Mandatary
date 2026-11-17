@@ -28,6 +28,8 @@ SHA = "1" * 40
 OLD = "2" * 40
 NEW = "3" * 40
 TOKEN = "tok-SECRET-0123456789"
+DOCKER_V2 = "application/vnd.docker.distribution.manifest.v2+json"
+OCI_MANIFEST = "application/vnd.oci.image.manifest.v1+json"
 ALL_OK = {j: {"result": "success", "outputs": {}} for j in pub.REQUIRED_JOBS}
 
 
@@ -95,6 +97,14 @@ class FakeDocker:
         self.wrong_config_for = None  # arch whose pushed manifest is served with a different config digest
         self.bad_index = False
         self.inspect_error = None
+        # What the pushed platform manifests are: the classic image store of a hosted runner pushes Docker v2 manifests, a containerd store pushes OCI ones.
+        self.child_media = DOCKER_V2
+        # How `buildx imagetools create` behaves. "oci": always writes an OCI index annotated as asked (the long-standing default of this fake).
+        # "classic": the buildx of the hosted runner; Docker v2 children give a Docker manifest list, which cannot carry annotations, written with exit 0
+        # and the annotations left out. "strict": a newer buildx; it refuses Docker v2 children ("annotations are not supported for Docker manifest lists")
+        # and writes nothing. OCI children give an annotated OCI index in every mode.
+        self.create_mode = "oci"
+        self.drop_annotations = set()  # annotation keys that a create reporting success silently leaves out of the index it wrote
 
     def names(self):
         return [" ".join(a[:3]) if a[0] == "buildx" else a[0] for a, _ in self.calls]
@@ -138,7 +148,7 @@ class FakeDocker:
         cfg = facts["config_digest"]
         if self.wrong_config_for == facts["architecture"]:
             cfg = sha(b"someone else's config")
-        doc = {"schemaVersion": 2, "mediaType": "application/vnd.docker.distribution.manifest.v2+json", "config": {"digest": cfg, "size": 1},
+        doc = {"schemaVersion": 2, "mediaType": self.child_media, "config": {"digest": cfg, "size": 1},
                "layers": [{"digest": sha(b"l" + facts["architecture"].encode()), "size": 1}]}
         mf = json.dumps(doc, sort_keys=True).encode()
         digest = sha(mf)
@@ -193,8 +203,14 @@ class FakeDocker:
             os_, arch = self.platform[d]
             if self.bad_index:
                 arch = "amd64"
-            entries.append({"mediaType": "application/vnd.docker.distribution.manifest.v2+json", "digest": d, "size": len(self.manifests[d]), "platform": {"os": os_, "architecture": arch}})
-        idx = json.dumps({"schemaVersion": 2, "mediaType": pub.OCI_INDEX, "manifests": entries, "annotations": ann}, sort_keys=True).encode()
+            entries.append({"mediaType": json.loads(self.manifests[d])["mediaType"], "digest": d, "size": len(self.manifests[d]), "platform": {"os": os_, "architecture": arch}})
+        docker_children = any(e["mediaType"] == DOCKER_V2 for e in entries)
+        index = {"schemaVersion": 2, "mediaType": pub.OCI_INDEX, "manifests": entries, "annotations": {k: v for k, v in ann.items() if k not in self.drop_annotations}}
+        if docker_children and self.create_mode == "strict":
+            return proc(1, b"", b"annotations are not supported for Docker manifest lists; use oci-mediatypes=true")
+        if docker_children and self.create_mode == "classic":  # a Docker manifest list has no annotations: they are dropped and the command still succeeds
+            index = {"schemaVersion": 2, "mediaType": pub.DOCKER_LIST, "manifests": entries}
+        idx = json.dumps(index, sort_keys=True).encode()
         self.manifests[sha(idx)] = idx
         self.tags[tag] = sha(idx)
         return proc()
@@ -691,6 +707,182 @@ class Publish(Tmp):
                           "manifests": [{"digest": sha(b"a"), "platform": {"os": "linux", "architecture": "amd64"}}, {"digest": sha(b"b"), "platform": {"os": "linux", "architecture": "arm64"}}]}, sort_keys=True).encode()
         fd.manifests[sha(raw)] = raw
         fd.tags["%s:%s" % (pub.IMAGE, pub.TAG)] = sha(raw)
+
+
+class IndexPublication(Tmp):
+    """Regressions of finding F-C5-1: the first real main publication wrote `dev` as a Docker manifest list without the revision annotation, because the
+    hosted runner's classic image store pushes Docker v2 platform manifests and its buildx dropped the annotation while `imagetools create` exited 0.
+    These tests exercise the real Registry.stage / create_index / verify_index / publish code over the fake registry; they prove that such output is REJECTED
+    and what state it leaves, not that the publication incident is resolved."""
+
+    def arrange(self, child_media=DOCKER_V2, create_mode="oci"):
+        out, fd = self.build_tested()
+        fd.child_media, fd.create_mode = child_media, create_mode
+        return out, fd
+
+    def stage_both(self, fd, out):
+        reg, staged = pub.Registry(fd), {}
+        for a in pub.ARCHES:
+            rec, tar = pub.load_record(out, a, SHA)
+            self.assertEqual(fd(["load", "--input", tar]).returncode, 0)
+            staged[a] = reg.stage(pub.LOCAL_TAG % a, a, SHA, rec["config_digest"])
+        return reg, staged
+
+    def recorded_config(self, out, arch):
+        with open(os.path.join(out, "tested-image-" + arch, "image-%s.json" % arch)) as fh:
+            return json.load(fh)["config_digest"]
+
+    def dev_index(self, fd):
+        return json.loads(fd.manifests[fd.dev()])
+
+    def assert_children_are_the_tested_images(self, fd, out, doc, media):
+        """Both descriptors are the staged manifests: right media type, platform, and a config digest equal to the tested image's."""
+        self.assertEqual(sorted((m["platform"]["os"], m["platform"]["architecture"]) for m in doc["manifests"]), [("linux", "amd64"), ("linux", "arm64")])
+        for m in doc["manifests"]:
+            self.assertEqual(m["mediaType"], media)
+            self.assertEqual(json.loads(fd.manifests[m["digest"]])["config"]["digest"], self.recorded_config(out, m["platform"]["architecture"]))
+
+    # -- the ordinary valid publication (positive control)
+
+    def test_an_annotated_oci_index_of_oci_platform_manifests_is_published_and_verified(self):
+        for mode in ("oci", "classic", "strict"):  # OCI children give an annotated OCI index whatever the buildx
+            with self.subTest(create_mode=mode):
+                out, fd = self.arrange(OCI_MANIFEST, mode)
+                res = pub.publish(fd, FakeGit(), out, SHA, env(), log=lambda *_: None)
+                self.assertTrue(res["published"])
+                doc = self.dev_index(fd)
+                self.assertEqual(doc["mediaType"], pub.OCI_INDEX)
+                self.assertEqual(doc["annotations"], {pub.ANN_REVISION: SHA, pub.ANN_SOURCE: pub.SOURCE_URL})
+                self.assert_children_are_the_tested_images(fd, out, doc, OCI_MANIFEST)
+                self.assertEqual(res["index"], fd.dev())
+
+    # -- finding F-C5-1, part 1: Docker v2 platform manifests
+
+    def test_docker_v2_platform_manifests_are_staged_as_the_tested_images(self):
+        out, fd = self.arrange(DOCKER_V2)
+        reg, staged = self.stage_both(fd, out)
+        for a in pub.ARCHES:
+            mf = json.loads(fd.manifests[staged[a]])
+            self.assertEqual(mf["mediaType"], DOCKER_V2)
+            self.assertEqual(mf["config"]["digest"], self.recorded_config(out, a))
+            self.assertEqual(fd.platform[staged[a]], ("linux", a))
+
+    def test_a_docker_manifest_list_without_the_revision_annotation_is_never_accepted_as_the_annotated_publication(self):
+        out, fd = self.arrange(DOCKER_V2, "classic")
+        with self.assertRaises(pub.Refuse) as cm:
+            pub.publish(fd, FakeGit(), out, SHA, env(), log=lambda *_: None)
+        self.assertIn("revision annotation", str(cm.exception))
+        self.assertNotIn("create failed", str(cm.exception))  # it is the READ-BACK that refused, after a create that exited 0
+        self.assertEqual(fd.names().count("buildx imagetools create"), 1)
+        self.assertEqual(fd.names()[-1], "logout")  # the credential is still dropped
+        # The actual post-write state: dev WAS written, as a Docker list of the two tested Docker v2 images, with no annotation at all.
+        doc = self.dev_index(fd)
+        self.assertEqual(doc["mediaType"], pub.DOCKER_LIST)
+        self.assertNotIn("annotations", doc)
+        self.assert_children_are_the_tested_images(fd, out, doc, DOCKER_V2)
+
+    def test_verify_index_refuses_a_docker_list_that_lacks_or_misstates_the_revision(self):
+        out, fd = self.arrange(DOCKER_V2, "classic")
+        reg, staged = self.stage_both(fd, out)
+        reg.create_index(staged, SHA)  # exits 0 and writes the list
+        doc = self.dev_index(fd)
+        self.assertEqual(doc["mediaType"], pub.DOCKER_LIST)
+        self.assertEqual([m["digest"] for m in doc["manifests"]], [staged[a] for a in pub.ARCHES])  # the right children and platforms ...
+        with self.assertRaises(pub.Refuse) as cm:  # ... and still not the annotated publication
+            reg.verify_index(staged, SHA)
+        self.assertIn("revision annotation", str(cm.exception))
+        for name, annotations in (("another revision", {pub.ANN_REVISION: OLD}), ("a source but no revision", {pub.ANN_SOURCE: pub.SOURCE_URL}), ("an empty revision", {pub.ANN_REVISION: ""})):
+            with self.subTest(name):
+                raw = json.dumps(dict(doc, annotations=annotations), sort_keys=True).encode()
+                fd.manifests[sha(raw)] = raw
+                fd.tags["%s:%s" % (pub.IMAGE, pub.TAG)] = sha(raw)
+                with self.assertRaises(pub.Refuse):
+                    reg.verify_index(staged, SHA)
+
+    def test_the_tested_config_and_platform_identity_checks_hold_for_both_child_media_types(self):
+        for media in (DOCKER_V2, OCI_MANIFEST):
+            with self.subTest(media=media, case="another config"):
+                out, fd = self.arrange(media)
+                fd.wrong_config_for = "arm64"
+                with self.assertRaises(pub.Refuse) as cm:
+                    pub.publish(fd, FakeGit(), out, SHA, env(), log=lambda *_: None)
+                self.assertIn("not the tested", str(cm.exception))
+                self.assertIsNone(fd.dev())
+                self.assertNotIn("buildx imagetools create", fd.names())
+            with self.subTest(media=media, case="platforms read back wrong"):
+                out, fd = self.arrange(media)
+                fd.bad_index = True  # both index entries claim linux/amd64
+                with self.assertRaises(pub.Refuse):
+                    pub.publish(fd, FakeGit(), out, SHA, env(), log=lambda *_: None)
+            with self.subTest(media=media, case="another revision in the annotation"):
+                out, fd = self.arrange(media)
+                reg, staged = self.stage_both(fd, out)
+                reg.create_index(staged, OLD)  # an index annotated with a revision that is not this commit's
+                with self.assertRaises(pub.Refuse):
+                    reg.verify_index(staged, SHA)
+
+    # -- finding F-C5-1, part 2: a create that reports success but drops the annotation
+
+    def test_a_create_that_exits_0_but_drops_the_revision_annotation_is_refused_by_the_read_back(self):
+        out, fd = self.arrange(OCI_MANIFEST)
+        fd.drop_annotations = {pub.ANN_REVISION}
+        reg, staged = self.stage_both(fd, out)
+        self.assertIsNone(reg.create_index(staged, SHA))  # command success: no exception, nothing says it is wrong
+        self.assertEqual(self.dev_index(fd)["mediaType"], pub.OCI_INDEX)  # the registry now holds an OCI index ...
+        self.assertNotIn(pub.ANN_REVISION, self.dev_index(fd)["annotations"])  # ... that does not carry the revision
+        with self.assertRaises(pub.Refuse) as cm:
+            reg.verify_index(staged, SHA)  # only the read-back catches it
+        self.assertIn("revision annotation", str(cm.exception))
+        out2, fd2 = self.arrange(OCI_MANIFEST)  # and the same through the whole publication
+        fd2.drop_annotations = {pub.ANN_REVISION}
+        with self.assertRaises(pub.Refuse) as cm:
+            pub.publish(fd2, FakeGit(), out2, SHA, env(), log=lambda *_: None)
+        self.assertIn("revision annotation", str(cm.exception))
+        self.assertNotIn(pub.ANN_REVISION, self.dev_index(fd2)["annotations"])  # dev WAS written and stays as written; the run is red
+
+    def test_a_read_back_refusal_after_a_write_is_not_a_refusal_before_the_write(self):
+        out, before = self.arrange(DOCKER_V2, "strict")  # refused before any write by the create command itself
+        self.seed_dev(before, OLD)
+        old = before.dev()
+        with self.assertRaises(pub.Refuse) as cm:
+            pub.publish(before, FakeGit(ancestors=[(OLD, SHA)]), out, SHA, env(), log=lambda *_: None)
+        self.assertIn("create failed", str(cm.exception))
+        self.assertEqual(before.dev(), old)  # dev byte-identical: nothing was written
+        out, after = self.arrange(DOCKER_V2, "classic")  # accepted by the command, refused by the read-back after the write
+        self.seed_dev(after, OLD)
+        old = after.dev()
+        with self.assertRaises(pub.Refuse) as cm:
+            pub.publish(after, FakeGit(ancestors=[(OLD, SHA)]), out, SHA, env(), log=lambda *_: None)
+        self.assertNotIn("create failed", str(cm.exception))
+        self.assertNotEqual(after.dev(), old)  # dev was replaced by the unannotated list: a read-back failure does NOT leave dev untouched
+        self.assertNotIn("annotations", self.dev_index(after))
+
+    def test_after_an_unannotated_dev_was_written_every_later_run_refuses_before_any_registry_write(self):
+        out, fd = self.arrange(DOCKER_V2, "classic")
+        with self.assertRaises(pub.Refuse):
+            pub.publish(fd, FakeGit(), out, SHA, env(), log=lambda *_: None)
+        written = fd.dev()
+        for attempt, newer in (("a re-run of the same commit", SHA), ("a newer commit", NEW)):
+            with self.subTest(attempt):
+                fd.calls.clear()
+                out2, _ = self.build_tested(sha_=newer) if newer != SHA else (out, None)
+                with self.assertRaises(pub.Refuse) as cm:
+                    pub.publish(fd, FakeGit(ancestors=[(SHA, NEW)]), out2, newer, env(), log=lambda *_: None)
+                self.assertIn("no revision annotation", str(cm.exception))
+                self.assertNotIn("push", fd.names())
+                self.assertNotIn("buildx imagetools create", fd.names())
+                self.assertEqual(fd.dev(), written)  # the evidence is preserved, not replaced
+
+    def test_a_docker_v2_publication_a_strict_buildx_refuses_leaves_nothing_on_dev(self):
+        out, fd = self.arrange(DOCKER_V2, "strict")
+        with self.assertRaises(pub.Refuse) as cm:
+            pub.publish(fd, FakeGit(), out, SHA, env(), log=lambda *_: None)
+        self.assertIn("create failed", str(cm.exception))
+        self.assertIsNone(fd.dev())
+        self.assertEqual(fd.names().count("buildx imagetools create"), 1)  # the write was attempted, and refused
+        self.assertEqual(fd.names()[-1], "logout")
+
+    seed_dev = Publish.seed_dev  # the same earlier dev tag (an annotated OCI index of another revision) as the freshness tests use
 
 
 def read_source():

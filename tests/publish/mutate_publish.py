@@ -1,6 +1,7 @@
 """Mutation check of scripts/publish_dev_image.py against tests/publish/test_publish.py (a maintainer tool, not run in CI).
-usage: python3 -I tests/publish/mutate_publish.py REPO_ROOT NEW_EMPTY_WORKDIR
-Every mutant must make the test suite FAIL; a surviving mutant is printed."""
+usage: python3 -I tests/publish/mutate_publish.py REPO_ROOT NEW_EMPTY_WORKDIR [TEST_CLASS ...]
+Every mutant must make the test suite FAIL; a surviving mutant is printed. With TEST_CLASS names (for example IndexPublication) only those test classes
+are run, to show which tests alone kill a mutant."""
 import os
 import shutil
 import subprocess
@@ -32,6 +33,8 @@ MUTANTS = [
     ("arch not checked", 'if facts["os"] != "linux" or facts["architecture"] != arch:', 'if False:'),
     ("index platforms not checked", 'if seen.get(("linux", a)) != staged[a]:', 'if False:'),
     ("index revision annotation not checked", 'if (doc.get("annotations") or {}).get(ANN_REVISION) != sha:', 'if False:'),
+    ("revision annotation required only of an OCI index", 'if (doc.get("annotations") or {}).get(ANN_REVISION) != sha:', 'if doc.get("mediaType") == OCI_INDEX and (doc.get("annotations") or {}).get(ANN_REVISION) != sha:'),
+    ("create success taken for verification", 'index = reg.verify_index(staged, sha)', 'index = ""'),
     ("index size not checked", 'if not isinstance(entries, list) or len(entries) != len(ARCHES):', 'if False:'),
     ("token on the command line", '"--password-stdin"], input=token.encode())', '"--password", token], input=token.encode())'),
     ("unknown dev revision tolerated", 'if not rev or not HEX40.match(rev):', 'if False:'),
@@ -54,7 +57,7 @@ for name, old, new in MUTANTS:
     with open(os.path.join(d, "scripts", "publish_dev_image.py"), "w") as fh:
         fh.write(src.replace(old, new, 1))
     shutil.copy(os.path.join(repo, "tests", "publish", "test_publish.py"), os.path.join(d, "tests", "publish", "test_publish.py"))
-    p = subprocess.run([sys.executable, "-I", os.path.join(d, "tests", "publish", "test_publish.py")], capture_output=True, text=True)
+    p = subprocess.run([sys.executable, "-I", os.path.join(d, "tests", "publish", "test_publish.py")] + sys.argv[3:], capture_output=True, text=True)
     killed = p.returncode != 0
     print("%-8s %s" % ("KILLED" if killed else "SURVIVED", name))
     if not killed:

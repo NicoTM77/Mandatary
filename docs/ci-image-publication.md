@@ -45,8 +45,10 @@ re-checks the event, ref, repository, absence of a pull-request ref and every ne
    attestation beside the image at most; the image manifest inside it is what is promoted, and any other shape is refused.)
 4. Only when **both** platforms are staged and verified, one `docker buildx imagetools create` writes `dev` as an index of exactly those two
    image manifests, annotated with the revision and the source. The result is read back: an index of exactly two entries, `linux/amd64` and
-   `linux/arm64`, whose digests are the staged ones, revision annotation equal to the commit. A failure at any step before the create leaves
-   `dev` as it was; the two platforms are never pushed onto the same tag one after the other.
+   `linux/arm64`, whose digests are the staged ones, revision annotation equal to the commit. A failure at any step **before** the create leaves
+   `dev` as it was; the two platforms are never pushed onto the same tag one after the other. The create **is** the write: if it exits 0 but
+   wrote something the read-back refuses (for example an index without the revision annotation), the run fails and `dev` has been changed:
+   it holds what the create wrote (finding F-C5-1, below). An exit status alone is never taken for a verified publication.
 
 The staging tags (`build-<40 hex commit>-amd64` and `-arm64`) are an implementation detail needed to hand the pushed manifests to
 `imagetools create`; they are per-commit and never moved. They are not release tags. They remain visible in the package, because deleting
@@ -65,11 +67,21 @@ written. Publication jobs are serialized by the concurrency group above, so two 
 
 ## Verification that exists
 
-* `tests/publish/test_publish.py` (41 tests, hermetic: a fake registry that stores manifests like the real one): the gate for every event, ref,
+* `tests/publish/test_publish.py` (51 tests, hermetic: a fake registry that stores manifests like the real one): the gate for every event, ref,
   repository and needed result; the saved-image facts for both archive layouts; the order of effects (nothing touches a registry before the
-  archives are verified, `dev` is written once and last, after both platforms); every failure path (push, load, login, digest, config, shape,
-  index create, read-back) leaves `dev` untouched; stale, repeated and concurrently moved `dev`; the token only on stdin. A mutation check
-  (`tests/publish/mutate_publish.py`, a maintainer tool that is not run in CI) kills all 32 mutants of the script.
+  archives are verified, `dev` is written once and last, after both platforms); every failure path BEFORE the create (push, load, login, digest,
+  config, shape, a create that fails) leaves `dev` untouched, whereas a failure of the READ-BACK after a create that exited 0 leaves `dev` as
+  written (asserted, see the F-C5-1 regressions below); stale, repeated and concurrently moved `dev`; the token only on stdin. A mutation check
+  (`tests/publish/mutate_publish.py`, a maintainer tool that is not run in CI) kills all 34 mutants of the script.
+* **F-C5-1 regressions** (`IndexPublication` in `test_publish.py`; the fake registry now models the platform manifests' media type and the
+  behaviour of `imagetools create`). A positive control publishes an annotated OCI index of OCI platform manifests. Docker v2 platform manifests,
+  as the hosted runner's classic image store pushes them, are staged and identity-checked (tested config digest, linux/amd64 and linux/arm64); when
+  the create then writes a Docker manifest list, which cannot carry annotations, and exits 0, the read-back refuses it, the post-write state
+  (a Docker list of the two tested images, no annotations) is asserted, and every later run refuses before any push or create. A create that
+  silently drops the revision annotation from an OCI index is refused the same way. A newer buildx that refuses Docker v2 children
+  ("annotations are not supported for Docker manifest lists") is a refusal BEFORE any write: `dev` is byte-identical. These tests prove that the
+  bad output is rejected and what it leaves behind. They do **not** make the publisher produce an annotated OCI index on the hosted runner, and they
+  do not repair the registry.
 * `tests/publish/test_workflow.py` (20 tests): the `publish` job condition is **evaluated** by a small GitHub-expression evaluator for
   pull request, `pull_request_target`, manual, branch, tag, fork and lookalike-repository scenarios and for every failed, cancelled, skipped or
   missing needed result; needs, permissions, that no other job has a package permission or the token, that the tested image is kept only for
@@ -86,10 +98,16 @@ written. Publication jobs are serialized by the concurrency group above, so two 
   asset, `p120-publish-dryrun-v1.log`, of the same evidence-only draft release as the evidence archive (it is not a member of the archive
   and not listed in `ARCHIVE.sha256`), not committed.
 
-## What has NOT been executed
+## What has NOT been executed, and the first real publication (finding F-C5-1, OPEN)
 
-* **No registry publication has happened** and nothing was pushed to `ghcr.io`: a pull request cannot publish, and this card does not merge.
-  The first real publication happens only when the owner merges and the `main` run succeeds.
+* **The first publication failed.** The `main` run 44093111109 at `666ee9c` (job `Publish dev image (main only)`) staged both tested images, `imagetools create`
+  wrote `dev`, and the read-back refused: "the dev index revision annotation is not 666ee9c...". Read anonymously and read-only (C5 run 528, and again
+  while writing these tests), `ghcr.io/nicotm77/mandatary:dev` is a **Docker manifest list** (`application/vnd.docker.distribution.manifest.list.v2+json`,
+  digest `sha256:0c889407...`) of two Docker v2 platform manifests with **no annotations**. Both entries are the tested images (their config digests are
+  the tested ones), so this is not an integrity problem; but the tag is not the annotated OCI index this document describes, and because it carries no
+  revision annotation every later run **refuses before writing** until the owner decides what to do with it (CI cannot delete package versions). This
+  record is kept as evidence; it is not resolved by the regression tests and no registry write, deletion or replacement was made for them. Closing it needs
+  a corrected publication on `main` and an independent read of the registry.
 * The behaviour of **GHCR** itself (authentication with `GITHUB_TOKEN`, package creation and repository association, visibility, the
   `imagetools` calls against it, the hosted runner's Docker version and image store) is not verified by anything here. After the first `main`
   run, read the registry; a green workflow is not evidence:
