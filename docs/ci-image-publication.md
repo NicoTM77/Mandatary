@@ -30,10 +30,11 @@ re-checks the event, ref, repository, absence of a pull-request ref and every ne
 ## What is promoted, and how the tested image is bound to the published one
 
 1. The Image job (both architectures, native runners) runs its whole acceptance and the Trivy gate against `mandatary-ci:<arch>`. **Only
-   after every one of those steps succeeded, and only on a push to `main`**, `publish_dev_image.py record` runs `docker save` on that image,
-   reads the **config digest from the saved archive itself** (the SHA-256 of the image config, which also carries the labels) together with
-   its OS, architecture and labels, requires `org.opencontainers.image.revision` to be this commit and `org.opencontainers.image.source` to be
-   `https://github.com/NicoTM77/Mandatary`, and uploads the archive and its record as the artifact `tested-image-<arch>` (retention one day).
+   after every one of those steps succeeded**, on every run (so a pull request proves the path on both CPUs, with no credential),
+   `publish_dev_image.py record` runs `docker save` on that image, reads the **config digest from the saved archive itself** (the SHA-256 of
+   the image config, which also carries the labels) together with its OS, architecture and labels, and requires
+   `org.opencontainers.image.revision` to be this commit and `org.opencontainers.image.source` to be `https://github.com/NicoTM77/Mandatary`.
+   **Only for a push to `main`** is the archive with its record uploaded as the artifact `tested-image-<arch>` (retention one day).
 2. The `publish` job downloads both artifacts and, **before any registry call**, re-verifies each: archive SHA-256 equals the record, the
    archive's own config digest equals the record, OS/architecture, revision and source labels. Any mismatch refuses the run with no login and
    no registry access.
@@ -70,7 +71,7 @@ serialized by the concurrency group above, so two publications do not interleave
   pull request, `pull_request_target`, manual, branch, tag, fork and lookalike-repository scenarios and for every failed, cancelled, skipped or
   missing needed result; needs, permissions, that no other job has a package permission or the token, that the tested image is kept only for
   a push to `main`, the concurrency settings, the step order and pinned actions. A mutation check
-  (`tests/publish/mutate_workflow.py`) kills all 27 mutations of the workflow wiring.
+  (`tests/publish/mutate_workflow.py`) kills all 28 mutations of the workflow wiring.
 * `scripts/ci-budget.test.mjs` pins that pull requests run these tests and that the pull-request report check is the compact one only.
 * **Dry run against a real daemon and a real registry software** (not GHCR): on the isolated test VM (Docker 29.9.3, buildx 0.39, containerd
   image store) with a throwaway local `registry:2` on 127.0.0.1, task-scoped and removed afterwards, the script was run end to end with small

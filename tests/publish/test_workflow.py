@@ -297,13 +297,20 @@ class Permissions(unittest.TestCase):
 
 
 class Steps(unittest.TestCase):
-    def test_the_tested_image_is_kept_only_for_a_push_to_main_and_only_in_the_image_job(self):
+    def test_the_tested_image_is_recorded_on_every_run_and_handed_over_only_for_a_push_to_main(self):
         image = JOBS["image"]
-        guarded = re.findall(r"- name: Keep the tested image for promotion \(main push only\)\n\s+if: (.+)\n", image)
-        self.assertEqual(guarded, ["${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}"])
+        # The record step runs on every run (it proves the save/record path on a pull request and needs no credential) ...
+        rec = re.search(r"- name: Record the tested image \(every run; handed to the publish job only for a push to main\)\n(\s+)run: \|\n((?:\s+.*\n)+?)\s+- uses:", image + "\n")
+        self.assertIsNotNone(rec)
+        self.assertNotRegex(rec.group(0), r"\n\s+if:")
+        self.assertIn('scripts/publish_dev_image.py record --image mandatary-ci:${{ matrix.arch }} --arch ${{ matrix.arch }} --out "$RUNNER_TEMP/promote"', rec.group(2))
+        self.assertNotRegex(rec.group(2), r"GITHUB_TOKEN|login|push")
+        # ... and the upload that hands it to the publish job is guarded to a push to main.
         up = re.search(r"- uses: actions/upload-artifact@\S+ # v4\n\s+if: (.+)\n\s+with:\n\s+name: tested-image-", image)
         self.assertIsNotNone(up)
+        guarded = ["${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}"]
         self.assertEqual(up.group(1), guarded[0])
+        self.assertEqual(len(re.findall(r"actions/upload-artifact@\S+ # v4\n\s+if: \$\{\{ github\.event_name == 'push'", image)), 1)
         for event, ref, expect in (("push", "refs/heads/main", True), ("pull_request", "refs/pull/1/merge", False), ("push", "refs/heads/x", False),
                                    ("workflow_dispatch", "refs/heads/main", False), ("push", "refs/tags/v1", False)):
             e = re.match(r"^\$\{\{ (.*) \}\}$", guarded[0]).group(1)

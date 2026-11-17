@@ -249,11 +249,10 @@ jobs:
           path: ${{ runner.temp }}/evidence
           if-no-files-found: warn
           retention-days: 30
-      # Dev-image promotion (docs/ci-image-publication.md). ONLY for a push to main, and only after every step above (the whole acceptance, the
-      # scan) succeeded: the image that just passed is saved with its recorded config digest and handed to the publish job as an artifact.
-      # A pull request run never takes these two steps, holds no registry credential and has no package permission.
-      - name: Keep the tested image for promotion (main push only)
-        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+      # Dev-image promotion (docs/ci-image-publication.md). Only after every step above (the whole acceptance, the scan) succeeded, the image that
+      # just passed is saved with its recorded config digest on EVERY run, so a pull request proves the save/record path on both CPUs; it holds no
+      # registry credential and has no package permission. It is uploaded for the publish job ONLY for a push to main.
+      - name: Record the tested image (every run; handed to the publish job only for a push to main)
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/promote"

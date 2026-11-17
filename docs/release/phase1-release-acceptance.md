@@ -142,6 +142,7 @@ A disposition changes how an adverse result is **classified**; it does not rewri
 **Registry publication: NOT EXECUTED.** Nothing was pushed to a registry, and a pull request run cannot publish: the CI workflow publishes `ghcr.io/nicotm77/mandatary:dev` only from a successful `push` to `refs/heads/main` of `NicoTM77/Mandatary`, after every required gate of that exact commit (both architecture jobs included) succeeded. This card does not merge, deploy or run the publishing job.
 
 * Contract, gates, freshness guard and verification steps: docs/ci-image-publication.md; hermetic tests: tests/publish/ and scripts/ci-budget.test.mjs.
+* Dry run (NOT GHCR): the publication script was run end to end against a throwaway local registry on the isolated test VM (Docker 29.9.3, containerd image store, two real commits): first publication, repeat run, newer commit, stale older commit (see docs/ci-image-publication.md). It proves the command sequence and parsing, not GHCR, authentication, package association or the hosted runner's Docker.
 * The first real publication is verified by reading the registry (gate G-GHCR); a green pull request run is not evidence of it.
 
 ## 8. Findings recorded by this run
