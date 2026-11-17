@@ -22,46 +22,67 @@
   }
  ],
  "archive": {
-  "id": "p120-evidence-v1",
+  "id": "p120-evidence-v2",
   "location": {
    "assets": {
-    "p120-evidence-v1-3ae690165ca4.tar.gz": {
-     "id": 757149148,
-     "sha256": "3ae690165ca43eaacbedec62ce622f598aedfe17da20e1b7b92f7b73031e898c",
-     "size": 1589779
+    "p120-evidence-v2-9fee61b1dd29.tar.gz": {
+     "id": 758611551,
+     "sha256": "9fee61b1dd29fdf6eeff7c0d3920492076565b717d8f23788c424aa269c0d3d9",
+     "size": 2504455
     },
-    "p120-evidence-v1.ARCHIVE.sha256": {
-     "id": 757149149,
-     "sha256": "8f348bcd2cb1f8deff3a2f6d582e2f2e00420b2d2e1762cad6925134b86f2e5e",
-     "size": 16722
+    "p120-evidence-v2.ARCHIVE.sha256": {
+     "id": 758611610,
+     "sha256": "02cfc8db74cd415e681054dccf7ae0db5c8d9b5f900b97051352818d09c0a6b2",
+     "size": 26467
     }
    },
-   "description": "an evidence-only DRAFT pre-release of NicoTM77/Mandatary (tag name `p120-evidence-v1`, no tag exists until a draft is published and it must never be published): not a product release and not a C5 release. A draft is visible to repository writers only; it is read through the GitHub API with `gh` (see docs/release-acceptance.md).",
+   "description": "an evidence-only DRAFT pre-release of NicoTM77/Mandatary (tag name `p120-evidence-v2`, no tag exists until a draft is published and it must never be published): not a product release and not a C5 release. A draft is visible to repository writers only; it is read through the GitHub API with `gh` (see docs/release-acceptance.md). The older draft `p120-evidence-v1` is left unchanged.",
    "draft": true,
    "kind": "github-release",
    "prerelease": true,
-   "release_id": 447898502,
+   "release_id": 448468895,
    "repo": "NicoTM77/Mandatary",
-   "tag": "p120-evidence-v1"
+   "tag": "p120-evidence-v2"
   },
   "manifest": "ARCHIVE.sha256",
-  "manifest_sha256": "8f348bcd2cb1f8deff3a2f6d582e2f2e00420b2d2e1762cad6925134b86f2e5e",
-  "members": 131,
+  "manifest_sha256": "02cfc8db74cd415e681054dccf7ae0db5c8d9b5f900b97051352818d09c0a6b2",
+  "members": 219,
   "notes": [
    "Git history limit: the raw evidence files were committed at f306a2a and fbb8193 of this pull request and are removed at the branch tip by additive commits. Their Git objects stay in the repository's history (the pull request's commits remain reachable through refs/pull/25/head) and are NOT purged; no history was rewritten. If the pull request is squash-merged they are not in main's history; the archive, not Git history, is the durable record.",
-   "An evidence-only draft release is durable for as long as the repository and the draft exist; an administrator can edit or delete it. The member manifest and the tarball digest committed here make any change detectable by the full audit; they cannot prevent deletion."
+   "An evidence-only draft release is durable for as long as the repository and the draft exist; an administrator can edit or delete it. The member manifest and the tarball digest committed here make any change detectable by the full audit; they cannot prevent deletion.",
+   "Version 2 supersedes version 1 without changing it: its manifest contains every one of the 131 members of `p120-evidence-v1` with the identical SHA-256 (`ARCHIVE.p120-evidence-v1.sha256` is the committed v1 manifest, so `report.py --check` proves this from the two manifests without reading either archive). v1 stays available in its own draft release."
   ],
-  "read_back": "read back from the draft-release asset through the GitHub API with `tests/release/evidence.py stage --from-release` (the caller's own `gh`): tarball size 1589779 bytes and SHA-256 3ae690165ca43eaacbedec62ce622f598aedfe17da20e1b7b92f7b73031e898c equal the catalog and the digest GitHub reports for the asset, 131 members extracted with every member digest equal to ARCHIVE.sha256, no member missing or extra; `evidence.py audit` regenerated all 10 summaries from the raw members byte for byte",
+  "read_back": "read back from the draft-release asset through the GitHub API with `tests/release/evidence.py stage --from-release` (the caller's own `gh`): tarball size 2504455 bytes and SHA-256 9fee61b1dd29fdf6eeff7c0d3920492076565b717d8f23788c424aa269c0d3d9 equal the catalog and the digest GitHub reports for the asset, 219 members extracted with every member digest equal to ARCHIVE.sha256, no member missing or extra; `report.py --check --audit-archive` regenerated all 11 summaries from the raw members byte for byte and the committed v1 manifest is contained in it (all 131 v1 members, identical SHA-256)",
   "roots": {
-   "records": "scratch-space reports (secret-free)",
+   "adverse-ci-e5e1856": "hosted run 44003552068 at e5e1856 (review 519 F1): job logs, jobs/run documents and the image-evidence release JSON of both architectures",
+   "records": "scratch-space reports (secret-free); v2 adds the review-519 report",
    "round-1-f306a2a": "git archive f306a2a docs/release",
-   "round-2-fbb8193": "git archive fbb8193 docs/release (code commit under test 1528ef0)"
+   "round-2-fbb8193": "git archive fbb8193 docs/release (code commit under test 1528ef0)",
+   "round-3-2ac064f": "the integrated evidence of code commit 2ac064f (VM run, hosted run 44059883746, local gates, browsers, scans) and, under diagnostics/run-41ae8d5/, the first runs of the F2 fix at 41ae8d5"
   },
-  "tarball": "p120-evidence-v1-3ae690165ca4.tar.gz",
-  "tarball_bytes": 1589779,
-  "tarball_sha256": "3ae690165ca43eaacbedec62ce622f598aedfe17da20e1b7b92f7b73031e898c"
+  "supersedes": {
+   "id": "p120-evidence-v1",
+   "manifest": "ARCHIVE.p120-evidence-v1.sha256",
+   "manifest_sha256": "8f348bcd2cb1f8deff3a2f6d582e2f2e00420b2d2e1762cad6925134b86f2e5e",
+   "members": 131,
+   "tarball": "p120-evidence-v1-3ae690165ca4.tar.gz",
+   "tarball_bytes": 1589779,
+   "tarball_sha256": "3ae690165ca43eaacbedec62ce622f598aedfe17da20e1b7b92f7b73031e898c"
+  },
+  "tarball": "p120-evidence-v2-9fee61b1dd29.tar.gz",
+  "tarball_bytes": 2504455,
+  "tarball_sha256": "9fee61b1dd29fdf6eeff7c0d3920492076565b717d8f23788c424aa269c0d3d9"
  },
  "artifacts": {
+  "adverse-ci-e5e1856": {
+   "file": "summaries/adverse-ci-e5e1856.json",
+   "kind": "results",
+   "member": "adverse-ci-e5e1856/image-evidence-amd64/release-amd64.json",
+   "revision": "0d6b022fc1d1b180092ac87fd2409a0c85422b3e",
+   "revision_basis": "raw document records its revision (source_sha); the hosted pull_request run 44003552068 checks out GitHub's merge commit of head e5e1856 and the base",
+   "role": "adverse",
+   "source": "adverse run (review 519 F1): the hosted `Image (linux/amd64)` job of run 44003552068 at e5e1856, whose product was identical to the one under test: REL-MATRIX-REST, REL-MATRIX-PARITY and REL-MATRIX-POS FAIL (X-dn-stop-A: REST 502 with an empty body, MCP 200). Kept because it contradicts the PASS of the criteria that cite those checks"
+  },
   "adverse-vm-diag-loop-1": {
    "file": "summaries/adverse-vm-diag-loop-1.json",
    "kind": "results",
@@ -83,69 +104,75 @@
   "browsers": {
    "file": "summaries/browsers.json",
    "kind": "results",
-   "member": "round-2-fbb8193/docs/release/evidence/browsers/results.json",
-   "revision": "1528ef025ad9af7ff1f40f64fa82e62db44118d4",
+   "member": "round-3-2ac064f/browsers/results.json",
+   "revision": "2ac064f85dba438909e2754118c361c733a24c88",
    "revision_basis": "stated by this catalog; the raw document records no revision (the same clean worktree at the code commit)",
    "source": "`collect.py browsers` over `go test -tags=webauthnbrowser` runs (Chromium, Firefox, WebKit; desktop and 390x844)"
   },
   "ci-amd64": {
    "file": "summaries/ci-amd64.json",
    "kind": "results",
-   "member": "round-2-fbb8193/docs/release/evidence/ci-amd64/release.json",
-   "revision": "c6918f0dbf155ece752169ddf1c7271f3584f3f2",
-   "revision_basis": "raw document records its revision (source_sha); the hosted pull_request run checks out GitHub's merge commit of head a0ced328743d80a69a71ea6b328c087abd35c8ac and the base",
+   "member": "round-3-2ac064f/ci-amd64/release.json",
+   "revision": "aac29fd6bedb2b29e63af2704768322657e47e44",
+   "revision_basis": "raw document records its revision (source_sha); the hosted pull_request run 44059883746 checks out GitHub's merge commit of head 2ac064f85dba438909e2754118c361c733a24c88 and the base",
    "source": "the same harness in the hosted `Image (linux/amd64)` job at the CI-run commit (artifact `image-evidence-amd64`)"
   },
   "ci-arm64": {
    "file": "summaries/ci-arm64.json",
    "kind": "results",
-   "member": "round-2-fbb8193/docs/release/evidence/ci-arm64/release.json",
-   "revision": "c6918f0dbf155ece752169ddf1c7271f3584f3f2",
+   "member": "round-3-2ac064f/ci-arm64/release.json",
+   "revision": "aac29fd6bedb2b29e63af2704768322657e47e44",
    "revision_basis": "raw document records its revision (source_sha); the same hosted merge commit",
    "source": "the same harness in the hosted `Image (linux/arm64)` job (native arm64 runner; artifact `image-evidence-arm64`)"
   },
   "gates": {
    "file": "summaries/gates.json",
    "kind": "results",
-   "member": "round-2-fbb8193/docs/release/evidence/gates/results.json",
-   "revision": "1528ef025ad9af7ff1f40f64fa82e62db44118d4",
-   "revision_basis": "stated by this catalog; the raw document records no revision (gates/tree-before.txt and tree-after.txt record head 1528ef025ad9af7ff1f40f64fa82e62db44118d4 with 0 modified files)",
+   "member": "round-3-2ac064f/gates/results.json",
+   "revision": "2ac064f85dba438909e2754118c361c733a24c88",
+   "revision_basis": "stated by this catalog; the raw document records no revision (gates/tree-before.txt and tree-after.txt record head 2ac064f85dba438909e2754118c361c733a24c88 with 0 modified files)",
    "source": "`collect.py gates` over the exit codes and logs of gofmt, vet, mod verify, golangci-lint, gosec, govulncheck, go test, node script tests, tsc, eslint, vitest, npm audit"
   },
   "hosted-ci": {
    "file": "summaries/hosted-ci.json",
    "kind": "results",
-   "member": "round-2-fbb8193/docs/release/evidence/hosted-ci/results.json",
-   "revision": "a0ced328743d80a69a71ea6b328c087abd35c8ac",
-   "revision_basis": "stated by this catalog; the raw document records no revision (hosted-ci/jobs.json: workflow run 43972577867, head_sha a0ced328743d80a69a71ea6b328c087abd35c8ac)",
+   "member": "round-3-2ac064f/hosted-ci/results.json",
+   "revision": "2ac064f85dba438909e2754118c361c733a24c88",
+   "revision_basis": "stated by this catalog; the raw document records no revision (hosted-ci/jobs.json: workflow run 44059883746, head_sha 2ac064f85dba438909e2754118c361c733a24c88)",
    "source": "`collect.py jobs` over the GitHub Actions jobs document of the CI run"
   },
   "scan-amd64": {
    "file": "summaries/scan-amd64.json",
    "kind": "results",
-   "member": "round-2-fbb8193/docs/release/evidence/scan-amd64/results.json",
-   "revision": "1528ef025ad9af7ff1f40f64fa82e62db44118d4",
+   "member": "round-3-2ac064f/scan-amd64/results.json",
+   "revision": "2ac064f85dba438909e2754118c361c733a24c88",
    "revision_basis": "stated by this catalog; the raw document records no revision (Trivy and SBOM of the image the VM built from the git archive of the code commit)",
    "source": "`collect.py scan` over the Trivy HIGH/CRITICAL json and the CycloneDX SBOM of the VM image"
   },
   "scan-arm64": {
    "file": "summaries/scan-arm64.json",
    "kind": "results",
-   "member": "round-2-fbb8193/docs/release/evidence/scan-arm64/results.json",
-   "revision": "c6918f0dbf155ece752169ddf1c7271f3584f3f2",
+   "member": "round-3-2ac064f/scan-arm64/results.json",
+   "revision": "aac29fd6bedb2b29e63af2704768322657e47e44",
    "revision_basis": "stated by this catalog; the raw document records no revision (Trivy and SBOM of the hosted arm64 image of the same run)",
    "source": "`collect.py scan` over the hosted arm64 Trivy and SBOM files"
   },
   "vm-amd64": {
    "file": "summaries/vm-amd64.json",
    "kind": "results",
-   "member": "round-2-fbb8193/docs/release/evidence/vm-amd64/release.json",
-   "revision": "1528ef025ad9af7ff1f40f64fa82e62db44118d4",
+   "member": "round-3-2ac064f/vm-amd64/release.json",
+   "revision": "2ac064f85dba438909e2754118c361c733a24c88",
    "revision_basis": "raw document records its revision (source_sha)",
    "source": "`tests/release/release.py` on the isolated VM daemon (linux/amd64), source = `git archive` of the code commit"
   }
  },
  "diagnostics": {
+  "adverse-ci-e5e1856": {
+   "disposition": "adverse hosted run (FAIL of REL-MATRIX-REST, REL-MATRIX-PARITY, REL-MATRIX-POS on the amd64 Image job), kept; open on the criteria that cite those checks until the remediation of section 6 closes it with fresh evidence",
+   "members": 13,
+   "members_prefix": "adverse-ci-e5e1856/",
+   "what": "hosted CI run 44003552068 at e5e1856: the logs of the two Image jobs and the Security job, the jobs and run documents, and the image-evidence release JSON (and results, SBOM, Trivy output) of both architectures"
+  },
   "r2-ab": {
    "disposition": "diagnostics, not criterion evidence (load-independent stages skipped). The orphan arm-A contended run is kept and is not one of the 15 counted A runs; smoke-B is kept. Headline: contended drop runs 2/15 A vs 0/30 B, one-sided Fisher p = 0.106 (target p < 0.05 NOT met); REL-LOAD-STABLE 0/15 A vs 30/30 B passing; timeouts 669 vs 0; refusals 191 vs 0.",
    "members": 18,
@@ -154,15 +181,27 @@
   },
   "records": {
    "disposition": "records that were previously only in scratch space, now durable",
-   "members": 5,
+   "members": 6,
    "members_prefix": "records/",
-   "what": "the R2 root-cause report and per-run table, the interim caching design of reviewer run 516, the review reports of runs 513 and 518"
+   "what": "the R2 root-cause report and per-run table, the interim caching design of reviewer run 516, the review reports of runs 513, 518 and 519"
   },
   "round-1-f306a2a": {
    "disposition": "historical; superseded by round 2 after the P1.20.1 layout fix (F-1). Not rewritten.",
    "members": 53,
    "members_prefix": "round-1-f306a2a/",
    "what": "docs/release of PR head f306a2a: the first acceptance evidence and its report (NOT ACCEPTED, 20 PASS / 2 FAIL: Firefox recovery-reveal-phone, SH-9a / P1-E3), including its clean runs and the diagnostics of that round"
+  },
+  "round-3-2ac064f": {
+   "disposition": "the criterion evidence of this report (summaries) is derived from here",
+   "members": 74,
+   "members_prefix": "round-3-2ac064f/",
+   "what": "the integrated evidence of code commit 2ac064f: raw harness JSON and logs of the VM run and of both hosted CPUs, scan outputs and SBOMs, local gate and browser logs, and the diagnostics of the first F2 runs"
+  },
+  "run-41ae8d5": {
+   "disposition": "historical, kept: not the evidence of the final code commit; the harness defect is fixed in 2ac064f and the 403 is disclosed as finding F-8",
+   "members": 10,
+   "members_prefix": "round-3-2ac064f/diagnostics/run-41ae8d5/",
+   "what": "the first runs of the F2 fix (code commit 41ae8d5): the VM run (155 PASS, REL-STOP-LONG FAIL because of a harness defect, one unexplained PERSISTENCE `login step 2: 403`) and hosted run 44055078430 (both Image jobs: 155 PASS, REL-STOP-LONG FAIL, same harness defect)"
   },
   "vm-run-0d8b431": {
    "disposition": "historical clean run, kept; the same product content as the adverse runs",
@@ -210,9 +249,9 @@
    "title": "Start-up transient: about 100 MB resident for 2.5 minutes after every start"
   },
   {
-   "detail": "The adverse runs of the earlier rounds stay in the archive (`vm-diag-loop-1`, `vm-diag-loop-2`, `vm-run-1a01db9-full`) and stay FAIL in the criteria that name them. Established (the root-cause report, archive `records/R2-RCA-report.md`): the fixture daemon saturates under the workload (dockerd and containerd about 165 % and 138 % of one CPU of 4) and the service multiplied its reads (12 per admitted status call, 33 per tail-logs call, every proof drop a failed daemon read with about 50 calls in flight). R2/B changed the product: one epoch-bound continuity check, at most one in flight, valid for less than 1 s, covers read admissions and stream deliveries; mutations, name resolution, target inspects and every authorization decision stay fresh (`docs/docker-backend.md`). The interleaved A/B measurement is in the archive (`diagnostics/r2-ab/README.md` is the guide): clean 10 + 10: metadata reads per call -92.8 %, `/info` per call -99.8 %, daemon CPU per call -86.4 %, p95 status 2.13 s -> 0.48 s and logs 5.99 s -> 0.49 s, 0 refusals/drops/timeouts in 10 B runs; contended (two host CPU burners) 15 A + 30 B: `REL-LOAD-STABLE` failed in 15/15 A runs and 0/30 B runs, timeouts 669 against 0, refusals 191 against 0, but the proof dropped in 2/15 A and 0/30 B runs (one-sided Fisher p = 0.106, target p < 0.05): the statistic the plan set for the drop rate alone is **not** met. The owner accepted this evidence as the disposition of R2 (section 6); SH-2d is therefore PASS WITH DISCLOSURES, not a pass of the statistic. The original clean-host failures were not exactly reproduced; the residual fail-closed availability risk is documented. The final VM run in this evidence is clean (`REL-LOAD-STABLE` PASS).",
+   "detail": "The adverse runs of the earlier rounds stay in the archive (`vm-diag-loop-1`, `vm-diag-loop-2`, `vm-run-1a01db9-full`) and stay FAIL in the criteria that name them. Evidenced (the root-cause report, archive `records/R2-RCA-report.md`; the mechanism, not the exact cause of the original clean-host failures, which was not reproduced): the fixture daemon saturates under the workload (dockerd and containerd about 165 % and 138 % of one CPU of 4) and the service multiplied its reads (12 per admitted status call, 33 per tail-logs call, every proof drop a failed daemon read with about 50 calls in flight). R2/B changed the product: one epoch-bound continuity check, at most one in flight, valid for less than 1 s, covers read admissions and stream deliveries; mutations, name resolution, target inspects and every authorization decision stay fresh (`docs/docker-backend.md`). The interleaved A/B measurement is in the archive (`diagnostics/r2-ab/README.md` is the guide): clean 10 + 10: metadata reads per call -92.8 %, `/info` per call -99.8 %, daemon CPU per call -86.4 %, p95 status 2.13 s -> 0.48 s and logs 5.99 s -> 0.49 s, 0 refusals/drops/timeouts in 10 B runs; contended (two host CPU burners) 15 A + 30 B: `REL-LOAD-STABLE` failed in 15/15 A runs and 0/30 B runs, timeouts 669 against 0, refusals 191 against 0, but the proof dropped in 2/15 A and 0/30 B runs (one-sided Fisher p = 0.106, target p < 0.05): the statistic the plan set for the drop rate alone is **not** met. The owner accepted this evidence as the disposition of R2 (section 6); SH-2d is therefore PASS WITH DISCLOSURES, not a pass of the statistic. The original clean-host failures were not exactly reproduced; the residual fail-closed availability risk is documented. The final VM run and both hosted runs of this evidence are clean (`REL-LOAD-STABLE` PASS).",
    "id": "F-3",
-   "title": "Intermittent fail-closed refusals under the approved workload on the slow VM daemon (R2): cause established, bounded continuity cache measured, owner-approved disposition"
+   "title": "Intermittent fail-closed refusals under the approved workload on the slow VM daemon (R2): mechanism evidenced, bounded continuity cache measured, owner-approved disposition"
   },
   {
    "detail": "`footprint.idle[configured].VmHWM_process_lifetime` is 178.07 MB on the VM (178.9 and 181.8 MB on the hosted runners): the setup, identity and matrix sign-ins (Argon2id, 64 MiB each) push the process above the 150 MB load budget briefly. The benchmark workload (API/MCP clients and log streams) contains no human sign-in and its measured peak is 41-43 MB with the high-water mark reset at the start of the window, so the budget is met as defined; a burst of sign-ins during load is not covered by this workload.",
@@ -233,6 +272,16 @@
    "detail": "The raw evidence of the first two rounds (full harness JSON, raw logs, scan outputs, SBOMs, A/B raw runs: 72 files, about 124 000 added lines) is held in one versioned archive (`archive` in `catalog.json`) and removed from the branch tip by additive commits. Git objects of the earlier commits (f306a2a, fbb8193) stay in the repository history behind `refs/pull/25/head`; no history was rewritten or purged, so removing the files at the tip does not purge them. The archive is an evidence-only draft release asset: durable while the repository and the draft exist, detectable but not preventable against deletion.",
    "id": "F-7",
    "title": "Raw run output is archived, not committed; Git history is not rewritten"
+  },
+  {
+   "detail": "In the first VM run of the F2 fix (code commit 41ae8d5, archive `round-3-2ac064f/diagnostics/run-41ae8d5/vm-amd64/`) the persistence stage's re-login got a 403 on the TOTP step (`PERSISTENCE-ERROR`, 155 PASS / 2 not PASS with the REL-STOP-LONG harness defect), so the restart, SIGKILL and usage-after-crash checks of that run did not execute. The same stage passed in the next VM run at 2ac064f (156 PASS) and on both hosted CPUs. The cause is NOT established (the bare status carried no code or reason; candidates such as a TOTP step or replay-window race in the harness's re-login were not tested); the harness now records the refusal's closed code and reason and the TOTP period of the failing step (`tests/release/stackdeploy.py`, diagnostics only). A recurrence would be investigated as a possible product or harness defect.",
+   "id": "F-8",
+   "title": "One unexplained `login step 2: 403` in the persistence stage of one VM run"
+  },
+  {
+   "detail": "The first run of the new `REL-STOP-LONG` check passed its product assertion (REST stop answered 200 after 12.2 s on the VM and on both hosted CPUs, before the fix the same shape is an EOF/502) and failed only because `tests/release/mcpclient` reported `elapsed_ms` 0 for every step (a deferred assignment on an unnamed result). The check is deliberately fail-closed on an unmeasured MCP answer; the client was fixed (named result) and the check re-run at 2ac064f. Both runs are archived (`round-3-2ac064f/diagnostics/run-41ae8d5/`).",
+   "id": "F-9",
+   "title": "The first runs of the F2 fix are kept, not hidden: REL-STOP-LONG found a defect in the test client"
   }
  ],
  "publication": {
@@ -244,27 +293,40 @@
   "status": "**Registry publication: NOT EXECUTED.** Nothing was pushed to a registry, and a pull request run cannot publish: the CI workflow publishes `ghcr.io/nicotm77/mandatary:dev` only from a successful `push` to `refs/heads/main` of `NicoTM77/Mandatary`, after every required gate of that exact commit (both architecture jobs included) succeeded. This card does not merge, deploy or run the publishing job."
  },
  "release_candidate": {
-  "OCI archive sha256 (VM, gzip layers)": "6471400793e23bcba4f33fa89d90b6dcfe482f35bab1c32051457e4bd10320b3",
+  "OCI archive sha256 (VM, gzip layers)": "f7a3d1e1a9ab807eb786bee177d219e17bb5f6ac56fd86cea995cf96468334f5",
   "VM host": "Ubuntu 26.04.1 LTS, kernel 7.0.0-43-generic, 4 CPUs, storage driver overlayfs",
   "base (main, P1.19 merged)": "8c1a55a301b4737edd307c6784f54dbf3abf985b",
-  "code commit under test": "1528ef025ad9af7ff1f40f64fa82e62db44118d4 (the image carries it as its revision label; REL-IMG-01)",
+  "code commit under test": "2ac064f85dba438909e2754118c361c733a24c88 (the image carries it as its revision label; REL-IMG-01)",
   "docker server / API / compose": "29.9.3 / 1.56 / 5.7.1",
-  "evidence and report commits after the code commit": "fbb8193 (the evidence of round R2), then additive commits of the owner-approved continuation: the X2 regression test (internal/docker/list_inventory_regression_test.go, no product file), the evidence-hygiene refactor (raw run output archived, compact evidence kept), and the main-only GHCR publication job. `git diff 1528ef0 HEAD -- cmd internal web ':(exclude)*_test.go'` is empty (the only file that differs under those paths is the new test file of X2): the product tree the evidence judged is the product tree of the head",
-  "evidence date": "2026-11-16",
-  "host helper binary sha256 (linux/amd64, built from the same archive)": "d7b926fa8e6fd058c29333b6f93d9086b229da39d1a0f8d6062d09d684012b34",
-  "hosted runs": "GitHub Actions CI run 43972577867 at a0ced32 (the code commit 1528ef0 plus only the SH-2d criteria text of that time; its two jobs `Image (linux/amd64)` and `Image (linux/arm64)` executed the same harness on native runners; summaries `ci-amd64`, `ci-arm64`, `hosted-ci`). Hosted CI of the final head is gate G-CI, not part of this evidence",
-  "image id (amd64, VM)": "sha256:2f0093f1b0a883f346e3abbde589be420b61c383954de8f5c64cecdcda2a4fe7",
-  "isolated daemon": "the declared fixture daemon ID ec06eb10-04b6-4f1b-bbb6-d336994db8ae (verified before the first resource and before cleanup, ISO-00/ISO-01); the VM daemon's container, network and volume snapshot is identical before and after the run (archive member `vm-amd64/snapshot-after.txt`)",
-  "product tree": "the product differs from the merged baseline by the P1.20.1 brand/layout change (web/) and the R2 changes (internal/docker, internal/logging, cmd/mandatary); the local gates and the browser suites ran on a clean worktree at exactly the code commit (`gates/tree-before.txt`, `gates/tree-after.txt`: head, 0 modified files), so GATE-PRODUCT-TREE compares what they judged with what the VM archive built",
+  "evidence and report commits after the code commit": "additive commits only: this evidence (version 2 archive, compact summaries, report). `git diff 2ac064f HEAD -- cmd internal web ':(exclude)*_test.go'` is empty: the product tree the evidence judged is the product tree of the head (the commits before the code commit of this round added the F2 fix 41ae8d5, its harness fixes 2ac064f, the X2 test, the evidence hygiene and the main-only GHCR publication job)",
+  "evidence date": "2026-11-17",
+  "host helper binary sha256 (linux/amd64, built from the same archive)": "aa6e6dbb9695273b6ee2b5e90c8bc4605b629e5d93fda7877e1470730659499e",
+  "hosted runs": "GitHub Actions CI run 44059883746 at the code commit 2ac064f85dba438909e2754118c361c733a24c88 (pull_request run; merge commit aac29fd6bedb2b29e63af2704768322657e47e44): all jobs success, `Publish dev image (main only)` skipped as designed; its two jobs `Image (linux/amd64)` and `Image (linux/arm64)` executed the harness on native runners (156 PASS / 0 not PASS each; summaries `ci-amd64`, `ci-arm64`, `hosted-ci`). Adverse hosted run 44003552068 at e5e1856 (summary `adverse-ci-e5e1856`) and the first runs of the F2 fix (hosted run 44055078430 at 41ae8d5) are archived. Hosted CI of the final head is gate G-CI, not part of this evidence",
+  "image id (amd64, VM)": "sha256:95729df18f833fc0dd13e10f379b74ec12f3618f1a6866c1349b5b5b7001cfde",
+  "isolated daemon": "the declared fixture daemon ID ec06eb10-04b6-4f1b-bbb6-d336994db8ae (verified before the first resource and before cleanup, ISO-00/ISO-01); the VM daemon's container, network and volume snapshot is identical before and after the run (archive members `vm-amd64/pre-snap.txt`, `vm-amd64/snapshot-after.txt`) except that the card's own `p120-trivy-cache` volume, left by the earlier run at 41ae8d5, existed before and was removed by this run's cleanup; the image list is identical",
+  "product tree": "the product differs from the merged baseline by the P1.20.1 brand/layout change (web/), the R2 changes (internal/docker, internal/logging, cmd/mandatary) and the F2 change (internal/ops, internal/api, internal/mcp, cmd/mandatary); the local gates and the browser suites ran on a clean worktree at exactly the code commit (`gates/tree-before.txt`, `gates/tree-after.txt`: head, 0 modified files), so GATE-PRODUCT-TREE compares what they judged with what the VM archive built",
   "release": "Mandatary Phase 1 release candidate (acceptance run of PR #25, round R2: P1.20.1 UX contribution, R3 documentation, R2 bounded continuity cache)",
-  "test tools sha256 (never shipped)": "mcpclient 891f2fd7892169069611f026ffe89aa6d085f98b0019448aa5026d29dfebdbf9; migfixture 8ddedb8e7af883db7c469b0f61985bf48e0cef3634ae7ce392bb12e63a95ca42"
+  "test tools sha256 (never shipped)": "mcpclient 626fa964efd0e920de5cd23e12023dab5f25897b6b65b6c0f473689309df7764; migfixture 606e383ad4e39204c859c7971dd20eb375af0242d245534ac7d7e5e458eb4315"
  },
+ "remediations": [
+  {
+   "adverse_run": "hosted CI run 44003552068, job `Image (linux/amd64)` (head e5e1856, merge commit 0d6b022fc1d1b180092ac87fd2409a0c85422b3e): `REL-MATRIX-REST`, `REL-MATRIX-PARITY` and `REL-MATRIX-POS` FAIL, X-dn-stop-A: REST `(502, '', '')`, MCP 200. The product of that run was identical to the product the earlier evidence judged, so one of four hosted runs of that product failed. Archive root `adverse-ci-e5e1856/`; the run was omitted from the first version of this evidence (review 519 F1) and is now recorded as an adverse run of the criteria that cite those checks.",
+   "finding": "Review 519 reproduced a product defect on the same call shape: `cmd/mandatary` set a 10 s `WriteTimeout` on every response while an admitted one-shot stop or restart may run `timeout_seconds` plus a 15 s stop grace (10 + 15 s by default, up to 315 s). The server closed the connection before the handler wrote its result, so the client saw EOF (behind the proxy an empty-body 502) although the stop completed and was counted allowed. The harness then recorded no per-call timing, so it cannot be shown from the archived run that its X-dn-stop-A call exceeded 10 s.",
+   "fix": "Narrow, after authorization only: the ops service announces the dispatch bound of an admitted stop/restart (`ops.DispatchObserver`, only for those two operations, only after authorization and the expired-bound check); the REST and MCP transports then extend that one response's write deadline to bound plus 5 s (`api.WithAdmissionDeadline`, forward only, read deadline untouched). Unauthenticated, denied and invalid requests keep the 10 s bound. No authorization, identity, invalidation, lease or freshness semantics changed. Documented in docs/api-mcp.md and docs/operations.md.",
+   "fresh_evidence": "At the code commit 2ac064f: the VM run (`vm-amd64`) 156 PASS / 0 not PASS and both hosted CPUs (`ci-amd64`, `ci-arm64`, hosted run 44059883746) 156 PASS / 0 not PASS: `REL-MATRIX-REST`, `REL-MATRIX-PARITY`, `REL-MATRIX-POS` and `REL-STOP-LONG` PASS on all three (the REST stop answered 200 after 12.2 s on every CPU). The matrix timing of the VM run shows the slowest matrix stop/restart at 5.3 s.",
+   "id": "F1 / F2 of review 519",
+   "not_established": "that the write bound was the cause of the one hosted 502: the archived run has no per-call timing and the failure did not recur (the hosted runs 44044826495 at 45629a3, 44055078430 at 41ae8d5 and 44059883746 at 2ac064f all passed `REL-MATRIX-REST`), so the cause of that single 502 is not established. The write-bound defect is real and fixed; the remediation closes the criteria on fresh passing evidence and does not prove that this was the cause. A later hosted 502 of the same shape would reopen it.",
+   "reference": "review 519 (`records/review519-report.md`, https://github.com/NicoTM77/Mandatary/pull/25#pullrequestreview-5935593688); docs/api-mcp.md (Stop and restart outlive the 10 s server write bound); archive `adverse-ci-e5e1856/`, `round-3-2ac064f/diagnostics/run-41ae8d5/`",
+   "tests": "RED-to-GREEN through the real `serverFor`, REST and a real MCP client against a slow executor (`cmd/mandatary/stop_write_deadline_test.go`: an admitted stop and restart deliver their result past the 10 s bound; unadmitted requests keep it), the ops observer tests (`internal/ops/dispatch_observer_test.go`: announced only after authorization and only for stop/restart), the transport unit test (`internal/api/admission_deadline_test.go`), and hand/script mutation checks of the wiring. The release harness gained per-call REST/MCP timing in the matrix stage and the `REL-STOP-LONG` check (container A ignores SIGTERM, `timeout_seconds` 12: REST stop, start and the MCP restart must still answer 200 although they outlast the 10 s bound, and A must run again; an unmeasured or fast answer is a failure); its fail-closed behaviour has positive and eight negative unit twins (`tests/release/test_release.py`).",
+   "title": "Hosted run 44003552068 at e5e1856: REST 502 on X-dn-stop-A, and the server write bound that cut off long stop/restart calls"
+  }
+ ],
  "schema": "mandatary-p120-evidence-catalog/1",
  "verdict_notes": [
   "Every PASS below is read from a recorded result of the named check in the named archived document; the digest shown is the SHA-256 of that RAW document, taken from `docs/release/evidence/ARCHIVE.sha256` and bound to the committed summary (`report.py --check`).",
   "A browser engine, architecture, or scanner that was not run is UNVERIFIED, not PASS. Where a result is FAIL the failing evidence is in the archived document and in section 8.",
   "arm64 was exercised only by the hosted arm64 runner (no arm64 VM exists). The Ubuntu 24.04 / Debian 13 / Unraid hosts were not exercised by this report.",
-  "The browser suites and the local gates ran on the coder's controller host on a clean worktree at exactly the code commit (`gates/tree-before.txt`, `gates/tree-after.txt` in the archive); the harness run is on the isolated VM from a `git archive` of the same commit. The hosted CI run is at the next commit, which differs only in the SH-2d criteria text of that time.",
+  "The browser suites and the local gates ran on the coder's controller host on a clean worktree at exactly the code commit (`gates/tree-before.txt`, `gates/tree-after.txt` in the archive); the harness run is on the isolated VM from a `git archive` of the same commit. The hosted CI run is at the same code commit.",
   "The R2 A/B runs (archive `diagnostics/r2-ab/`) are diagnostics with the load-independent stages skipped (`--skip`, diagnostics only); they are not evidence for a criterion, and the final VM run of this evidence skipped nothing.",
   "SH-2d is PASS WITH DISCLOSURES only because of an owner-approved acceptance-policy disposition (section 6). It is NOT a claim that the pre-registered proof-drop statistic passed: it did not (2/15 against 0/30 runs with a drop, one-sided Fisher p = 0.106, target p < 0.05). The historical adverse runs stay FAIL."
  ]

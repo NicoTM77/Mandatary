@@ -48,6 +48,11 @@ negative, boolean or non-numeric measurement is never a pass (`footprint.within`
   sessions (status and logs) - plus **5 active follow-log streams**, for 40 s of load, against the deployment through its TLS proxy.
   `VmHWM` is reset (`/proc/<pid>/clear_refs`) immediately before the window so the peak covers only the window; the sampled peak
   and the kernel high-water mark are both gated. The cgroup `memory.peak` is recorded for information (it includes page cache).
+* **Long stop and restart (`REL-STOP-LONG`).** The matrix records the duration of every REST and MCP call (`matrix.timing` in the
+  evidence). The lifecycle stage then stops container A, which ignores SIGTERM, with `timeout_seconds` 12 through REST, starts it, and
+  restarts it through the real MCP client: each must answer 200 although the call outlasts the server's 10 s write bound
+  (docs/api-mcp.md, "Stop and restart outlive the 10 s server write bound"), A must run again, and both the REST stop and the MCP
+  restart must have been **measured** to take longer than the bound (a fast or unmeasured answer is a failure, never a pass).
 * **Stability under the workload (SH-2d, `REL-LOAD-STABLE`).** Every attempt of the workload is traced (revision, interface, operation,
   outcome or error reason, duration) and correlated with the service's own `docker safety proof dropped` / `restored` log lines
   (closed `reason`/`step`/`cause` vocabulary, durations and counts only; never an error text, path, ID or payload), a probe of the
@@ -57,7 +62,10 @@ negative, boolean or non-numeric measurement is never a pass (`footprint.within`
   are held to the documented rule (every observed success accounted, at most the unobserved attempts more), never recomputed from
   client successes; a cell without unobserved attempts stays exact. A criterion may name **sealed adverse runs**
   (`adverse` in `tests/release/criteria.json`): while their state is `open`, a failing one fails the criterion even when the final run is
-  clean; only a reviewed change that records the established cause (product, fixture or harness) sets `dispositioned`.
+  clean; only a reviewed change sets a closed state: `dispositioned` (an owner decision, which states what it does not claim) or
+  `remediated` (a defect fixed in the product, pinned by a regression test, with fresh passing evidence of the criterion's own checks;
+  a technical closure, not an owner decision, which states what it does not establish). A closed group needs its own text, so the closure is
+  never silent, and the adverse run itself is never rewritten.
 * **Environment.** Docker server/API/Compose versions, kernel, OS, CPU count, memory, storage driver, 4 KiB `fsync` latency of the
   work file system and the daemon ID are recorded in the evidence.
 
@@ -124,10 +132,15 @@ check the result (`docs/release/evidence/`, all sealed by `SHA256SUMS`):
 | `ARCHIVE.sha256` | The complete member manifest of the archive (`sha256sum` format, sorted, one line per member) |
 | `summaries/*.json` | A compact, deterministic summary of each raw `results` document: the digest of the raw member it was derived from, its revision, every check result, and the measured values (long traces are cut to their length) |
 
-The archive of this release is `p120-evidence-v1`: `p120-evidence-v1-<12 hex>.tar.gz` plus `p120-evidence-v1.ARCHIVE.sha256`, assets of
-an **evidence-only draft pre-release** of this repository (tag name `p120-evidence-v1`; it is not a product release, not a C5 release,
-and must never be published). Its roots are `round-1-f306a2a/` (the first evidence round), `round-2-fbb8193/` (the integrated round,
-with the R2 A/B raw runs) and `records/` (the R2 root-cause report, the review reports, the interim design). The authoritative
+The archive of this release is `p120-evidence-v2`: `p120-evidence-v2-<12 hex>.tar.gz` plus `p120-evidence-v2.ARCHIVE.sha256`, assets of
+an **evidence-only draft pre-release** of this repository (tag name `p120-evidence-v2`; it is not a product release, not a C5 release,
+and must never be published). It **supersedes** `p120-evidence-v1` without changing it: v1 stays in its own draft release, and the
+v2 manifest contains every one of the v1 members with the identical SHA-256. The committed `ARCHIVE.p120-evidence-v1.sha256` is the v1
+manifest, so `report.py --check` proves that containment from the two committed manifests without reading either archive, and the
+full audit covers the v1 members too (they are in the v2 tarball). The roots are `round-1-f306a2a/` and `round-2-fbb8193/` (the
+earlier rounds, including the R2 A/B raw runs), `records/` (the R2 root-cause report, the review reports, the interim design),
+`round-3-2ac064f/` (the integrated evidence of the final code commit, with the first runs of the F2 fix under `diagnostics/run-41ae8d5/`)
+and `adverse-ci-e5e1856/` (the adverse hosted run of review 519 F1). The authoritative
 identifiers, size, tarball digest and member count are in `catalog.json` and the generated report. A draft release is visible to
 repository writers; it is read with the caller's own `gh` (never a credential of this repository). It is durable while the repository and
 the draft exist; an administrator can delete it, which the digests make detectable but cannot prevent. A new evidence round makes a new
@@ -222,8 +235,9 @@ point, **interleaved** A/B, each arm built from its own `git archive`, the same 
 The contended arm is far better in the observable failure (0 of 30 B runs against 15 of 15 A runs failing the stability result,
 timeouts 669 against 0), but the pre-registered statistic on the **drop rate alone is not met**: 2 of 15 against 0 of 30 gives a
 one-sided Fisher exact p = 0.106 (target p < 0.05), because the drop is rare even under contention in arm A. R2 is therefore **not**
-claimed as resolved on the stated target; the evidence is that the cause is established (daemon saturation amplified by the service's
-own continuity reads) and that removing most of that amplification removes the observed timeouts and failures in this fixture.
+claimed as resolved on the stated target; the evidence is that the mechanism is evidenced (daemon saturation amplified by the service's
+own continuity reads; the exact cause of the original clean-host failures was not reproduced and is not established) and that
+removing most of that amplification removes the observed timeouts and failures in this fixture.
 
 **Owner-approved disposition (SH-2d).** The owner accepted this A/B evidence as the disposition of R2 (option 1 of reviewer run 518):
 SH-2d is reported as **PASS WITH DISCLOSURES**. This is an acceptance-policy decision, **not** a claim that the pre-registered

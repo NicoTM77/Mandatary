@@ -15,6 +15,7 @@ __pycache__/
 /docs/release/evidence/*
 !/docs/release/evidence/catalog.json
 !/docs/release/evidence/ARCHIVE.sha256
+!/docs/release/evidence/ARCHIVE.*.sha256
 !/docs/release/evidence/SHA256SUMS
 !/docs/release/evidence/summaries/
 !/docs/release/evidence/summaries/*.json

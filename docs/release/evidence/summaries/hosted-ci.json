@@ -2,18 +2,18 @@
  "artifact": "hosted-ci",
  "results": [
   {
-   "detail": "Image (linux/arm64): completed/success",
-   "id": "HOSTED-Image-linux-arm64",
-   "status": "PASS"
-  },
-  {
-   "detail": "Storage (linux/arm64): completed/success",
-   "id": "HOSTED-Storage-linux-arm64",
-   "status": "PASS"
-  },
-  {
    "detail": "Negative control (Go 1.27.4): completed/success",
    "id": "HOSTED-Negative-control-Go-1.27.4",
+   "status": "PASS"
+  },
+  {
+   "detail": "Baseline (Go 1.26.11): completed/success",
+   "id": "HOSTED-Baseline-Go-1.26.11",
+   "status": "PASS"
+  },
+  {
+   "detail": "Image (linux/arm64): completed/success",
+   "id": "HOSTED-Image-linux-arm64",
    "status": "PASS"
   },
   {
@@ -27,26 +27,31 @@
    "status": "PASS"
   },
   {
-   "detail": "Image (linux/amd64): completed/success",
-   "id": "HOSTED-Image-linux-amd64",
+   "detail": "Storage (linux/arm64): completed/success",
+   "id": "HOSTED-Storage-linux-arm64",
    "status": "PASS"
   },
   {
-   "detail": "Baseline (Go 1.26.11): completed/success",
-   "id": "HOSTED-Baseline-Go-1.26.11",
+   "detail": "Image (linux/amd64): completed/success",
+   "id": "HOSTED-Image-linux-amd64",
    "status": "PASS"
   },
   {
    "detail": "Security: completed/success",
    "id": "HOSTED-Security",
    "status": "PASS"
+  },
+  {
+   "detail": "Publish dev image (main only): completed/skipped",
+   "id": "HOSTED-Publish-dev-image-main-only",
+   "status": "FAIL"
   }
  ],
  "revision": null,
  "schema": "mandatary-p120-evidence-summary/1",
  "source": {
-  "bytes": 1016,
-  "member": "round-2-fbb8193/docs/release/evidence/hosted-ci/results.json",
-  "sha256": "6b2f08d3e448d8d867420e5b2f32f55bfe3c71761e19ffbc342e6dbc98404bc2"
+  "bytes": 1157,
+  "member": "round-3-2ac064f/hosted-ci/results.json",
+  "sha256": "add487fd7a36e63087b0693a620d8b9cbf299aaefc9adf9e5c78c3a0313b52fb"
  }
 }

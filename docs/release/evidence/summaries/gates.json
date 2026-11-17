@@ -7,22 +7,22 @@
    "status": "PASS"
   },
   {
-   "detail": "go vet ./...: exit 0 in 5 s",
+   "detail": "go vet ./...: exit 0 in 2 s",
    "id": "GATE-GOVET",
    "status": "PASS"
   },
   {
-   "detail": "go mod verify: exit 0 in 11 s",
+   "detail": "go mod verify: exit 0 in 8 s",
    "id": "GATE-GOMOD-VERIFY",
    "status": "PASS"
   },
   {
-   "detail": "pinned golangci-lint run ./...: exit 0 in 6 s",
+   "detail": "pinned golangci-lint run ./...: exit 0 in 8 s",
    "id": "GATE-GOLANGCI",
    "status": "PASS"
   },
   {
-   "detail": "pinned gosec ./...: exit 0 in 23 s",
+   "detail": "pinned gosec ./...: exit 0 in 17 s",
    "id": "GATE-GOSEC",
    "status": "PASS"
   },
@@ -42,17 +42,17 @@
    "status": "PASS"
   },
   {
-   "detail": "tests/image/test_isolation.py (isolation guard tests): exit 0 in 4 s",
+   "detail": "tests/image/test_isolation.py (isolation guard tests): exit 0 in 3 s",
    "id": "GATE-ISOLATION-TESTS",
    "status": "PASS"
   },
   {
-   "detail": "node --test scripts/*.test.mjs (CI budgets, toolchain pins, ledger, dependency residuals, generation): exit 0 in 24 s",
+   "detail": "node --test scripts/*.test.mjs (CI budgets, toolchain pins, ledger, dependency residuals, generation): exit 0 in 27 s",
    "id": "GATE-NODE-SCRIPTS",
    "status": "PASS"
   },
   {
-   "detail": "tsc --noEmit: exit 0 in 2 s",
+   "detail": "tsc --noEmit: exit 0 in 3 s",
    "id": "GATE-WEB-TYPECHECK",
    "status": "PASS"
   },
@@ -72,7 +72,7 @@
    "status": "PASS"
   },
   {
-   "detail": "compared 1528ef025ad9..1528ef025ad9 over cmd internal web Dockerfile docker-compose.yml deploy go.mod go.sum sqlc.yaml tools; 0 product file(s) differ",
+   "detail": "compared 2ac064f85dba..2ac064f85dba over cmd internal web Dockerfile docker-compose.yml deploy go.mod go.sum sqlc.yaml tools; 0 product file(s) differ",
    "id": "GATE-PRODUCT-TREE",
    "status": "PASS"
   }
@@ -80,8 +80,8 @@
  "revision": null,
  "schema": "mandatary-p120-evidence-summary/1",
  "source": {
-  "bytes": 2112,
-  "member": "round-2-fbb8193/docs/release/evidence/gates/results.json",
-  "sha256": "80b3cea9bf126833558d113f6d39f8e0f93850fc1ccca7b2173e63331664ca6e"
+  "bytes": 2111,
+  "member": "round-3-2ac064f/gates/results.json",
+  "sha256": "c330cd9862a609359e8173e5210e5b80e2c294c2cb9f60738fad3ca3d235e6ec"
  }
 }

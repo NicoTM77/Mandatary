@@ -5,16 +5,16 @@
    "api": "1.56",
    "cgroup": "systemd v2",
    "compose": "5.7.1",
-   "compose_project": "p120da5dmstk",
+   "compose_project": "p1205ae4mstk",
    "cpus": 4,
    "daemon_id": "ec06eb10-04b6-4f1b-bbb6-d336994db8ae",
    "docker_server": "29.9.3",
    "fsync_4k_work_filesystem": {
-    "mean_ms": 1.773,
+    "mean_ms": 0.914,
     "n": 200,
-    "p50_ms": 1.316,
-    "p95_ms": 3.741,
-    "p99_ms": 7.764
+    "p50_ms": 0.906,
+    "p95_ms": 1.236,
+    "p99_ms": 1.513
    },
    "host_cpus": 4,
    "kernel": "7.0.0-43-generic",
@@ -26,16 +26,16 @@
   "footprint": {
    "idle": [
     {
-     "RssAnon_last": 10711040,
-     "RssFile_last": 17211392,
-     "VmHWM_process_lifetime": 100675584,
-     "VmRSS_peak_in_window": 100827136,
-     "VmRSS_steady_max": 27922432,
-     "VmRSS_steady_median": 27881472,
+     "RssAnon_last": 10833920,
+     "RssFile_last": 16912384,
+     "VmHWM_process_lifetime": 100069376,
+     "VmRSS_peak_in_window": 100401152,
+     "VmRSS_steady_max": 27746304,
+     "VmRSS_steady_median": 27336704,
      "cgroup": {
-      "memory.current": 35610624,
+      "memory.current": 13115392,
       "memory.max": "max",
-      "memory.peak": 113090560
+      "memory.peak": 89931776
      },
      "curve_s_rss_anon_file": {
       "omitted_list_length": 60
@@ -47,16 +47,16 @@
      "window_s": 300
     },
     {
-     "RssAnon_last": 15900672,
-     "RssFile_last": 18452480,
-     "VmHWM_process_lifetime": 186011648,
-     "VmRSS_peak_in_window": 34906112,
-     "VmRSS_steady_max": 34799616,
-     "VmRSS_steady_median": 34549760,
+     "RssAnon_last": 15048704,
+     "RssFile_last": 18292736,
+     "VmHWM_process_lifetime": 178110464,
+     "VmRSS_peak_in_window": 33783808,
+     "VmRSS_steady_max": 33783808,
+     "VmRSS_steady_median": 33247232,
      "cgroup": {
-      "memory.current": 44216320,
+      "memory.current": 20832256,
       "memory.max": "max",
-      "memory.peak": 197406720
+      "memory.peak": 169443328
      },
      "curve_s_rss_anon_file": {
       "omitted_list_length": 60
@@ -68,16 +68,16 @@
      "window_s": 300
     },
     {
-     "RssAnon_last": 9981952,
-     "RssFile_last": 17084416,
-     "VmHWM_process_lifetime": 98091008,
-     "VmRSS_peak_in_window": 98222080,
-     "VmRSS_steady_max": 27066368,
-     "VmRSS_steady_median": 26771456,
+     "RssAnon_last": 10182656,
+     "RssFile_last": 17088512,
+     "VmHWM_process_lifetime": 98492416,
+     "VmRSS_peak_in_window": 98852864,
+     "VmRSS_steady_max": 27541504,
+     "VmRSS_steady_median": 27119616,
      "cgroup": {
-      "memory.current": 11620352,
+      "memory.current": 11997184,
       "memory.max": "max",
-      "memory.peak": 87228416
+      "memory.peak": 87609344
      },
      "curve_s_rss_anon_file": {
       "omitted_list_length": 60
@@ -90,7 +90,7 @@
     }
    ],
    "image": {
-    "archive_sha256": "395739ea39ad24578b09d9842889e21ac4b1102781def5d45c0a3f016dadb951",
+    "archive_sha256": "2e6d242324c818ec6d09307c5fa87db768bd98b1c99974891be7c2054b94acd5",
     "budget": {
      "MB": 60.0,
      "MiB": 57.22,
@@ -98,8 +98,8 @@
     },
     "compressed": {
      "MB": 12.44,
-     "MiB": 11.86,
-     "bytes": 12440713
+     "MiB": 11.87,
+     "bytes": 12442574
     },
     "layers": {
      "omitted_list_length": 15
@@ -108,41 +108,41 @@
    },
    "latency": {
     "allowed_accounted": {
-     "mean_ms": 99.046,
+     "mean_ms": 126.341,
      "n": 150,
-     "p50_ms": 93.716,
-     "p95_ms": 129.691,
-     "p99_ms": 133.993
+     "p50_ms": 124.07,
+     "p95_ms": 166.667,
+     "p99_ms": 191.383
     },
     "denied_accounted": {
-     "mean_ms": 73.126,
+     "mean_ms": 79.719,
      "n": 150,
-     "p50_ms": 70.104,
-     "p95_ms": 97.058,
-     "p99_ms": 110.709
+     "p50_ms": 74.528,
+     "p95_ms": 114.724,
+     "p99_ms": 135.547
     },
     "note": "denied_accounted - unauth_401 = authorization + one synchronous durable usage write, measured through the TLS proxy on the isolated host; not a microbenchmark of the write alone",
     "unauth_401": {
-     "mean_ms": 43.124,
+     "mean_ms": 43.768,
      "n": 150,
-     "p50_ms": 43.016,
-     "p95_ms": 43.936,
-     "p99_ms": 45.652
+     "p50_ms": 43.13,
+     "p95_ms": 47.756,
+     "p99_ms": 48.487
     },
-    "usage_write_cost_estimate_p50_ms": 27.088
+    "usage_write_cost_estimate_p50_ms": 31.398
    },
    "load": {
-    "VmHWM_after": 40476672,
-    "VmRSS_after": 38297600,
-    "VmRSS_before": 34549760,
-    "VmRSS_peak_sampled": 39854080,
+    "VmHWM_after": 40067072,
+    "VmRSS_after": 37945344,
+    "VmRSS_before": 33550336,
+    "VmRSS_peak_sampled": 38825984,
     "attempts": {
-     "omitted_list_length": 1187
+     "omitted_list_length": 1300
     },
     "cgroup": {
-     "memory.current": 48635904,
+     "memory.current": 25751552,
      "memory.max": "max",
-     "memory.peak": 197406720
+     "memory.peak": 169443328
     },
     "clients": {
      "follow_streams": 5,
@@ -150,19 +150,19 @@
      "rest_pollers": 10
     },
     "correlation": {
-     "attempts": 1187,
+     "attempts": 1300,
      "daemon_probe_failures": 0,
      "daemon_probe_ms": {
-      "mean_ms": 72.966,
+      "mean_ms": 62.628,
       "n": 89,
-      "p50_ms": 13.41,
-      "p95_ms": 294.14,
-      "p99_ms": 345.81
+      "p50_ms": 11.26,
+      "p95_ms": 231.86,
+      "p99_ms": 262.06
      },
      "drop_context": [],
      "drops": 0,
      "drops_by_reason_step_cause": {},
-     "ok": 1187,
+     "ok": 1300,
      "outage_ms": null,
      "outages_unrestored": 0,
      "refusal_classes": {},
@@ -175,52 +175,52 @@
      "omitted_list_length": 89
     },
     "host_cpu": {
-     "omitted_list_length": 41
+     "omitted_list_length": 40
     },
     "mcp": {
      "by_op": {
-      "container_logs": 313,
-      "container_status": 312
+      "container_logs": 345,
+      "container_status": 344
      },
-     "calls": 625,
+     "calls": 689,
      "errors": 0,
-     "ok": 625,
-     "p50_ms": 433.856,
-     "p95_ms": 780.386,
-     "p99_ms": 871.54,
-     "seconds": 40.945169053,
+     "ok": 689,
+     "p50_ms": 403.384,
+     "p95_ms": 542.98,
+     "p99_ms": 631.842,
+     "seconds": 40.258705283,
      "workers": 10
     },
     "mcp_error": null,
     "peak_reset_before_window": true,
     "rest": {
      "errors": 0,
-     "logs": 280,
-     "status": 282
+     "logs": 305,
+     "status": 306
     },
     "rest_error_classes": {},
     "rest_latency": {
-     "mean_ms": 536.425,
-     "n": 562,
-     "p50_ms": 517.988,
-     "p95_ms": 787.839,
-     "p99_ms": 880.656
+     "mean_ms": 464.899,
+     "n": 611,
+     "p50_ms": 471.354,
+     "p95_ms": 600.632,
+     "p99_ms": 677.689
     },
     "rss_samples": 41,
-    "seconds": 42.0,
+    "seconds": 41.0,
     "service_log_safety_lines": [
-     "mandatary-1  | {\"time\":\"2026-11-16T22:22:08.461526893Z\",\"level\":\"INFO\",\"msg\":\"docker backend verified\"}"
+     "mandatary-1  | {\"time\":\"2026-11-17T09:55:50.558014448Z\",\"level\":\"INFO\",\"msg\":\"docker backend verified\"}"
     ],
     "service_safety_events": [
      [
       "verified",
-      1794867728461,
+      1794909350558,
       {}
      ]
     ],
     "streams": {
      "failed": 0,
-     "frames": 220,
+     "frames": 215,
      "load1": 3,
      "load2": 2,
      "opened": 5
@@ -229,13 +229,13 @@
   },
   "image": {
    "architecture": "amd64",
-   "docker_size_bytes": 41575561,
-   "id": "sha256:2f0093f1b0a883f346e3abbde589be420b61c383954de8f5c64cecdcda2a4fe7",
+   "docker_size_bytes": 41581518,
+   "id": "sha256:95729df18f833fc0dd13e10f379b74ec12f3618f1a6866c1349b5b5b7001cfde",
    "os": "linux",
    "repo_digests": [
-    "p120-mandatary@sha256:2f0093f1b0a883f346e3abbde589be420b61c383954de8f5c64cecdcda2a4fe7"
+    "p120-mandatary@sha256:95729df18f833fc0dd13e10f379b74ec12f3618f1a6866c1349b5b5b7001cfde"
    ],
-   "revision_label": "1528ef025ad9af7ff1f40f64fa82e62db44118d4",
+   "revision_label": "2ac064f85dba438909e2754118c361c733a24c88",
    "rootfs_layers": {
     "omitted_list_length": 15
    }
@@ -262,11 +262,77 @@
     "peer": [],
     "self": []
    },
+   "long_stop": {
+    "mcp_restart": {
+     "ms": 12344,
+     "result": [
+      200,
+      "",
+      ""
+     ]
+    },
+    "rest_start": {
+     "ms": 263,
+     "result": [
+      200,
+      "",
+      ""
+     ]
+    },
+    "rest_stop": {
+     "ms": 12229,
+     "result": [
+      200,
+      "",
+      ""
+     ]
+    },
+    "server_write_bound_ms": 10000,
+    "timeout_seconds": 12
+   },
    "raw": {
     "omitted_list_length": 29
    },
    "table": {
     "omitted_list_length": 94
+   },
+   "timing": {
+    "at_or_over_server_write_bound": [],
+    "calls": 94,
+    "mcp_max_ms": 5352,
+    "rest_max_ms": 5348,
+    "slowest": [
+     {
+      "id": "X-a-restart-A",
+      "mcp_ms": 5352,
+      "op": "restart",
+      "rest_ms": 5348
+     },
+     {
+      "id": "X-dn-restart-A",
+      "mcp_ms": 5316,
+      "op": "restart",
+      "rest_ms": 5345
+     },
+     {
+      "id": "X-dn-stop-A",
+      "mcp_ms": 5284,
+      "op": "stop",
+      "rest_ms": 5326
+     },
+     {
+      "id": "X-a-stop-A",
+      "mcp_ms": 5264,
+      "op": "stop",
+      "rest_ms": 5319
+     },
+     {
+      "id": "X-a-start-A",
+      "mcp_ms": 258,
+      "op": "start",
+      "rest_ms": 333
+     }
+    ]
    },
    "tools": [
     "container_config",
@@ -354,7 +420,7 @@
      "role:single_administrator"
     ],
     "report": {
-     "backup_id": "701c7e6c-6b3c-41a8-9a75-b07143c3b72f",
+     "backup_id": "10569ef2-76c2-42df-b471-63e72b9c92bd",
      "credentials_stripped": false,
      "excluded": [
       "sessions",
@@ -407,7 +473,7 @@
      },
      "unexpected_rules": [],
      "withheld_rules": [
-      "agent:rel-ro|ALLOW|container:inspect_status|p120da5d-a"
+      "agent:rel-ro|ALLOW|container:inspect_status|p1205ae4-a"
      ]
     }
    },
@@ -456,7 +522,7 @@
      "role:single_administrator"
     ],
     "report": {
-     "backup_id": "5464624b-f967-41ca-9e8e-3b2f2d8877a3",
+     "backup_id": "b991364d-8375-4749-b857-275142801a5c",
      "credentials_stripped": true,
      "excluded": [
       "sessions",
@@ -506,36 +572,36 @@
      },
      "unexpected_rules": [],
      "withheld_rules": [
-      "agent:rel-ro|ALLOW|container:inspect_status|p120da5d-a"
+      "agent:rel-ro|ALLOW|container:inspect_status|p1205ae4-a"
      ]
     }
    }
   },
   "stage_seconds": {
-   "DEPLOY": 6.3,
+   "DEPLOY": 6.2,
    "DEVFLOW": 0.8,
    "DOCS": 0.0,
    "IDENTITIES": 2.2,
    "IDLE-CONFIGURED": 300.0,
    "IDLE-FRESH": 300.0,
    "IMG": 0.7,
-   "LATENCY": 32.3,
-   "LIFECYCLE": 20.9,
-   "LOAD": 42.2,
-   "LOGLEVEL": 32.1,
+   "LATENCY": 37.5,
+   "LIFECYCLE": 46.1,
+   "LOAD": 41.3,
+   "LOGLEVEL": 32.0,
    "LOGS": 0.4,
-   "MATRIX": 56.6,
-   "MIGRATION": 7.8,
-   "PERSISTENCE": 326.1,
-   "RESTORE": 127.6,
-   "SETUP": 16.3
+   "MATRIX": 58.5,
+   "MIGRATION": 7.9,
+   "PERSISTENCE": 324.7,
+   "RESTORE": 127.7,
+   "SETUP": 4.2
   },
   "usage": {
    "AFTER-CRASH": {
     "daily_cells": 60,
     "diffs": [],
     "expected_cells": 60,
-    "expected_events": 1658,
+    "expected_events": 1774,
     "graceful_exit": 0,
     "hourly_diffs": [],
     "recent_events": 1000
@@ -544,16 +610,16 @@
     "daily_cells": 60,
     "diffs": [],
     "expected_cells": 60,
-    "expected_events": 1648,
+    "expected_events": 1764,
     "graceful_exit": 0,
     "hourly_diffs": [],
     "recent_events": 1000
    }
   }
  },
- "image": "p120-mandatary:1528ef025ad9",
+ "image": "p120-mandatary:2ac064f85dba",
  "not_pass": 0,
- "pass": 155,
+ "pass": 156,
  "platform": "linux/amd64",
  "results": [
   {
@@ -562,12 +628,12 @@
    "status": "PASS"
   },
   {
-   "detail": "1528ef025ad9af7ff1f40f64fa82e62db44118d4 linux/amd64",
+   "detail": "2ac064f85dba438909e2754118c361c733a24c88 linux/amd64",
    "id": "REL-IMG-01",
    "status": "PASS"
   },
   {
-   "detail": "12.44 MB (11.86 MiB), budget 60 MB, 15 layers",
+   "detail": "12.44 MB (11.87 MiB), budget 60 MB, 15 layers",
    "id": "REL-FOOT-IMG",
    "status": "PASS"
   },
@@ -582,12 +648,12 @@
    "status": "PASS"
   },
   {
-   "detail": "steady max 27.92 MB (median 27.88 MB, anon 10.71 MB, file 17.21 MB); peak in window 100.83 MB; settled under 50 MB at 140.0 s; process VmHWM 100.68 MB",
+   "detail": "steady max 27.75 MB (median 27.34 MB, anon 10.83 MB, file 16.91 MB); peak in window 100.40 MB; settled under 50 MB at 140.0 s; process VmHWM 100.07 MB",
    "id": "REL-FOOT-IDLE-fresh",
    "status": "PASS"
   },
   {
-   "detail": "start-up peak in the 300 s window 100.83 MB; time to stabilization 140.0 s; steady-state maximum 27.92 MB",
+   "detail": "start-up peak in the 300 s window 100.40 MB; time to stabilization 140.0 s; steady-state maximum 27.75 MB",
    "id": "REL-FOOT-SETTLE-fresh",
    "status": "PASS"
   },
@@ -632,7 +698,7 @@
    "status": "PASS"
   },
   {
-   "detail": "{'owner': 'e8857c82-da0d-46ca-a539-dd6a948c1b24'}{'g': '6c778f60-e563-4753-a6b1-cd26cab72e63', 'g2': 'c58c5169-8f66-4c3d-8ba9-b998fd57238a'}",
+   "detail": "{'owner': 'd9ddf2bd-ae67-456c-82b5-d32572cb8ca2'}{'g': 'a0523936-4f16-4578-98ef-598b06062c77', 'g2': '32b93d94-6c11-452c-8fdf-e6ca4bfd52e2'}",
    "id": "REL-ID-01",
    "status": "PASS"
   },
@@ -657,7 +723,7 @@
    "status": "PASS"
   },
   {
-   "detail": "['mandatary-mailpit-mailpit-1', 'p120da5d-a', 'p120da5d-b', 'p120da5d-c', 'p120da5dmstk-proxy-1', 'p120da5dmstk-smtp-1']",
+   "detail": "['mandatary-mailpit-mailpit-1', 'p1205ae4-a', 'p1205ae4-b', 'p1205ae4-c', 'p1205ae4mstk-proxy-1', 'p1205ae4mstk-smtp-1']",
    "id": "REL-ID-06",
    "status": "PASS"
   },
@@ -697,7 +763,7 @@
    "status": "PASS"
   },
   {
-   "detail": "[{'id': 'L-none', 'connected': False, 'http_status': 401, 'http_code': 'unauthenticated', 'elapsed_ms': 0}, {'id': 'L-garbage', 'connected': False, 'http_status': 401, 'http_code': 'unauthenticated', ",
+   "detail": "[{'id': 'L-none', 'connected': False, 'http_status': 401, 'http_code': 'unauthenticated', 'elapsed_ms': 11.19}, {'id': 'L-garbage', 'connected': False, 'http_status': 401, 'http_code': 'unauthenticate",
    "id": "REL-MCP-NOAUTH",
    "status": "PASS"
   },
@@ -772,7 +838,7 @@
    "status": "PASS"
   },
   {
-   "detail": "disable [204, 204] ended=True 0.1s last=b'{\"error\":{\"code\":\"forbidden\",\"status\":403,\"reason\":\"authorization_ended\",\"messag'",
+   "detail": "disable [204, 204] ended=True 0.2s last=b'{\"error\":{\"code\":\"forbidden\",\"status\":403,\"reason\":\"authorization_ended\",\"messag'",
    "id": "REL-LIFE-POL-2",
    "status": "PASS"
   },
@@ -792,32 +858,37 @@
    "status": "PASS"
   },
   {
-   "detail": "p50 ms: 401 43.02, denied+accounted 70.10, allowed+accounted 93.72; p99 ms: 45.65 / 110.71 / 133.99",
+   "detail": "stop (200, '', '') 12229 ms, start (200, '', ''), restart (200, '', '') 12344 ms, running=True",
+   "id": "REL-STOP-LONG",
+   "status": "PASS"
+  },
+  {
+   "detail": "p50 ms: 401 43.13, denied+accounted 74.53, allowed+accounted 124.07; p99 ms: 48.49 / 135.55 / 191.38",
    "id": "REL-LAT",
    "status": "PASS"
   },
   {
-   "detail": "steady max 34.80 MB (median 34.55 MB, anon 15.90 MB, file 18.45 MB); peak in window 34.91 MB; settled under 50 MB at 0.0 s; process VmHWM 186.01 MB",
+   "detail": "steady max 33.78 MB (median 33.25 MB, anon 15.05 MB, file 18.29 MB); peak in window 33.78 MB; settled under 50 MB at 0.0 s; process VmHWM 178.11 MB",
    "id": "REL-FOOT-IDLE-configured",
    "status": "PASS"
   },
   {
-   "detail": "start-up peak in the 300 s window 34.91 MB; time to stabilization 0.0 s; steady-state maximum 34.80 MB",
+   "detail": "start-up peak in the 300 s window 33.78 MB; time to stabilization 0.0 s; steady-state maximum 33.78 MB",
    "id": "REL-FOOT-SETTLE-configured",
    "status": "PASS"
   },
   {
-   "detail": "rest ok 562, mcp ok 625, streams {'load1': 3, 'load2': 2, 'opened': 5, 'failed': 0, 'frames': 220} ",
+   "detail": "rest ok 611, mcp ok 689, streams {'load1': 3, 'load2': 2, 'opened': 5, 'failed': 0, 'frames': 215} ",
    "id": "REL-LOAD-RUN",
    "status": "PASS"
   },
   {
-   "detail": "rest errors 0 {}; mcp {'calls': 625, 'ok': 625, 'errors': 0, 'by_error': None}; service log lines: mandatary-1  | {\"time\":\"2026-11-16T22:22:08.461526893Z\",\"level\":\"INFO\",\"msg\":\"docker backend verified\"}",
+   "detail": "rest errors 0 {}; mcp {'calls': 689, 'ok': 689, 'errors': 0, 'by_error': None}; service log lines: mandatary-1  | {\"time\":\"2026-11-17T09:55:50.558014448Z\",\"level\":\"INFO\",\"msg\":\"docker backend verified\"}",
    "id": "REL-LOAD-STABLE",
    "status": "PASS"
   },
   {
-   "detail": "budget 150 MB; 41 RSS samples at 1 Hz; rss before 34.55 MB after 38.30 MB",
+   "detail": "budget 150 MB; 41 RSS samples at 1 Hz; rss before 33.55 MB after 37.95 MB",
    "id": "REL-FOOT-LOAD",
    "status": "PASS"
   },
@@ -832,12 +903,12 @@
    "status": "PASS"
   },
   {
-   "detail": "steady max 27.07 MB (median 26.77 MB, anon 9.98 MB, file 17.08 MB); peak in window 98.22 MB; settled under 50 MB at 155.0 s; process VmHWM 98.09 MB",
+   "detail": "steady max 27.54 MB (median 27.12 MB, anon 10.18 MB, file 17.09 MB); peak in window 98.85 MB; settled under 50 MB at 155.0 s; process VmHWM 98.49 MB",
    "id": "REL-FOOT-IDLE-after-restart",
    "status": "PASS"
   },
   {
-   "detail": "start-up peak in the 300 s window 98.22 MB; time to stabilization 155.0 s; steady-state maximum 27.07 MB",
+   "detail": "start-up peak in the 300 s window 98.85 MB; time to stabilization 155.0 s; steady-state maximum 27.54 MB",
    "id": "REL-FOOT-SETTLE-after-restart",
    "status": "PASS"
   },
@@ -942,7 +1013,7 @@
    "status": "PASS"
   },
   {
-   "detail": "200 {'backup_id': '701c7e6c-6b3c-41a8-9a75-b07143c3b72f', 'mode': 'full', 'provenance': 'authenticated', 'initiator': 'admin', 'restore_generation': 2, 'state': 'restore_quarantine', 'next_step': 'host_re",
+   "detail": "200 {'backup_id': '10569ef2-76c2-42df-b471-63e72b9c92bd', 'mode': 'full', 'provenance': 'authenticated', 'initiator': 'admin', 'restore_generation': 2, 'state': 'restore_quarantine', 'next_step': 'host_re",
    "id": "REL-RESTORE-R1-DO",
    "status": "PASS"
   },
@@ -957,7 +1028,7 @@
    "status": "PASS"
   },
   {
-   "detail": "exit 0: restore-administrator recovery generation 2 issued, absolute expiry 2026-11-16T23:11:00Z. No secret was printed; run the matching reveal command on this host terminal.\r\n",
+   "detail": "exit 0: restore-administrator recovery generation 2 issued, absolute expiry 2026-11-17T10:45:00Z. No secret was printed; run the matching reveal command on this host terminal.\r\n",
    "id": "REL-R1-RECOVERY-recovery-issue",
    "status": "PASS"
   },
@@ -1007,7 +1078,7 @@
    "status": "PASS"
   },
   {
-   "detail": "200 {'approved': [{'kind': 'endpoint', 'id': '1407644f-ad30-48ab-83bc-fc286ac1ec7f', 'result': 'approved'}, {'kind': 'user', 'id': '0116b0f5bed5d0c9e51d2b62e70b241e5c2905be3ebfe9d977a0719cb5fd7786', 'resu",
+   "detail": "200 {'approved': [{'kind': 'endpoint', 'id': '56cb5212-62c4-4496-8272-cd5ddf343410', 'result': 'approved'}, {'kind': 'user', 'id': 'd9ddf2bd-ae67-456c-82b5-d32572cb8ca2', 'result': 'approved'}, {'kind': '",
    "id": "REL-RESTORE-R1-APPROVE",
    "status": "PASS"
   },
@@ -1037,7 +1108,7 @@
    "status": "PASS"
   },
   {
-   "detail": "gone=['agent:rel-ro|ALLOW|container:inspect_status|p120da5d-a'] extra=[]",
+   "detail": "gone=['agent:rel-ro|ALLOW|container:inspect_status|p1205ae4-a'] extra=[]",
    "id": "REL-RESTORE-R1-SCOPE",
    "status": "PASS"
   },
@@ -1112,7 +1183,7 @@
    "status": "PASS"
   },
   {
-   "detail": "200 {'backup_id': '5464624b-f967-41ca-9e8e-3b2f2d8877a3', 'mode': 'clean', 'provenance': 'unauthenticated', 'initiator': 'admin', 'restore_generation': 2, 'state': 'restore_quarantine', 'next_step': 'host",
+   "detail": "200 {'backup_id': 'b991364d-8375-4749-b857-275142801a5c', 'mode': 'clean', 'provenance': 'unauthenticated', 'initiator': 'admin', 'restore_generation': 2, 'state': 'restore_quarantine', 'next_step': 'host",
    "id": "REL-RESTORE-R2-DO",
    "status": "PASS"
   },
@@ -1127,7 +1198,7 @@
    "status": "PASS"
   },
   {
-   "detail": "exit 0: restore-administrator recovery generation 2 issued, absolute expiry 2026-11-16T23:12:01Z. No secret was printed; run the matching reveal command on this host terminal.\r\n",
+   "detail": "exit 0: restore-administrator recovery generation 2 issued, absolute expiry 2026-11-17T10:46:01Z. No secret was printed; run the matching reveal command on this host terminal.\r\n",
    "id": "REL-R2-RECOVERY-recovery-issue",
    "status": "PASS"
   },
@@ -1177,7 +1248,7 @@
    "status": "PASS"
   },
   {
-   "detail": "200 {'approved': [{'kind': 'endpoint', 'id': '81d472ac-5983-4cf7-87d3-0161b514605c', 'result': 'approved'}, {'kind': 'user', 'id': '0116b0f5bed5d0c9e51d2b62e70b241e5c2905be3ebfe9d977a0719cb5fd7786', 'resu",
+   "detail": "200 {'approved': [{'kind': 'endpoint', 'id': 'bcb19bf0-89cb-4310-8335-5bf025d50858', 'result': 'approved'}, {'kind': 'user', 'id': 'd9ddf2bd-ae67-456c-82b5-d32572cb8ca2', 'result': 'approved'}, {'kind': '",
    "id": "REL-RESTORE-R2-APPROVE",
    "status": "PASS"
   },
@@ -1207,7 +1278,7 @@
    "status": "PASS"
   },
   {
-   "detail": "gone=['agent:rel-ro|ALLOW|container:inspect_status|p120da5d-a'] extra=[]",
+   "detail": "gone=['agent:rel-ro|ALLOW|container:inspect_status|p1205ae4-a'] extra=[]",
    "id": "REL-RESTORE-R2-SCOPE",
    "status": "PASS"
   },
@@ -1332,12 +1403,12 @@
    "status": "PASS"
   }
  ],
- "revision": "1528ef025ad9af7ff1f40f64fa82e62db44118d4",
+ "revision": "2ac064f85dba438909e2754118c361c733a24c88",
  "schema": "mandatary-p120-evidence-summary/1",
- "seconds": 1287,
+ "seconds": 1304,
  "source": {
-  "bytes": 227630,
-  "member": "round-2-fbb8193/docs/release/evidence/vm-amd64/release.json",
-  "sha256": "5609487d145fb229041fe27c5d7c1661ce84fa800d1472720fa894b95966e24e"
+  "bytes": 243339,
+  "member": "round-3-2ac064f/vm-amd64/release.json",
+  "sha256": "56294d6a52e1cc2f822d00e24ddd2201517f7dcb02428d4ce45f1d20e82c556e"
  }
 }

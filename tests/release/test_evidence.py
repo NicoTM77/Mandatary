@@ -17,6 +17,7 @@ What is pinned, each with a negative twin:
 import io
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tarfile
@@ -626,6 +627,50 @@ class Committed(unittest.TestCase):
             self.assertIn(needle, text)
         self.assertTrue(all(g["state"] == "open" for g in cat["acceptance_gates"]))  # nothing here closes the review or merge gates
         self.assertIn("NOT EXECUTED", cat["publication"]["status"])
+
+
+class CommittedVersion2(unittest.TestCase):
+    """Review 519 F1/F2/F4 against the repository's own evidence: the omitted adverse hosted run is recorded, its closure is a remediation
+    (never silent), the older archive version is provably contained, and every compact file is tracked by a fresh clone."""
+
+    root = Committed.root
+    ev = Committed.ev
+
+    def test_the_adverse_hosted_run_of_review_519_is_recorded_and_its_closure_is_a_stated_remediation(self):
+        cat = evidence.load_catalog(self.ev)
+        a = cat["artifacts"]["adverse-ci-e5e1856"]
+        self.assertEqual(a["role"], "adverse")
+        self.assertTrue(a["member"].startswith("adverse-ci-e5e1856/"))
+        summary = json.load(open(os.path.join(self.ev, a["file"])))
+        by_id = {r["id"]: r["status"] for r in summary["results"]}
+        for check in ("REL-MATRIX-REST", "REL-MATRIX-PARITY", "REL-MATRIX-POS"):
+            self.assertEqual(by_id[check], "FAIL", check)  # the historical result is not rewritten
+        crit = {c["id"]: c for c in json.load(open(os.path.join(HERE, "criteria.json")))["criteria"]}
+        for cid in ("SH-1", "SH-5", "P1-E1", "P1-E2", "P1-E6"):
+            groups = report.adverse_groups(crit[cid])
+            self.assertTrue(any(any(r.endswith("@adverse-ci-e5e1856") for r in g["refs"]) for g in groups), cid)
+            self.assertTrue(all(report.group_closed(g) for g in groups if g["state"] == "remediated"), cid)
+        self.assertEqual(cat["remediations"][0]["id"], "F1 / F2 of review 519")
+        self.assertIn("not established", cat["remediations"][0]["not_established"])
+        for ref in ("REL-STOP-LONG@vm-amd64", "REL-STOP-LONG@ci-amd64", "REL-STOP-LONG@ci-arm64"):
+            self.assertIn(ref, crit["SH-5"]["evidence"])
+
+    def test_the_new_archive_version_supersedes_the_older_one_and_the_older_manifest_is_tracked(self):
+        cat = evidence.load_catalog(self.ev)
+        sup = cat["archive"]["supersedes"]
+        self.assertEqual((cat["archive"]["id"], sup["id"]), ("p120-evidence-v2", "p120-evidence-v1"))
+        self.assertTrue(os.path.isfile(os.path.join(self.ev, sup["manifest"])))
+        if shutil.which("git") and os.path.exists(os.path.join(self.root, ".git")):  # a directory, or the file of a worktree
+            for rel in sorted(os.listdir(self.ev)):
+                r = subprocess.run(["git", "-C", self.root, "check-ignore", "-q", "docs/release/evidence/" + rel], capture_output=True)
+                self.assertEqual(r.returncode, 1, "%s is ignored by .gitignore, so a fresh clone would not have it" % rel)
+
+    def test_sh_2d_says_the_mechanism_is_evidenced_not_that_the_cause_is_established(self):
+        text = open(os.path.join(HERE, "criteria.json")).read() + json.dumps(evidence.load_catalog(self.ev)["findings"]) + open(os.path.join(self.root, "docs", "release-acceptance.md")).read()
+        self.assertNotIn("The cause is established", text)
+        self.assertNotIn("cause established", text)
+        self.assertNotIn("the cause is established", text)
+        self.assertIn("mechanism is evidenced", text)
 
 
 if __name__ == "__main__":
