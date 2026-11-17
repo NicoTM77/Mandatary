@@ -194,7 +194,7 @@ specifications or later integration/device/governance/release gates.
 
 | Applicable contract | Executable evidence |
 | --- | --- |
-| OTP-PARAMETERS/WINDOW/REPLAY, O01–04 |TestTOTPParametersAndWindow, TestTOTPConcurrentReplayAndPeriodLimit, TestTOTPCollisionCannotExtendOutputReplay, TestTOTPSeparateProcessesAcceptOnce, TestTOTPReplaySurvivesRepositoryRestart |
+| OTP-PARAMETERS/WINDOW/REPLAY, O01–04 |TestTOTPParametersAndWindow, TestTOTPConcurrentReplayAndPeriodLimit, TestTOTPCollisionCannotExtendOutputReplay, TestTOTPSeparateProcessesAcceptOnce, TestTOTPPreviousStepCodeSpendsTheVerifierPeriod, TestTOTPReplaySurvivesRepositoryRestart |
 | OTP-SEED, BINDING-FIRST/ADDITIONAL/RECORDS |TestTOTPBindingRequiresProof, TestTOTPLifecycleSessionDenials, TestTOTPPendingExpiryOwnerAndTamper; retained repository wrong-key/tamper/envelope/redaction tests |
 | REAUTH-STRENGTH, AUTHENTICATOR-INVALIDATION, PWD-MFA-ONLY |TestTOTPRevocationRequiresFreshAssurance, TestRequiredLastFactorCannotBeRemoved, TestRecoveredCapabilityDenialsAndNoNormalAuthority; existing schema/password regressions |
 | LOOKUP-ISSUE/STORAGE/ASSURANCE, RECOVERY-CODE-LIFECYCLE/AAL2/NO-SESSION |TestRecoveryCodesAtomicAndRestricted, TestRecoveryCodeEntropyHashAndRestart, TestRecoverySeparateProcessesConsumeOnce, TestRecoveryReenrollmentNeverCreatesSession, TestRecoveryCrashBeforeResponseCannotRedisplayOrReuse, TestLifecycleSecretValuesRedactedAndRevealOnce |

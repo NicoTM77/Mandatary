@@ -14,6 +14,7 @@ import tarfile
 import tempfile
 import types
 import unittest
+from unittest import mock
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "image"))
@@ -529,6 +530,110 @@ class LoginRefusalDiagnostics(unittest.TestCase):
         self.assertEqual(stackdeploy.refusal({"error": {"code": "x" * 100}}), " [%s/]" % ("x" * 40))
         for none in (None, "html", [], {}, {"error": "text"}, {"error": {}}, {"error": {"code": "", "reason": ""}}):
             self.assertEqual(stackdeploy.refusal(none), "", none)
+
+
+class FakeClock:
+    """A deterministic clock: sleep() advances it, so the harness's period waits run instantly and are observable."""
+
+    def __init__(self, now):
+        self.now = float(now)
+
+    def time(self):
+        return self.now
+
+    def sleep(self, seconds):
+        self.now += seconds
+
+
+class FakeService:
+    """The sign-in factor rule of the real service (internal/auth/lifecycle.go VerifyTOTP + HasTOTPReplay, pinned by
+    internal/auth TestTOTPConcurrentReplayAndPeriodLimit): the verifier takes its OWN period at verification, accepts the
+    code of the previous, current or next 30 s step, records (step, verifier period), and refuses an acceptance when a
+    recorded step is the same or a recorded verifier period is at or after the current one."""
+
+    def __init__(self, clock, latency):
+        self.clock, self.latency, self.accepted, self.verified_at = clock, latency, [], []
+
+    def verify(self, code):
+        self.clock.now += self.latency  # the request reaches the service after the code was computed
+        period = int(self.clock.time() // 30)
+        steps = [s for s in (period - 1, period, period + 1) if code == "c%d" % s]
+        self.verified_at.append(self.clock.time())
+        if not steps or any(s == steps[0] or p >= period for s, p in self.accepted):
+            return False
+        self.accepted.append((steps[0], period))
+        return True
+
+
+class FakeClient:
+    service = None
+
+    def __init__(self, port, caroot):
+        self.csrf = None
+
+    def req(self, method, path, body=None):
+        clock = self.service.clock
+        if path == "/api/v1/login":
+            clock.now += 0.05
+            return 200, {}, {"step": "factor", "csrf_token": "t"}
+        if path == "/api/v1/login/totp":
+            ok = self.service.verify(body["code"])
+            return (200, {}, {"step": "session"}) if ok else (403, {}, {"error": {"code": "forbidden", "reason": "denied"}})
+        return 200, {}, {"csrf_token": "s"}
+
+
+class AdminLoginPeriod(unittest.TestCase):
+    """Review 520 F5: the VM run at 41ae8d5 failed its final administrator re-sign-in with 'login step 2: 403'. Mechanism: Admin.login read the
+    TOTP period BEFORE the step-2 request, but the service spends ITS verifier period at verification. A step 2 in flight over a 30 s boundary
+    spent period P+1 while the harness remembered P, so the next sign-in (already in P+1) was correctly refused as a replay."""
+
+    BOUNDARY = 30 * 1000
+
+    def admin(self, start, latency=0.2):
+        import stackdeploy
+        import stack
+        clock = FakeClock(start)
+        service = FakeService(clock, latency)
+        FakeClient.service = service
+        fake_time = types.SimpleNamespace(time=clock.time, sleep=clock.sleep)
+        patches = [mock.patch.object(stackdeploy, "time", fake_time), mock.patch.object(stack, "Client", FakeClient),
+                   mock.patch.object(stack, "totp", lambda seed, *a, **k: "c%d" % int(clock.time() // 30))]
+        for p in patches:
+            p.start()
+            self.addCleanup(p.stop)
+        return stackdeploy.Admin(types.SimpleNamespace(port=1, caroot="x"), "u", "p", "seed"), clock, service
+
+    def test_a_step_two_that_crosses_a_boundary_does_not_make_the_next_sign_in_a_replay(self):
+        adm, clock, service = self.admin(self.BOUNDARY - 0.1)  # the code is computed in period 999 and verified 0.15 s into period 1000
+        adm.login()
+        self.assertEqual(service.accepted, [(999, 1000)], "the scenario must really straddle: code of 999 verified in 1000")
+        adm.login()  # RED before the fix: 'login step 2: 403' (the harness believed period 999 was the spent one)
+        self.assertEqual([p for _, p in service.accepted], [1000, 1001])
+        self.assertGreaterEqual(service.verified_at[-1], self.BOUNDARY + 30, "the second sign-in waited for the period after the verifier's")
+
+    def test_a_sign_in_that_does_not_cross_a_boundary_still_waits_only_for_the_next_period(self):
+        adm, clock, service = self.admin(self.BOUNDARY + 5)
+        adm.login()
+        adm.login()
+        self.assertEqual(service.accepted, [(1000, 1000), (1001, 1001)])
+        self.assertLess(service.verified_at[-1], self.BOUNDARY + 31, "no longer wait than the next period")
+
+    def test_the_stand_in_service_enforces_the_one_acceptance_per_period_rule(self):
+        # Negative control: without the harness's wait a second acceptance in the same verifier period is refused, so the tests above can fail.
+        adm, clock, service = self.admin(self.BOUNDARY + 5)
+        adm.login()
+        client = FakeClient(1, "x")
+        self.assertEqual(client.req("POST", "/api/v1/login/totp", {"code": "c%d" % int(clock.time() // 30)})[0], 403)
+        service.accepted.clear()  # and the stand-in does accept once a recorded period no longer blocks it
+        self.assertEqual(client.req("POST", "/api/v1/login/totp", {"code": "c%d" % int(clock.time() // 30)})[0], 200)
+
+    def test_a_refused_step_two_still_advances_the_remembered_period(self):
+        adm, clock, service = self.admin(self.BOUNDARY + 5)
+        service.accepted.append((999, 1000))  # a spent period: the code is refused
+        with self.assertRaises(Exception) as cm:
+            adm.login()
+        self.assertIn("login step 2: 403", str(cm.exception))
+        self.assertEqual(adm.last_period, 1000)
 
 
 class Report(unittest.TestCase):

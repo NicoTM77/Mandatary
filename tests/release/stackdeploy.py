@@ -50,8 +50,14 @@ class Admin:
         if st != 200 or not isinstance(body, dict) or body.get("step") != "factor":
             raise DeployError("login step 1: %s%s" % (st, refusal(body)))
         cl.csrf = body.get("csrf_token")
-        self.last_period = int(time.time() // 30)
-        st, _, body = cl.req("POST", "/api/v1/login/totp", {"code": stack.totp(self.seed)})
+        try:
+            st, _, body = cl.req("POST", "/api/v1/login/totp", {"code": stack.totp(self.seed)})
+        finally:
+            # The service records an accepted code under ITS OWN verifier period, taken when it verifies, and refuses a second acceptance in
+            # (or before) that period (internal/auth/lifecycle.go VerifyTOTP; docs/authenticator-lifecycle.md). A code computed at the end of
+            # period P and verified in P+1 therefore spends P+1. The period must be read after the answer, which comes after the verification;
+            # read before the request (as it was) the next sign-in could start inside the spent period and be refused as a replay.
+            self.last_period = max(self.last_period, int(time.time() // 30))
         if st != 200 or not isinstance(body, dict) or body.get("step") != "session":
             raise DeployError("login step 2: %s%s (TOTP period %d, second %.1f of it)" % (st, refusal(body), int(time.time() // 30), time.time() % 30))
         st, _, body = cl.req("GET", "/api/v1/session")
@@ -231,8 +237,8 @@ class Deployment:
         st, _, body = cl.req("POST", "/api/v1/setup/totp", {"algorithm": "SHA256"})
         seed = (body or {}).get("secret", "") if isinstance(body, dict) else ""
         e.secrets.append(seed)
-        period = int(time.time() // 30)
         st2, _, _ = cl.req("POST", "/api/v1/setup/totp/confirm", {"code": stack.totp(seed)}) if seed else (0, 0, 0)
+        period = int(time.time() // 30)  # after the answer: the service spends its own verifier period at verification (see Admin.login)
         check("setup-totp", "TOTP enrolled only after proof with a live code", st == 200 and st2 in (200, 204), "%s %s" % (st, st2))
         st, _, body = cl.req("POST", "/api/v1/setup/complete", {})
         check("setup-complete", "setup completes and issues no session", st == 200 and isinstance(body, dict) and body.get("login_required") is True, str(st))
