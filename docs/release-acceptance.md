@@ -170,7 +170,8 @@ report only. `catalog.json` records the code commit, the baseline, the image and
 browser suites ran on a clean worktree at exactly that code commit, so no product file differs between what they judged and what the VM
 archive built (`GATE-PRODUCT-TREE`; since the UX and R2 changes the product tree is no longer the merged baseline, so the comparison is
 against the code commit, not against `main`). The commits after the code commit change no product file (`git diff 1528ef0 HEAD -- cmd
-internal web` is empty): the X2 regression test, the evidence hygiene and the CI publication job.
+internal web ':(exclude)*_test.go'` is empty; the one test file that differs is the X2 regression test): they add the X2 test, the
+evidence hygiene and the CI publication job.
 
 ## R2 measurement: bounded continuity freshness (interleaved A/B)
 

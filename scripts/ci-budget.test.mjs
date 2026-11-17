@@ -96,6 +96,9 @@ test('the image job runs the P1.20 release acceptance on the declared fixture da
   const image = job('image');
   assert.match(image, /python3 tests\/release\/test_release\.py/);
   assert.match(image, /python3 tests\/release\/test_evidence\.py/);
+  // The dev-image publication contract (scripts/publish_dev_image.py, the publish job) is tested hermetically on every pull request.
+  assert.match(image, /python3 tests\/publish\/test_publish\.py/);
+  assert.match(image, /python3 tests\/publish\/test_workflow\.py/);
   // The report check is the COMPACT verification: it needs no archive and no credential, so a fresh clone and a fork pull request run it
   // as is. The full archive audit (evidence.py stage / report.py --audit-archive) must never become a credentialed pull-request step.
   assert.doesNotMatch(image, /--audit-archive|evidence\.py stage|--from-release/);
