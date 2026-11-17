@@ -1,3 +1,0 @@
-# Raw logs are evidence here (sealed in SHA256SUMS); the repository-wide *.log rule must not drop them.
-!*.log
-!**/*.log

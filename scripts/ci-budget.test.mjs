@@ -95,6 +95,10 @@ test('the image job covers both CPUs natively and gates on a digest-pinned Trivy
 test('the image job runs the P1.20 release acceptance on the declared fixture daemon, on both CPUs', () => {
   const image = job('image');
   assert.match(image, /python3 tests\/release\/test_release\.py/);
+  assert.match(image, /python3 tests\/release\/test_evidence\.py/);
+  // The report check is the COMPACT verification: it needs no archive and no credential, so a fresh clone and a fork pull request run it
+  // as is. The full archive audit (evidence.py stage / report.py --audit-archive) must never become a credentialed pull-request step.
+  assert.doesNotMatch(image, /--audit-archive|evidence\.py stage|--from-release/);
   assert.match(image, /python3 tests\/release\/report\.py --evidence docs\/release\/evidence --criteria tests\/release\/criteria\.json --out docs\/release\/phase1-release-acceptance\.md --check/);
   assert.match(image, /release\.py[^\n]*\\\n[^\n]*--docker-host "\$FIXTURE_DOCKER_HOST" --expect-daemon-id "\$FIXTURE_DAEMON_ID"/);
   assert.match(image, /--mcp-client "\$RUNNER_TEMP\/out\/mcpclient" --mig-tool "\$RUNNER_TEMP\/out\/migfixture"/);

@@ -1,0 +1,22 @@
+{
+ "artifact": "scan-amd64",
+ "results": [
+  {
+   "detail": "Version: 0.76.2; 2 result target(s) scanned (/work/image.tar (debian 13.7), mandatary); HIGH/CRITICAL findings: 0",
+   "id": "SCAN-TRIVY-amd64",
+   "status": "PASS"
+  },
+  {
+   "detail": "CycloneDX 1.7, 63 components",
+   "id": "SCAN-SBOM-amd64",
+   "status": "PASS"
+  }
+ ],
+ "revision": null,
+ "schema": "mandatary-p120-evidence-summary/1",
+ "source": {
+  "bytes": 310,
+  "member": "round-2-fbb8193/docs/release/evidence/scan-amd64/results.json",
+  "sha256": "a6dbeaf2dfcdbc9732fddb8f94ba28931d0fc059c9113414dea957a5ff2228db"
+ }
+}

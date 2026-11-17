@@ -2,9 +2,10 @@
 
 This page is the **method**. The **result** for a given release is the generated, versioned report
 `docs/release/phase1-release-acceptance.md`, built by
-`tests/release/report.py` from the evidence files committed in `docs/release/evidence/`. Nothing in the report is typed by
+`tests/release/report.py` from the **compact evidence** committed in `docs/release/evidence/` (a catalog, an archive manifest and
+compact summaries; the bulky raw run output is in a separate evidence archive, see "Evidence layout"). Nothing in the report is typed by
 hand: `python3 tests/release/report.py --check ...` fails when the page is stale or edited, and every criterion links the
-result of a named check together with the SHA-256 of the artifact that holds it.
+result of a named check together with the SHA-256 of the **raw** artifact that holds it.
 
 It is acceptance evidence for one release candidate. It is **not** a NIST, FIPS, product-qualification or
 runtime-compatibility claim, it does not authorize a merge or a deployment, and a skipped target, an unimplemented check, a
@@ -18,8 +19,9 @@ missing browser or a missing architecture is reported as UNVERIFIED, never as a 
 | `tests/release/mcpclient` | Built from the locked Go module, never shipped in the image | The **real MCP client**: the official go-sdk over Streamable HTTP with verified TLS, one session per scripted run, and a load mode |
 | `tests/release/migfixture` | Built from the locked Go module, never shipped | Lowers a **copy** of a populated store to the immediately prior schema with the repository's own goose down-migration, so the release image is proven to upgrade real data |
 | `tests/release/collect.py` | Controller | Turns the raw output of the local gates, the browser suites, the Trivy/SBOM files and the hosted jobs document into `results` documents; a gate that exited 0 without producing its evidence is FAIL |
-| `tests/release/report.py` | Controller and CI | Links each criterion in `tests/release/criteria.json` to results and artifact digests, renders the report, and `--check`s it |
-| `tests/release/test_release.py` | Anywhere, no Docker | Hermetic positive/negative tests of everything above that does not need a daemon |
+| `tests/release/report.py` | Controller and CI | Links each criterion in `tests/release/criteria.json` to results and artifact digests, renders the report, and `--check`s it (compact verification); `--audit-archive` adds the full raw-archive audit |
+| `tests/release/evidence.py` | Controller; CI runs only its compact `verify` through `report.py --check` | Compact summaries of raw results, the deterministic evidence archive (`pack`), resolving it from a local file or the draft-release asset (`stage`), the full audit (`audit`), local regeneration of the summaries (`regenerate`) and `seal` |
+| `tests/release/test_release.py`, `tests/release/test_evidence.py` | Anywhere, no Docker, no network, no credential | Hermetic positive/negative tests of everything above that does not need a daemon: the harness pieces, and the evidence design (regeneration, archive resolution and staging, unavailable evidence, digest and provenance mismatches, hostile archives, verdict rules) |
 
 ## Clean source, exact commit
 
@@ -111,19 +113,64 @@ the unique `p120...` prefix of its run, never a name from another run.
 
 ## Evidence layout and consistency
 
-`docs/release/evidence/` holds one directory per evidence source (`vm-amd64`, `ci-amd64`, `ci-arm64`, `scan-amd64`, `scan-arm64`,
-`gates`, `browsers`, `hosted-ci`) with the harness `release.json`, the raw logs and the collected `results.json`, a `diagnostics/`
-directory (runs that are not linked to a criterion but are cited by a finding), `manifest.json` (what each artifact is and how it was
-produced) and `SHA256SUMS`, which seals **every** file. `tests/release/report.py --check` (run by the Image job and by
-`tests/release/test_release.py`) fails when a file was changed, added or removed without re-sealing, or when the committed report is not
-what the sealed evidence produces. The criteria and the check ids they link are in `tests/release/criteria.json`
-(`tests/release/test_release.py` checks that every criterion has evidence and a known artifact).
+The raw output of a release run (the full harness JSON of every environment, raw browser, gate and driver logs including empty
+snapshots, detailed diagnostics and the A/B raw runs, scan outputs and SBOMs) is large and run-specific, so it is **not** part of the
+maintained source tree. It is held in ONE immutable, versioned evidence archive; Git keeps only what is needed to read, regenerate and
+check the result (`docs/release/evidence/`, all sealed by `SHA256SUMS`):
 
-The VM run is produced from a `git archive` of the code commit; the evidence commit that follows adds this directory and the report
-only. `docs/release/evidence/manifest.json` records the code commit, the baseline, the image and binary digests and states that
-the local gates and the browser suites ran on a clean worktree at exactly that code commit, so no product file differs between what
-they judged and what the VM archive built (`GATE-PRODUCT-TREE`; since the UX and R2 changes the product tree is no longer the merged
-baseline, so the comparison is against the code commit, not against `main`).
+| File | Content |
+| --- | --- |
+| `catalog.json` | The provenance catalog: the tested code commit and the other revisions, the archive identity, size, digest and location, the artifact each summary came from (archive member, SHA-256, revision and how the revision is established), the diagnostics and adverse runs with their dispositions, the owner-approved dispositions, the acceptance gates still open, the publication status, the findings and the known limits |
+| `ARCHIVE.sha256` | The complete member manifest of the archive (`sha256sum` format, sorted, one line per member) |
+| `summaries/*.json` | A compact, deterministic summary of each raw `results` document: the digest of the raw member it was derived from, its revision, every check result, and the measured values (long traces are cut to their length) |
+
+The archive of this release is `p120-evidence-v1`: `p120-evidence-v1-<12 hex>.tar.gz` plus `p120-evidence-v1.ARCHIVE.sha256`, assets of
+an **evidence-only draft pre-release** of this repository (tag name `p120-evidence-v1`; it is not a product release, not a C5 release,
+and must never be published). Its roots are `round-1-f306a2a/` (the first evidence round), `round-2-fbb8193/` (the integrated round,
+with the R2 A/B raw runs) and `records/` (the R2 root-cause report, the review reports, the interim design). The authoritative
+identifiers, size, tarball digest and member count are in `catalog.json` and the generated report. A draft release is visible to
+repository writers; it is read with the caller's own `gh` (never a credential of this repository). It is durable while the repository and
+the draft exist; an administrator can delete it, which the digests make detectable but cannot prevent. A new evidence round makes a new
+archive id (`p120-evidence-v2`, ...): archives are never rewritten.
+
+**Two verification levels, never confused.**
+
+1. **Compact-summary verification** - `python3 tests/release/report.py --check` (the Image job runs it, and `tests/release/test_evidence.py`
+   runs it against this repository's own evidence). It needs no archive and no credential. It checks that `SHA256SUMS` matches every
+   committed file, that the catalog, `ARCHIVE.sha256` and every summary agree (each summary names its raw member, that member's SHA-256 and
+   revision, equal to the manifest and to the catalog; a missing, edited or re-bound summary fails), and that the committed report is what
+   they produce. It does **not** open the archive and so does not prove that the raw evidence exists.
+2. **Full raw-archive audit** - needs read access to the archive:
+
+   ```bash
+   python3 tests/release/evidence.py stage --evidence docs/release/evidence --dest "$WORK/staged" --from-release --gh "gh"   # or --tarball FILE
+   python3 tests/release/report.py --evidence docs/release/evidence --criteria tests/release/criteria.json \
+     --out docs/release/phase1-release-acceptance.md --check --audit-archive "$WORK/staged"
+   ```
+
+   `stage` fetches the asset (or reads the given tarball), refuses a wrong size or tarball digest, refuses any member that is not a regular
+   file with a safe name that the manifest lists (path traversal, symlinks, duplicates, unlisted members, oversize are all refused),
+   and checks every member digest against `ARCHIVE.sha256`; `--audit-archive` then checks completeness (no member missing or extra)
+   and **regenerates every summary from its raw member** and compares it byte for byte. Unavailable evidence, a digest mismatch or a
+   provenance mismatch fails; nothing is skipped silently. Pull requests only run level 1.
+
+**Regenerating after a new run.** Collect the raw results (`collect.py`, the harness), add them to a new archive root, then
+`evidence.py pack --root PREFIX=DIR ... --out TARBALL --manifest ARCHIVE.sha256` (refuses symlinks, unsafe names and secret-like
+patterns; the tarball is deterministic), upload the tarball and the manifest as assets of a new evidence-only draft release, update
+`catalog.json` (archive identity and digests, artifacts, revisions, dispositions), read the asset back with `stage --from-release`,
+`evidence.py regenerate --staged ...`, `evidence.py seal`, `report.py` (writes the report), then `report.py --check --audit-archive`.
+
+**Honest limit of the move.** The raw evidence files of the first two rounds were committed at `f306a2a` and `fbb8193` of this pull
+request. They are removed at the branch tip by ordinary additive commits; the Git objects of those commits stay in the repository's
+history (behind `refs/pull/25/head`) and are **not** purged: no history was rewritten. If the pull request is squash-merged they are not
+part of the main history; the archive, not Git history, is the durable record.
+
+The VM run is produced from a `git archive` of the code commit; the evidence commits that follow add the compact evidence and the
+report only. `catalog.json` records the code commit, the baseline, the image and binary digests and states that the local gates and the
+browser suites ran on a clean worktree at exactly that code commit, so no product file differs between what they judged and what the VM
+archive built (`GATE-PRODUCT-TREE`; since the UX and R2 changes the product tree is no longer the merged baseline, so the comparison is
+against the code commit, not against `main`). The commits after the code commit change no product file (`git diff 1528ef0 HEAD -- cmd
+internal web` is empty): the X2 regression test, the evidence hygiene and the CI publication job.
 
 ## R2 measurement: bounded continuity freshness (interleaved A/B)
 
@@ -143,7 +190,7 @@ point, **interleaved** A/B, each arm built from its own `git archive`, the same 
 * The window's own daemon requests are the difference between the counter line before it and the one written at the graceful stop
   after it. Daemon CPU is the 1 Hz `/proc` sample of `dockerd` + `containerd` inside the window. Latency is the client-side latency of
   successful calls.
-* Every run is kept (`docs/release/evidence/diagnostics/r2-ab/`: per-run rows, summaries, raw `release.json` of every run, the driver
+* Every run is kept (archive member `round-2-fbb8193/docs/release/evidence/diagnostics/r2-ab/` (not in Git, see "Evidence layout"): per-run rows, summaries, raw `release.json` of every run, the driver
   logs, schedules and the analysis script). Two disclosures: (1) the first driver version stopped reading its clean schedule after
   `clean-A01` because `ssh` consumed the rest of standard input, and its chain went on into the contended schedule; the arm-A
   contended run it started (`burn-A00-orphan`) was allowed to finish and is kept and listed, but it is **not** one of the 15 counted A
@@ -175,8 +222,20 @@ The contended arm is far better in the observable failure (0 of 30 B runs agains
 timeouts 669 against 0), but the pre-registered statistic on the **drop rate alone is not met**: 2 of 15 against 0 of 30 gives a
 one-sided Fisher exact p = 0.106 (target p < 0.05), because the drop is rare even under contention in arm A. R2 is therefore **not**
 claimed as resolved on the stated target; the evidence is that the cause is established (daemon saturation amplified by the service's
-own continuity reads) and that removing most of that amplification removes the observed timeouts and failures in this fixture. The
-sealed adverse runs of SH-2d stay `open` until a reviewed change dispositions them.
+own continuity reads) and that removing most of that amplification removes the observed timeouts and failures in this fixture.
+
+**Owner-approved disposition (SH-2d).** The owner accepted this A/B evidence as the disposition of R2 (option 1 of reviewer run 518):
+SH-2d is reported as **PASS WITH DISCLOSURES**. This is an acceptance-policy decision, **not** a claim that the pre-registered
+statistic passed, and it waives nothing in security: authorization, identity, invalidation, cancellation and fault classification, leases
+and freshness are unchanged. The disclosures stay visible in the report (section 6) and the criteria: 2/15 against 0/30 runs with a
+proof drop and p = 0.106 (target not met); contended `REL-LOAD-STABLE` 0/15 A against 30/30 B passes, 669 against 0 timeouts, 191
+against 0 refusals; the original clean-host failures (3 of 5 VM runs) were not exactly reproduced although the mechanism is evidenced.
+The historical adverse runs (`vm-diag-loop-1`, `vm-diag-loop-2`, `vm-run-1a01db9`) stay FAIL in the archive and in the criterion's
+adverse list; the criterion's adverse state is `dispositioned` and carries the disposition text instead of being rewritten as a success.
+**Residual risk:** under a saturated daemon the service can still refuse a legitimate call or time out a daemon read; this fails closed
+(an availability risk, not an integrity or confidentiality one) and is logged by the safety-transition diagnostics. The report as a whole
+is `CRITERIA MET - ACCEPTANCE PENDING` and becomes `ACCEPTED` only when the acceptance gates of the catalog (independent exact-head
+review, hosted CI at the final head, the owner's merge, and the post-merge registry read-back) are closed; the report cannot close them.
 
 ## Known limits of this evidence
 

@@ -1,1 +1,0 @@
-compared 1528ef025ad9..1528ef025ad9 over cmd internal web Dockerfile docker-compose.yml deploy go.mod go.sum sqlc.yaml tools

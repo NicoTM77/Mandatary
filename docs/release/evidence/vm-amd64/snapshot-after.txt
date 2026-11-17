@@ -1,3 +1,0 @@
-BEFORE (logs/pre-snap.txt): C:9cf7a696b1ec |N:0d77899c7a99 1d4163a01edf c614c3683a3f d908fcb7ebfa |V:p1201373mstk_proxy_config p1201373mstk_proxy_data p120-trivy-cache 
-AFTER  (read after the run, same snapshot function): C:9cf7a696b1ec |N:0d77899c7a99 1d4163a01edf c614c3683a3f d908fcb7ebfa |V:p1201373mstk_proxy_config p1201373mstk_proxy_data p120-trivy-cache
-(9cf7a696b1ec is the VM's own pre-existing mailpit container; p120-trivy-cache is this card's scanner cache volume; the two p1201373mstk_* volumes are leftovers of an interrupted diagnostic run of this card from earlier in the day, present before this run started and removed by the coder after the evidence was fetched. Nothing else exists.)

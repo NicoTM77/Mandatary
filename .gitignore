@@ -9,3 +9,12 @@
 # Python bytecode from tests/image
 __pycache__/
 *.pyc
+
+# P1.20 release evidence: only the compact files below are kept in Git. Raw run output (full harness JSON, raw logs, scan output, SBOMs,
+# diagnostics) belongs in the versioned evidence archive named by docs/release/evidence/catalog.json (docs/release-acceptance.md).
+/docs/release/evidence/*
+!/docs/release/evidence/catalog.json
+!/docs/release/evidence/ARCHIVE.sha256
+!/docs/release/evidence/SHA256SUMS
+!/docs/release/evidence/summaries/
+!/docs/release/evidence/summaries/*.json

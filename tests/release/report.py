@@ -1,40 +1,43 @@
 #!/usr/bin/env python3
 """Versioned release acceptance report of P1.20 (standard library only).
 
-Every release criterion names the concrete results that establish it ("CHECK-ID@artifact"), where each artifact is
-a committed evidence file whose SHA-256 is computed here, never typed in. A criterion is
+Every release criterion names the concrete results that establish it ("CHECK-ID@artifact"). An artifact is one raw result document of
+the evidence archive (see evidence.py); the report reads its compact summary from `docs/release/evidence/summaries/` and shows the
+SHA-256 of the RAW document, which the summary records and ARCHIVE.sha256 lists, never a digest typed in by hand. A criterion is
 
-  PASS        every linked result is PASS and every linked artifact exists with a digest
+  PASS        every linked result is PASS and every linked artifact has a digest
   FAIL        at least one linked result is FAIL
-  UNVERIFIED  anything else: no link at all, a link with no result, a BLOCKED/skipped result, an artifact without a
-              digest. A missing target, browser or architecture can therefore never count as a pass.
+  UNVERIFIED  anything else: no link at all, a link with no result, a BLOCKED/skipped result, an artifact without a digest. A missing
+              target, browser or architecture can therefore never count as a pass.
 
-A criterion may also name sealed ADVERSE runs (`adverse.refs`, "CHECK@diagnostics/<file>.json": failed or contradictory runs that are kept
-in the evidence). While `adverse.state` is "open", a FAIL among them fails the criterion whatever the final run says; it stops counting only when a
-reviewed change sets the state to "dispositioned" and records the disposition (cause established, product/fixture/harness) in `adverse.disposition`.
-A clean final run therefore never erases a contradictory same-content failure.
+A criterion may also name ADVERSE runs (`adverse.refs`, "CHECK@artifact": failed or contradictory runs that are kept in the evidence).
+While `adverse.state` is "open", a FAIL among them fails the criterion whatever the final run says. It stops counting only when a
+reviewed change sets the state to "dispositioned" and records the disposition (who decided, on what basis, what it does and does NOT
+claim) in `adverse`. A dispositioned criterion is reported as "PASS WITH DISCLOSURES": the adverse runs stay listed as the FAIL they
+were, and a clean final run never erases a contradictory same-content failure.
 
-The overall verdict is "ACCEPTED" only when every criterion is PASS. `--check` recomputes the report from the
-committed evidence and fails when the committed markdown is stale or was edited by hand (tests/release/
-test_report_consistency.py runs it in CI).
+The overall verdict is "ACCEPTED" only when every criterion is PASS and every acceptance gate of the catalog (independent exact-head
+review, owner merge) is closed. When the criteria are met but a gate is open the report says so ("CRITERIA MET - ACCEPTANCE PENDING").
 
-    python3 tests/release/report.py --evidence docs/release/evidence --criteria tests/release/criteria.json --out docs/release/phase1-release-acceptance.md [--check]
+Two verification levels exist and are reported separately:
+
+  --check            COMPACT: the committed catalog, ARCHIVE.sha256 and summaries are mutually consistent (every summary is bound to its
+                     raw archive member by digest and revision) and the committed report is what they produce. The raw archive is NOT read.
+  --audit-archive D  FULL: additionally the staged archive D (evidence.py stage) is audited: every member digest, completeness, and every
+                     summary regenerated from its raw member byte for byte.
+
+    python3 tests/release/report.py --evidence docs/release/evidence --criteria tests/release/criteria.json --out docs/release/phase1-release-acceptance.md [--check] [--audit-archive STAGED]
 """
 import argparse
-import hashlib
 import json
 import os
 import sys
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import evidence  # noqa: E402
+
 ORDER = {"FAIL": 0, "UNVERIFIED": 1, "PASS": 2}
-
-
-def sha256_file(path):
-    h = hashlib.sha256()
-    with open(path, "rb") as fh:
-        for chunk in iter(lambda: fh.read(1 << 20), b""):
-            h.update(chunk)
-    return h.hexdigest()
+sha256_file = evidence.sha256_file
 
 
 def evaluate(criteria, results, digests, adverse=None):
@@ -65,13 +68,15 @@ def evaluate(criteria, results, digests, adverse=None):
             adverse_links.append({"ref": ref, "result": res or "none", "digest": digests.get(ref.rsplit("@", 1)[1] if "@" in ref else "")})
             if adv.get("state") != "dispositioned" and res != "PASS" and ORDER["FAIL" if res == "FAIL" else "UNVERIFIED"] < ORDER[status]:
                 status = "FAIL" if res == "FAIL" else "UNVERIFIED"
-        rows.append(dict(c, status=status, links=links, adverse_links=adverse_links))
+        # An adverse run that is not PASS and was dispositioned makes the PASS a PASS WITH DISCLOSURES (never a silent one).
+        disclosed = status == "PASS" and adv.get("state") == "dispositioned" and any(a["result"] != "PASS" for a in adverse_links)
+        rows.append(dict(c, status=status, links=links, adverse_links=adverse_links, disclosed=disclosed))
     return rows
 
 
 def verify_sums(evdir):
-    """Every committed evidence file (raw logs included) is listed in SHA256SUMS with its digest, so an edited log is detected even when it
-    is not one of the linked results files. Returns a list of problems (empty = consistent)."""
+    """Every committed evidence file (catalog, archive manifest, summaries) is listed in SHA256SUMS with its digest, so an edited file is
+    detected even when it is not one of the linked results. Returns a list of problems (empty = consistent)."""
     path = os.path.join(evdir, "SHA256SUMS")
     if not os.path.exists(path):
         return ["SHA256SUMS is missing"]
@@ -91,57 +96,44 @@ def verify_sums(evdir):
     on_disk = set()
     for root, _, files in os.walk(evdir):
         for fn in files:
-            rel = os.path.relpath(os.path.join(root, fn), evdir)
+            rel = os.path.relpath(os.path.join(root, fn), evdir).replace(os.sep, "/")
             if rel != "SHA256SUMS":
                 on_disk.add(rel)
     problems += ["not listed: " + n for n in sorted(on_disk - set(listed))]
     return problems
 
 
-def load_adverse(evdir, criteria):
-    """Results of the sealed adverse runs a criterion names: ({"CHECK@file": status}, {file: sha256}). A missing file stays unlinked (UNVERIFIED)."""
-    res, dig = {}, {}
-    for c in criteria:
-        for ref in (c.get("adverse") or {}).get("refs", []):
-            check, _, rel = ref.partition("@")
-            path = os.path.join(evdir, rel)
-            if not rel or not os.path.exists(path):
-                continue
-            dig[rel] = sha256_file(path)
-            with open(path) as fh:
-                doc = json.load(fh)
-            for r in doc.get("results", []):
-                if r.get("id") == check:
-                    res[ref] = r.get("status")
-    return res, dig
+seal = evidence.seal  # the maintainer's step after a regeneration: rewrite SHA256SUMS over every file of the evidence directory
 
 
 def load_evidence(evdir):
-    with open(os.path.join(evdir, "manifest.json")) as fh:
-        manifest = json.load(fh)
+    """(catalog, results, digests, meta): the result of every check of every artifact, keyed "CHECK@artifact", and the SHA-256 of the RAW
+    document each summary was derived from (the digest that ARCHIVE.sha256 lists; evidence.verify_compact binds the two)."""
+    with open(os.path.join(evdir, "catalog.json")) as fh:
+        catalog = json.load(fh)
     results, digests, meta = {}, {}, {}
-    for name, a in manifest["artifacts"].items():
+    for name, a in catalog["artifacts"].items():
         path = os.path.join(evdir, a["file"])
         if not os.path.exists(path):
             continue
-        digests[name] = sha256_file(path)
+        with open(path) as fh:
+            doc = json.load(fh)
+        digests[name] = (doc.get("source") or {}).get("sha256") or sha256_file(path)
         meta[name] = a
         if a["kind"] == "results":
-            with open(path) as fh:
-                doc = json.load(fh)
             for r in doc.get("results", []):
                 results["%s@%s" % (r["id"], name)] = r["status"]
-    return manifest, results, digests, meta
+    return catalog, results, digests, meta
 
 
 def mb(v):
     return "%.2f MB (%d B)" % (v / 1e6, v) if isinstance(v, (int, float)) and not isinstance(v, bool) else "not measured"
 
 
-def measured_table(evdir, manifest):
-    """The measured values behind the budget criteria, read from the committed harness results (never typed). Missing values read 'not measured'."""
+def measured_table(evdir, catalog):
+    """The measured values behind the budget criteria, read from the committed summaries (never typed). Missing values read 'not measured'."""
     rows = []
-    for name, a in manifest["artifacts"].items():
+    for name, a in catalog["artifacts"].items():
         path = os.path.join(evdir, a["file"])
         if a["kind"] != "results" or not os.path.exists(path):
             continue
@@ -170,48 +162,86 @@ def verdict(rows):
     return ok, n
 
 
-def render(manifest, rows, digests, meta, results, evdir):
+def open_gates(catalog):
+    return [g for g in catalog.get("acceptance_gates", []) if g.get("state") != "closed"]
+
+
+def overall(rows, catalog):
+    """ACCEPTED only with every criterion PASS and every acceptance gate closed; otherwise the criteria level is stated, never promoted."""
+    ok, _ = verdict(rows)
+    if not ok:
+        return "NOT ACCEPTED"
+    gates = open_gates(catalog)
+    return "CRITERIA MET - ACCEPTANCE PENDING" if gates else "ACCEPTED"
+
+
+def render(catalog, rows, digests, meta, results, evdir):
     ok, n = verdict(rows)
+    disclosed = sum(1 for r in rows if r.get("disclosed"))
     L = []
     w = L.append
+    arch = catalog["archive"]
     w("# Phase 1 release acceptance, security and footprint report (P1.20)")
     w("")
-    w("> Generated by `tests/release/report.py` from the committed files in `docs/release/evidence/`; `python3 tests/release/report.py --check` fails when this page is stale or edited by hand.")
+    w("> Generated by `tests/release/report.py` from the compact evidence in `docs/release/evidence/` (catalog, archive manifest and summaries); `python3 tests/release/report.py --check` fails when this page is stale or edited by hand. The raw run output is in the evidence archive named in section 2; `--check` does not read it, `--audit-archive` does.")
     w("> This is acceptance evidence for one release candidate. It is **not** a NIST, FIPS, product-qualification or runtime-compatibility claim, and it does not authorize a merge or a deployment (Nico alone merges).")
     w("")
     w("## 1. Verdict")
     w("")
-    rc = manifest["release_candidate"]
+    rc = catalog["release_candidate"]
     w("| Item | Value |")
     w("| --- | --- |")
     for k, v in rc.items():
         w("| %s | %s |" % (k.replace("_", " "), v))
     w("")
-    w("**Overall: %s.** %d criteria: %d PASS, %d FAIL, %d UNVERIFIED. A criterion with no linked result, a skipped/BLOCKED result or an artifact without a digest is UNVERIFIED and never counts as a pass." % (
-        "ACCEPTED" if ok else "NOT ACCEPTED", len(rows), n["PASS"], n["FAIL"], n["UNVERIFIED"]))
+    w("**Overall: %s.** %d criteria: %d PASS (%d of them with explicit disclosures), %d FAIL, %d UNVERIFIED. A criterion with no linked result, a skipped/BLOCKED result or an artifact without a digest is UNVERIFIED and never counts as a pass." % (
+        overall(rows, catalog), len(rows), n["PASS"], disclosed, n["FAIL"], n["UNVERIFIED"]))
     w("")
-    for note in manifest.get("verdict_notes", []):
+    gates = catalog.get("acceptance_gates", [])
+    if gates:
+        w("Acceptance gates that this page cannot attest by itself (the page is evidence; it is not the reviewer or the owner):")
+        w("")
+        for g in gates:
+            w("* **%s** - %s: %s" % (g["id"], g["text"], g.get("state", "open").upper()))
+        w("")
+    for note in catalog.get("verdict_notes", []):
         w("* " + note)
     w("")
-    w("## 2. Evidence artifacts (SHA-256 computed from the committed files)")
+    w("## 2. Evidence archive and what was verified")
     w("")
-    w("| Artifact | File | SHA-256 | Produced by |")
-    w("| --- | --- | --- | --- |")
-    for name, a in manifest["artifacts"].items():
-        w("| `%s` | `%s` | `%s` | %s |" % (name, a["file"], digests.get(name, "MISSING"), a["source"]))
+    loc = arch.get("location", {})
+    w("| Item | Value |")
+    w("| --- | --- |")
+    w("| archive id | `%s` |" % arch["id"])
+    w("| tarball | `%s`, %s bytes, SHA-256 `%s` |" % (arch["tarball"], arch["tarball_bytes"], arch["tarball_sha256"]))
+    w("| members | %s, every one listed with its SHA-256 in `docs/release/evidence/ARCHIVE.sha256` (SHA-256 of that manifest: `%s`) |" % (arch["members"], arch["manifest_sha256"]))
+    w("| durable location | %s |" % loc.get("description", "not recorded"))
+    w("| read-back | %s |" % arch.get("read_back", "not recorded"))
     w("")
-    w("## 3. Measured values behind the budgets")
+    w("**Verification levels.** `report.py --check` is a **compact-summary verification**: the committed catalog, archive manifest and summaries are consistent with each other (each summary names its raw archive member, that member's SHA-256 and revision, and they equal the manifest and the catalog) and this page is what they produce. It does **not** open the archive. A **full raw-archive audit** (`tests/release/evidence.py stage` then `report.py --audit-archive`) obtains the archive, verifies its tarball digest, size, member list and every member digest, and regenerates every summary from its raw member byte for byte. Pull-request CI performs only the compact verification, because it needs no credential; the full audit needs read access to the archive.")
+    w("")
+    for note in arch.get("notes", []):
+        w("* " + note)
+    w("")
+    w("## 3. Evidence artifacts (SHA-256 of the raw document, from the archive manifest)")
+    w("")
+    w("| Artifact | Archived raw file | SHA-256 (raw) | Revision | Produced by |")
+    w("| --- | --- | --- | --- | --- |")
+    for name, a in catalog["artifacts"].items():
+        w("| `%s` | `%s` | `%s` | `%s` | %s |" % (name, a.get("member", "?"), digests.get(name, "MISSING"), (a.get("revision") or "unrecorded")[:12], a["source"]))
+    w("")
+    w("## 4. Measured values behind the budgets")
     w("")
     w("Budgets (technical-decisions.md 10.2, MB = 10^6 bytes): image <= 60 MB compressed; idle <= 50 MB resident after stabilization (final 60 s of a 300 s observation window after readiness, SQLite initialized, one local Docker endpoint connected); load <= 150 MB resident under 20 clients and 5 streams.")
     w("")
-    w("Idle method as applied: RSS (`VmRSS` of the service process, read on the host) is sampled every 5 s from readiness for 300 s; the gated value is the **maximum** of the samples inside the final 60 s (the strictest aggregation; the median is in the evidence). The **start-up transient** (its peak and the time until the process stabilizes under 50 MB) is reported in the same cells and as its own check; the idle limit does not apply to it. The 150 MB load budget and the 60 MB image budget are unchanged.")
+    w("Idle method as applied: RSS (`VmRSS` of the service process, read on the host) is sampled every 5 s from readiness for 300 s; the gated value is the **maximum** of the samples inside the final 60 s (the strictest aggregation; the median is in the archived evidence). The **start-up transient** (its peak and the time until the process stabilizes under 50 MB) is reported in the same cells and as its own check; the idle limit does not apply to it. The 150 MB load budget and the 60 MB image budget are unchanged.")
     w("")
     w("| Environment (artifact) | Host | Compressed image | Idle after first start | Idle configured | Idle after restart | Load |")
     w("| --- | --- | --- | --- | --- | --- | --- |")
-    for r in measured_table(evdir, manifest):
+    for r in measured_table(evdir, catalog):
         w("| `%s` | %s |" % (r[0], " | ".join(x.replace("|", "\\|") for x in r[1:])))
     w("")
-    w("## 4. Criteria")
+    w("## 5. Criteria")
     w("")
     groups = []
     for r in rows:
@@ -227,16 +257,42 @@ def render(manifest, rows, digests, meta, results, evdir):
             lim = (r.get("limits") or "")
             adv = r.get("adverse") or {}
             if adv:
-                lim += (" " if lim else "") + "Sealed adverse runs (%s): %s. %s" % (
-                    adv.get("state", "open"), ", ".join("%s %s" % (a["ref"], a["result"]) for a in r["adverse_links"]), adv.get("disposition", ""))
-            w("| %s | %s | **%s** | %s | %s |" % (r["id"], r["text"].replace("|", "\\|"), r["status"], links, lim.replace("|", "\\|")))
+                lim += (" " if lim else "") + "Adverse runs (%s): %s. %s" % (
+                    adv.get("state", "open"), ", ".join("%s %s (%s)" % (a["ref"], a["result"], (a["digest"] or "no digest")[:12]) for a in r["adverse_links"]), adv.get("disposition", ""))
+            status = "PASS WITH DISCLOSURES" if r.get("disclosed") else r["status"]
+            w("| %s | %s | **%s** | %s | %s |" % (r["id"], r["text"].replace("|", "\\|"), status, links, lim.replace("|", "\\|")))
         w("")
-    if manifest.get("findings"):
-        w("## 5. Findings recorded by this run")
+    dispositions = catalog.get("dispositions", [])
+    if dispositions:
+        w("## 6. Owner-approved dispositions")
+        w("")
+        w("A disposition changes how an adverse result is **classified**; it does not rewrite the result. The historical adverse runs stay FAIL in the archive and above. Each disposition states what it does not claim.")
+        w("")
+        for d in dispositions:
+            w("### %s - %s" % (d["id"], d["title"]))
+            w("")
+            w("* **Decision:** " + d["decision"])
+            w("* **Approved by:** " + d["approved_by"])
+            w("* **Reference:** " + d["reference"])
+            for k, label in (("kept_visible", "Kept visible"), ("not_claimed", "Not claimed"), ("residual_risk", "Residual risk")):
+                if d.get(k):
+                    w("* **%s:** %s" % (label, d[k]))
+            w("")
+    pub = catalog.get("publication")
+    if pub:
+        w("## 7. Registry publication")
+        w("")
+        w(pub["status"])
+        w("")
+        for line in pub.get("details", []):
+            w("* " + line)
+        w("")
+    if catalog.get("findings"):
+        w("## 8. Findings recorded by this run")
         w("")
         w("These are observations made while producing the evidence. They are not criteria and are not hidden by the verdict above; each names where it is evidenced and what it needs.")
         w("")
-        for f in manifest["findings"]:
+        for f in catalog["findings"]:
             w("### %s - %s" % (f["id"], f["title"]))
             w("")
             w(f["detail"])
@@ -245,16 +301,14 @@ def render(manifest, rows, digests, meta, results, evdir):
 
 
 def build(evdir, criteria_path):
-    problems = verify_sums(evdir)
+    problems = verify_sums(evdir) + evidence.verify_compact(evdir)
     if problems:
-        raise SystemExit("evidence is not consistent with SHA256SUMS: " + "; ".join(problems[:5]))
-    manifest, results, digests, meta = load_evidence(evdir)
+        raise SystemExit("evidence is not consistent: " + "; ".join(problems[:5]))
+    catalog, results, digests, meta = load_evidence(evdir)
     with open(criteria_path) as fh:
         criteria = json.load(fh)["criteria"]
-    adverse, adverse_digests = load_adverse(evdir, criteria)
-    digests = dict(digests, **adverse_digests)
-    rows = evaluate(criteria, results, digests, adverse)
-    return manifest, rows, digests, meta, results
+    rows = evaluate(criteria, results, digests, results)
+    return catalog, rows, digests, meta, results
 
 
 def main():
@@ -262,11 +316,20 @@ def main():
     ap.add_argument("--evidence", required=True)
     ap.add_argument("--criteria", required=True)
     ap.add_argument("--out", required=True)
-    ap.add_argument("--check", action="store_true", help="fail when --out differs from what the evidence produces")
+    ap.add_argument("--check", action="store_true", help="compact verification: fail when --out differs from what the compact evidence produces")
+    ap.add_argument("--audit-archive", metavar="STAGED", help="also run the FULL audit of the archive staged by `evidence.py stage`")
     a = ap.parse_args()
-    manifest, rows, digests, meta, results = build(a.evidence, a.criteria)
-    text = render(manifest, rows, digests, meta, results, a.evidence)
+    if a.audit_archive:
+        problems, counts = evidence.audit_archive(a.evidence, a.audit_archive)
+        if problems:
+            for p in problems[:20]:
+                print("AUDIT FAILED: " + p, file=sys.stderr)
+            return 1
+        print("FULL ARCHIVE AUDIT PASSED: %(members_verified)d members verified against ARCHIVE.sha256, %(summaries_regenerated)d summaries regenerated from the raw members" % counts)
+    catalog, rows, digests, meta, results = build(a.evidence, a.criteria)
+    text = render(catalog, rows, digests, meta, results, a.evidence)
     ok, n = verdict(rows)
+    state = overall(rows, catalog)
     if a.check:
         have = None
         if os.path.exists(a.out):
@@ -275,11 +338,12 @@ def main():
         if have != text:
             print("STALE: %s does not match the committed evidence" % a.out, file=sys.stderr)
             return 1
-        print("report consistent: %s (%d PASS, %d FAIL, %d UNVERIFIED)" % (a.out, n["PASS"], n["FAIL"], n["UNVERIFIED"]))
+        print("report consistent (compact-summary verification; the raw archive was %s): %s - %s (%d PASS, %d FAIL, %d UNVERIFIED)" % (
+            "audited above" if a.audit_archive else "NOT read", a.out, state, n["PASS"], n["FAIL"], n["UNVERIFIED"]))
         return 0
     with open(a.out, "w") as fh:
         fh.write(text)
-    print("wrote %s: %s (%d PASS, %d FAIL, %d UNVERIFIED)" % (a.out, "ACCEPTED" if ok else "NOT ACCEPTED", n["PASS"], n["FAIL"], n["UNVERIFIED"]))
+    print("wrote %s: %s (%d PASS, %d FAIL, %d UNVERIFIED)" % (a.out, state, n["PASS"], n["FAIL"], n["UNVERIFIED"]))
     return 0
 
 

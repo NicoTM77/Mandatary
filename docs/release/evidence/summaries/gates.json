@@ -1,0 +1,87 @@
+{
+ "artifact": "gates",
+ "results": [
+  {
+   "detail": "gofmt -l over cmd internal web tests/{security,adapters,release}: exit 0 in 1 s",
+   "id": "GATE-GOFMT",
+   "status": "PASS"
+  },
+  {
+   "detail": "go vet ./...: exit 0 in 5 s",
+   "id": "GATE-GOVET",
+   "status": "PASS"
+  },
+  {
+   "detail": "go mod verify: exit 0 in 11 s",
+   "id": "GATE-GOMOD-VERIFY",
+   "status": "PASS"
+  },
+  {
+   "detail": "pinned golangci-lint run ./...: exit 0 in 6 s",
+   "id": "GATE-GOLANGCI",
+   "status": "PASS"
+  },
+  {
+   "detail": "pinned gosec ./...: exit 0 in 23 s",
+   "id": "GATE-GOSEC",
+   "status": "PASS"
+  },
+  {
+   "detail": "pinned govulncheck ./... (reachability-based): exit 0; says 'No vulnerabilities found'",
+   "id": "GATE-GOVULNCHECK",
+   "status": "PASS"
+  },
+  {
+   "detail": "go test -count=1 ./cmd/... ./internal/... ./tests/...: exit 0, 15 packages ok, 0 failures",
+   "id": "GATE-GOTEST",
+   "status": "PASS"
+  },
+  {
+   "detail": "tests/release/test_release.py (hermetic harness tests): exit 0 in 1 s",
+   "id": "GATE-RELEASE-HARNESS-TESTS",
+   "status": "PASS"
+  },
+  {
+   "detail": "tests/image/test_isolation.py (isolation guard tests): exit 0 in 4 s",
+   "id": "GATE-ISOLATION-TESTS",
+   "status": "PASS"
+  },
+  {
+   "detail": "node --test scripts/*.test.mjs (CI budgets, toolchain pins, ledger, dependency residuals, generation): exit 0 in 24 s",
+   "id": "GATE-NODE-SCRIPTS",
+   "status": "PASS"
+  },
+  {
+   "detail": "tsc --noEmit: exit 0 in 2 s",
+   "id": "GATE-WEB-TYPECHECK",
+   "status": "PASS"
+  },
+  {
+   "detail": "eslint --max-warnings 0: exit 0 in 12 s",
+   "id": "GATE-WEB-LINT",
+   "status": "PASS"
+  },
+  {
+   "detail": "vitest run: exit 0, 776/776 tests passed in 36 files",
+   "id": "GATE-WEB-VITEST",
+   "status": "PASS"
+  },
+  {
+   "detail": "npm audit --audit-level=high: exit 0; high+critical 0 of 0 advisories",
+   "id": "GATE-NPM-AUDIT",
+   "status": "PASS"
+  },
+  {
+   "detail": "compared 1528ef025ad9..1528ef025ad9 over cmd internal web Dockerfile docker-compose.yml deploy go.mod go.sum sqlc.yaml tools; 0 product file(s) differ",
+   "id": "GATE-PRODUCT-TREE",
+   "status": "PASS"
+  }
+ ],
+ "revision": null,
+ "schema": "mandatary-p120-evidence-summary/1",
+ "source": {
+  "bytes": 2112,
+  "member": "round-2-fbb8193/docs/release/evidence/gates/results.json",
+  "sha256": "80b3cea9bf126833558d113f6d39f8e0f93850fc1ccca7b2173e63331664ca6e"
+ }
+}

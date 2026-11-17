@@ -1,0 +1,455 @@
+{
+ "artifact": "adverse-vm-diag-loop-1",
+ "evidence": {
+  "environment": {
+   "api": "1.56",
+   "cgroup": "systemd v2",
+   "compose": "5.7.1",
+   "compose_project": "p1206552mstk",
+   "cpus": 4,
+   "daemon_id": "ec06eb10-04b6-4f1b-bbb6-d336994db8ae",
+   "docker_server": "29.9.3",
+   "fsync_4k_work_filesystem": {
+    "mean_ms": 1.277,
+    "n": 200,
+    "p50_ms": 0.985,
+    "p95_ms": 3.347,
+    "p99_ms": 4.759
+   },
+   "host_cpus": 4,
+   "kernel": "7.0.0-43-generic",
+   "memory_bytes": 3557892096,
+   "os": "Ubuntu 26.04.1 LTS",
+   "os_arch": "linux/amd64",
+   "storage_driver": "overlayfs"
+  },
+  "footprint": {
+   "image": {
+    "archive_sha256": "06f5203daf60a1aabdc7aa547b811acd05697562c5444df499e5f9f2065acc52",
+    "budget": {
+     "MB": 60.0,
+     "MiB": 57.22,
+     "bytes": 60000000
+    },
+    "compressed": {
+     "MB": 12.42,
+     "MiB": 11.84,
+     "bytes": 12418705
+    },
+    "layers": {
+     "omitted_list_length": 15
+    },
+    "method": "sum of the sizes of the manifest, config and gzip layer blobs of `buildx --output type=oci,compression=gzip` for linux/amd64"
+   },
+   "latency": {
+    "allowed_accounted": {
+     "mean_ms": 184.491,
+     "n": 150,
+     "p50_ms": 181.741,
+     "p95_ms": 206.624,
+     "p99_ms": 247.549
+    },
+    "denied_accounted": {
+     "mean_ms": 98.877,
+     "n": 150,
+     "p50_ms": 96.94,
+     "p95_ms": 109.272,
+     "p99_ms": 115.219
+    },
+    "note": "denied_accounted - unauth_401 = authorization + one synchronous durable usage write, measured through the TLS proxy on the isolated host; not a microbenchmark of the write alone",
+    "unauth_401": {
+     "mean_ms": 43.117,
+     "n": 150,
+     "p50_ms": 42.995,
+     "p95_ms": 44.03,
+     "p99_ms": 45.134
+    },
+    "usage_write_cost_estimate_p50_ms": 53.945
+   },
+   "load": {
+    "VmHWM_after": 41148416,
+    "VmRSS_after": 35422208,
+    "VmRSS_before": 32530432,
+    "VmRSS_peak_sampled": 40448000,
+    "cgroup": {
+     "memory.current": 22761472,
+     "memory.max": "max",
+     "memory.peak": 245100544
+    },
+    "clients": {
+     "follow_streams": 5,
+     "mcp_sessions": 10,
+     "rest_pollers": 10
+    },
+    "mcp": {
+     "by_error": {
+      "forbidden/default_deny": 8,
+      "forbidden/safety_unverified": 34
+     },
+     "by_op": {
+      "container_logs": 70,
+      "container_status": 70
+     },
+     "calls": 182,
+     "error_samples": [
+      "tool error result"
+     ],
+     "errors": 42,
+     "ok": 140,
+     "p50_ms": 1745.544,
+     "p95_ms": 5301.161,
+     "p99_ms": 5376.732,
+     "seconds": 42.135093728,
+     "workers": 10
+    },
+    "mcp_error": null,
+    "peak_reset_before_window": true,
+    "rest": {
+     "errors": 38,
+     "logs": 84,
+     "status": 85
+    },
+    "rest_error_classes": {
+     "403/forbidden": 38
+    },
+    "rest_latency": {
+     "mean_ms": 2143.963,
+     "n": 169,
+     "p50_ms": 1960.473,
+     "p95_ms": 3824.901,
+     "p99_ms": 4168.159
+    },
+    "rss_samples": 43,
+    "seconds": 43.0,
+    "service_log_safety_lines": [
+     "mandatary-1  | {\"time\":\"2026-11-15T15:32:13.685920825Z\",\"level\":\"INFO\",\"msg\":\"docker backend verified\"}"
+    ],
+    "streams": {
+     "failed": 0,
+     "frames": 84,
+     "load1": 3,
+     "load2": 2,
+     "opened": 5
+    }
+   }
+  },
+  "image": {
+   "architecture": "amd64",
+   "docker_size_bytes": 41504401,
+   "id": "sha256:6999e50228c428684383e7eaa9517f1f2afef509c8d67dad9453c4cfd4fdf226",
+   "os": "linux",
+   "repo_digests": [
+    "p120-mandatary@sha256:6999e50228c428684383e7eaa9517f1f2afef509c8d67dad9453c4cfd4fdf226"
+   ],
+   "revision_label": "6774f12cce6d48e36ca69b174171fe22c2488d46",
+   "rootfs_layers": {
+    "omitted_list_length": 15
+   }
+  },
+  "lifecycle": {},
+  "matrix": {
+   "cases": 94,
+   "daemon_events_on_protected_or_ungranted": {
+    "B": [],
+    "peer": [],
+    "self": []
+   },
+   "raw": {
+    "omitted_list_length": 29
+   },
+   "table": {
+    "omitted_list_length": 94
+   },
+   "tools": [
+    "container_config",
+    "container_logs",
+    "container_restart",
+    "container_start",
+    "container_status",
+    "container_stop"
+   ]
+  },
+  "migration": {},
+  "persistence": {},
+  "restore": {},
+  "stage_seconds": {
+   "DEPLOY": 6.3,
+   "DEVFLOW": "skipped",
+   "DOCS": "skipped",
+   "IDENTITIES": 2.2,
+   "IDLE-CONFIGURED": "skipped",
+   "IDLE-FRESH": "skipped",
+   "IMG": 1.1,
+   "LATENCY": 49.0,
+   "LIFECYCLE": 22.9,
+   "LOAD": 43.2,
+   "LOGLEVEL": "skipped",
+   "LOGS": "skipped",
+   "MATRIX": 63.4,
+   "MIGRATION": "skipped",
+   "PERSISTENCE": "skipped",
+   "RESTORE": "skipped",
+   "SETUP": 11.2
+  },
+  "usage": {}
+ },
+ "image": "p120-mandatary:6774f12cce6d",
+ "not_pass": 1,
+ "pass": 48,
+ "platform": "linux/amd64",
+ "results": [
+  {
+   "detail": "",
+   "id": "ISO-00",
+   "status": "PASS"
+  },
+  {
+   "detail": "6774f12cce6d48e36ca69b174171fe22c2488d46 linux/amd64",
+   "id": "REL-IMG-01",
+   "status": "PASS"
+  },
+  {
+   "detail": "12.42 MB (11.84 MiB), budget 60 MB, 15 layers",
+   "id": "REL-FOOT-IMG",
+   "status": "PASS"
+  },
+  {
+   "detail": "",
+   "id": "REL-FOOT-SAME",
+   "status": "PASS"
+  },
+  {
+   "detail": "",
+   "id": "REL-DEP-01",
+   "status": "PASS"
+  },
+  {
+   "detail": "exit 0",
+   "id": "REL-SETUP-setup-reveal",
+   "status": "PASS"
+  },
+  {
+   "detail": "200",
+   "id": "REL-SETUP-setup-exchange",
+   "status": "PASS"
+  },
+  {
+   "detail": "200",
+   "id": "REL-SETUP-setup-account",
+   "status": "PASS"
+  },
+  {
+   "detail": "204",
+   "id": "REL-SETUP-setup-proof",
+   "status": "PASS"
+  },
+  {
+   "detail": "204",
+   "id": "REL-SETUP-setup-confirm",
+   "status": "PASS"
+  },
+  {
+   "detail": "200 204",
+   "id": "REL-SETUP-setup-totp",
+   "status": "PASS"
+  },
+  {
+   "detail": "200",
+   "id": "REL-SETUP-setup-complete",
+   "status": "PASS"
+  },
+  {
+   "detail": "200",
+   "id": "REL-SETUP-login",
+   "status": "PASS"
+  },
+  {
+   "detail": "{'owner': 'd3fd7143-aaac-457c-b922-b5d18b64b4b3'}{'g': 'e5dd10df-f7ae-4c6b-a40b-f103fe1bc27b', 'g2': 'b6a18f65-1c43-4675-ac5d-5a373f450a27'}",
+   "id": "REL-ID-01",
+   "status": "PASS"
+  },
+  {
+   "detail": "14",
+   "id": "REL-ID-02",
+   "status": "PASS"
+  },
+  {
+   "detail": "204",
+   "id": "REL-ID-03",
+   "status": "PASS"
+  },
+  {
+   "detail": "[True, True, True, True, True, True, True, True, True, True, True, True, True, True]",
+   "id": "REL-ID-04",
+   "status": "PASS"
+  },
+  {
+   "detail": "",
+   "id": "REL-ID-05",
+   "status": "PASS"
+  },
+  {
+   "detail": "['mandatary-mailpit-mailpit-1', 'p1206552-a', 'p1206552-b', 'p1206552-c', 'p1206552mstk-proxy-1', 'p1206552mstk-smtp-1']",
+   "id": "REL-ID-06",
+   "status": "PASS"
+  },
+  {
+   "detail": "[]",
+   "id": "REL-MATRIX-REST",
+   "status": "PASS"
+  },
+  {
+   "detail": "[]",
+   "id": "REL-MATRIX-MCP",
+   "status": "PASS"
+  },
+  {
+   "detail": "[]",
+   "id": "REL-MATRIX-PARITY",
+   "status": "PASS"
+  },
+  {
+   "detail": "",
+   "id": "REL-MATRIX-POS",
+   "status": "PASS"
+  },
+  {
+   "detail": "[]",
+   "id": "REL-MATRIX-RAW",
+   "status": "PASS"
+  },
+  {
+   "detail": "['container_config', 'container_logs', 'container_restart', 'container_start', 'container_status', 'container_stop']",
+   "id": "REL-MCP-CATALOG",
+   "status": "PASS"
+  },
+  {
+   "detail": "[]",
+   "id": "REL-MCP-UNSUPPORTED",
+   "status": "PASS"
+  },
+  {
+   "detail": "[{'id': 'L-none', 'connected': False, 'http_status': 401, 'http_code': 'unauthenticated', 'elapsed_ms': 0}, {'id': 'L-garbage', 'connected': False, 'http_status': 401, 'http_code': 'unauthenticated', ",
+   "id": "REL-MCP-NOAUTH",
+   "status": "PASS"
+  },
+  {
+   "detail": "{'B': [], 'self': [], 'peer': []}",
+   "id": "REL-MATRIX-EFFECT",
+   "status": "PASS"
+  },
+  {
+   "detail": "",
+   "id": "REL-MATRIX-STATE",
+   "status": "PASS"
+  },
+  {
+   "detail": "201",
+   "id": "REL-LIFE-EXP-0",
+   "status": "PASS"
+  },
+  {
+   "detail": "((200, '', ''), (200, '', ''))",
+   "id": "REL-LIFE-EXP-1",
+   "status": "PASS"
+  },
+  {
+   "detail": "((401, 'unauthenticated', ''), (401, 'unauthenticated', ''))",
+   "id": "REL-LIFE-EXP-2",
+   "status": "PASS"
+  },
+  {
+   "detail": "((200, '', ''), (200, '', ''))",
+   "id": "REL-LIFE-REV-1",
+   "status": "PASS"
+  },
+  {
+   "detail": "204",
+   "id": "REL-LIFE-REV-2",
+   "status": "PASS"
+  },
+  {
+   "detail": "((401, 'unauthenticated', ''), (401, 'unauthenticated', ''))",
+   "id": "REL-LIFE-REV-3",
+   "status": "PASS"
+  },
+  {
+   "detail": "(200, '', '') (401, 'unauthenticated', '')",
+   "id": "REL-LIFE-SESSION",
+   "status": "PASS"
+  },
+  {
+   "detail": "((200, '', ''), (200, '', '')) ((401, 'unauthenticated', ''), (401, 'unauthenticated', '')) 204",
+   "id": "REL-LIFE-DIS",
+   "status": "PASS"
+  },
+  {
+   "detail": "201 ((200, '', ''), (200, '', '')) ((200, '', ''), (200, '', ''))",
+   "id": "REL-LIFE-ROT-1",
+   "status": "PASS"
+  },
+  {
+   "detail": "((401, 'unauthenticated', ''), (401, 'unauthenticated', ''), (200, '', ''), (200, '', ''))",
+   "id": "REL-LIFE-ROT-2",
+   "status": "PASS"
+  },
+  {
+   "detail": "((200, '', ''), (200, '', '')) ((403, 'forbidden', 'default_deny'), (403, 'forbidden', 'default_deny')) 204",
+   "id": "REL-LIFE-GROUP",
+   "status": "PASS"
+  },
+  {
+   "detail": "((200, '', ''), (200, '', '')) 200 2",
+   "id": "REL-LIFE-POL-1",
+   "status": "PASS"
+  },
+  {
+   "detail": "disable [204, 204] ended=True 0.2s last=b'{\"error\":{\"code\":\"forbidden\",\"status\":403,\"reason\":\"authorization_ended\",\"messag'",
+   "id": "REL-LIFE-POL-2",
+   "status": "PASS"
+  },
+  {
+   "detail": "((403, 'forbidden', 'default_deny'), (403, 'forbidden', 'default_deny'))",
+   "id": "REL-LIFE-POL-3",
+   "status": "PASS"
+  },
+  {
+   "detail": "[204, 204] ((200, '', ''), (200, '', ''))",
+   "id": "REL-LIFE-POL-4",
+   "status": "PASS"
+  },
+  {
+   "detail": "[204, 204] ((403, 'forbidden', 'default_deny'), (403, 'forbidden', 'default_deny'))",
+   "id": "REL-LIFE-POL-5",
+   "status": "PASS"
+  },
+  {
+   "detail": "p50 ms: 401 42.99, denied+accounted 96.94, allowed+accounted 181.74; p99 ms: 45.13 / 115.22 / 247.55",
+   "id": "REL-LAT",
+   "status": "PASS"
+  },
+  {
+   "detail": "rest ok 169 err 38 {'403/forbidden': 38}, mcp {'calls': 182, 'ok': 140, 'errors': 42, 'error_samples': ['tool error result'], 'by_error': {'forbidden/default_deny': 8, 'forbidden/safety_unverified': 34}}, streams {'load1': 3, 'load2': 2, 'opened': 5, 'failed': 0, 'frames': 84} ",
+   "id": "REL-LOAD-RUN",
+   "status": "FAIL"
+  },
+  {
+   "detail": "budget 150 MB; 43 RSS samples at 1 Hz; rss before 32.53 MB after 35.42 MB",
+   "id": "REL-FOOT-LOAD",
+   "status": "PASS"
+  },
+  {
+   "detail": "",
+   "id": "ISO-01",
+   "status": "PASS"
+  }
+ ],
+ "revision": "6774f12cce6d48e36ca69b174171fe22c2488d46",
+ "schema": "mandatary-p120-evidence-summary/1",
+ "seconds": 211,
+ "source": {
+  "bytes": 50500,
+  "member": "round-2-fbb8193/docs/release/evidence/diagnostics/vm-diag-loop-1.json",
+  "sha256": "72a11c51728d0b269a64672d1a865956e6864c23bc72b375f3e788071fd3f589"
+ }
+}
