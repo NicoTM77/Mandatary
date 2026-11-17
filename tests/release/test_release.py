@@ -442,6 +442,26 @@ class Harness(unittest.TestCase):
             self.assertFalse(os.path.exists(os.path.join(d, "w")))  # nothing was created
 
 
+class MatrixMismatchDiagnostics(unittest.TestCase):
+    """A stray unexpected answer must leave the service's own warning/safety lines in the evidence next to the failed case ids."""
+
+    def test_only_warning_error_and_safety_backend_lines_are_kept_with_the_sorted_unique_ids(self):
+        import core
+        log = "\n".join(['svc | {"level":"INFO","msg":"request ok"}', 'svc | {"level":"WARN","msg":"x"}', 'svc | {"level":"INFO","msg":"docker safety proof dropped"}',
+                         'svc | {"level":"ERROR","msg":"y"}', 'svc | {"level":"INFO","msg":"listening"}'])
+        got = core.mismatch_log(log, ["b", "a", "b"])
+        self.assertEqual(got["ids"], ["a", "b"])
+        self.assertEqual(len(got["lines"]), 3)
+        self.assertFalse(any("request ok" in ln or "listening" in ln for ln in got["lines"]))
+
+    def test_the_line_count_and_width_are_bounded_and_an_empty_log_is_an_empty_record(self):
+        import core
+        log = "\n".join('{"level":"WARN","msg":"%s"}' % ("x" * 500) for _ in range(100))
+        got = core.mismatch_log(log, [])
+        self.assertEqual((len(got["lines"]), max(len(ln) for ln in got["lines"])), (40, 240))
+        self.assertEqual(core.mismatch_log(None, ["z"]), {"ids": ["z"], "lines": []})
+
+
 class Report(unittest.TestCase):
     def test_a_criterion_without_a_result_or_digest_is_never_a_pass(self):
         crit = [{"id": "C1", "text": "x", "evidence": []}, {"id": "C2", "text": "y", "evidence": ["REL-A@res"]}]

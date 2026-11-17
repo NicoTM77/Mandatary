@@ -292,7 +292,7 @@ class Permissions(unittest.TestCase):
         self.assertNotIn("persist-credentials: true", WORKFLOW)
         self.assertNotRegex(WORKFLOW, r"github\.event\.pull_request\.head|github\.head_ref")
         for name, block in JOBS.items():
-            for m in re.finditer(r"uses: actions/checkout@\S+\n\s+with:\n((?:\s+.+\n)+)", block + "\n"):
+            for m in re.finditer(r"uses: actions/checkout@\S+\n\s+with:\n((?: +\S.*\n)+)", block + "\n"):
                 self.assertIn("persist-credentials: false", m.group(1), name)
 
 
@@ -300,11 +300,15 @@ class Steps(unittest.TestCase):
     def test_the_tested_image_is_recorded_on_every_run_and_handed_over_only_for_a_push_to_main(self):
         image = JOBS["image"]
         # The record step runs on every run (it proves the save/record path on a pull request and needs no credential) ...
-        rec = re.search(r"- name: Record the tested image \(every run; handed to the publish job only for a push to main\)\n(\s+)run: \|\n((?:\s+.*\n)+?)\s+- uses:", image + "\n")
-        self.assertIsNotNone(rec)
-        self.assertNotRegex(rec.group(0), r"\n\s+if:")
-        self.assertIn('scripts/publish_dev_image.py record --image mandatary-ci:${{ matrix.arch }} --arch ${{ matrix.arch }} --out "$RUNNER_TEMP/promote"', rec.group(2))
-        self.assertNotRegex(rec.group(2), r"GITHUB_TOKEN|login|push")
+        # (Plain string slicing, not a nested-quantifier regex: that shape is polynomial/exponential on crafted input.)
+        head = "- name: Record the tested image (every run; handed to the publish job only for a push to main)\n"
+        self.assertIn(head, image)
+        step = image.split(head, 1)[1].split("\n      - uses:", 1)[0]
+        self.assertTrue(step.lstrip().startswith("run: |\n"), step[:80])
+        self.assertNotRegex(step, r"\n\s+if:")
+        run_body = step.split("run: |\n", 1)[1]
+        self.assertIn('scripts/publish_dev_image.py record --image mandatary-ci:${{ matrix.arch }} --arch ${{ matrix.arch }} --out "$RUNNER_TEMP/promote"', run_body)
+        self.assertNotRegex(run_body, r"GITHUB_TOKEN|login|push")
         # ... and the upload that hands it to the publish job is guarded to a push to main.
         up = re.search(r"- uses: actions/upload-artifact@\S+ # v4\n\s+if: (.+)\n\s+with:\n\s+name: tested-image-", image)
         self.assertIsNotNone(up)

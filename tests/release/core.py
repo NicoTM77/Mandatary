@@ -243,6 +243,13 @@ def mutating_events(c: Ctx, cid, since):
     return [x.strip() for x in p.stdout.splitlines() if x.strip()]
 
 
+def mismatch_log(log_text, ids, keep=40, width=240):
+    """The failed case ids and the last `keep` service log lines that are warnings/errors or about safety/backend state."""
+    pat = re.compile(r'"level":"(WARN|ERROR)"|unverified|safety|heartbeat|backend|dropped', re.I)
+    lines = [ln[:width] for ln in (log_text or "").splitlines() if pat.search(ln)]
+    return {"ids": sorted(set(ids)), "lines": lines[-keep:]}
+
+
 def run_matrix(c: Ctx):
     c.t_events = time.time()  # daemon events are judged from here: the fixtures' own start-up is not a policy effect
     ctxn = dict(c.names)
@@ -258,6 +265,10 @@ def run_matrix(c: Ctx):
     n_deny = sum(1 for k in cases if k.expect is matrix.DENY)
     c.ev["matrix"]["cases"] = len(cases)
     c.ev["matrix"]["table"] = [{"id": k.id, "who": k.who, "op": k.op, "expect": repr(k.expect), "rest": r1, "mcp": r2} for k, r1, r2 in zip(cases, rest_res, mcp_res)]
+    if bad_rest or bad_mcp or diverge:
+        # Diagnostic only: an unexpected answer (for example one stray 502) is otherwise unattributable. Keep the service's own
+        # warning/error and safety/backend lines (the service logs carry no secrets, error text or payloads) next to the failed ids.
+        c.ev["matrix"]["service_log_on_mismatch"] = mismatch_log(c.dep.logs(), [x[0] for x in bad_rest + bad_mcp + diverge])
     c.check("REL-MATRIX-REST", "REST: all %d cases (%d allowed, %d denied, plus 401/unknown endpoint/backend error) meet the expectation" % (len(cases), n_ok, n_deny), not bad_rest, str(bad_rest[:4]))
     c.check("REL-MATRIX-MCP", "real MCP client (official go-sdk, Streamable HTTP over verified TLS): the same %d cases meet the same expectation" % len(cases), not bad_mcp, str(bad_mcp[:4]))
     c.check("REL-MATRIX-PARITY", "REST and the real MCP client give the identical class (status, code, reason) for every case", not diverge, str(diverge[:4]))
