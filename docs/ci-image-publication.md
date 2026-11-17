@@ -79,8 +79,9 @@ serialized by the concurrency group above, so two publications do not interleave
   annotations), repeat run (skipped), newer commit (published), and the older commit after the newer one (skipped, `dev` byte-identical). This
   run found and fixed the containerd-store push shape described above. It proves the command sequence and parsing, not GHCR. The driver is
   `tests/publish/dryrun_local_registry.sh` (a maintainer tool; it needs an isolated, disposable Docker host and a local `registry:2`, never a
-  production daemon); the log of the run (SHA-256 `4c1cfa30721be3e57e45642fb22d371592013bb7c8bcf7e581105030f7fd587e`) is attached to the
-  Kanban card, not committed.
+  production daemon); the log of the run (SHA-256 `4c1cfa30721be3e57e45642fb22d371592013bb7c8bcf7e581105030f7fd587e`) is a supplemental
+  asset, `p120-publish-dryrun-v1.log`, of the same evidence-only draft release as the evidence archive (it is not a member of the archive
+  and not listed in `ARCHIVE.sha256`), not committed.
 
 ## What has NOT been executed
 
